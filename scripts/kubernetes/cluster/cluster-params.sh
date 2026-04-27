@@ -44,9 +44,9 @@ rm -f "$TMP_LIB"
 require_root
 
 # ───────────────────────── Defaults ─────────────────────────────────────────
-DEFAULT_K8S_VERSION="1.35"
+DEFAULT_K8S_VERSION="1.36"
 DEFAULT_POD_CIDR="10.244.0.0/16"
-SUPPORTED_K8S_VERSIONS=("1.29" "1.30" "1.31" "1.32" "1.33" "1.34" "1.35")
+SUPPORTED_K8S_VERSIONS=("1.29" "1.30" "1.31" "1.32" "1.33" "1.34" "1.35" "1.36")
 
 # ───────────────────────── Helpers ──────────────────────────────────────────
 detect_node_ip() {
