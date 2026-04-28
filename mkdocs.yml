@@ -10,16 +10,19 @@ repo_name: "runbook"  # GitHub slug for buttons
 edit_uri: edit/main/docs/  # NEW: Path to edit files (assumes 'main' branch; change if 'master')
 
 # Build & output config – optimizes for GH Pages static hosting
-site_dir: site  # Output folder (default; GH Pages serves from root of gh-pages branch)
+docs_dir: .
+site_dir: site/  # Output folder (default; GH Pages serves from root of gh-pages branch)
 use_directory_urls: true  # Clean URLs (e.g., /kubernetes/ instead of /kubernetes/index.html)
 strict: true  # NEW: Enforce strict link checking during build/deploy (prevents 404s on GH Pages)
-
+exclude_docs: |
+  README.md
+  
 # Theme: Material with GH Pages-friendly features
 theme:
   name: material
-  # custom_dir: docs/overrides
-  favicon: images/favicon.ico
-  logo: images/favicon.svg
+  custom_dir: docs/overrides
+  favicon: docs/images/favicon.ico
+  logo: docs/images/favicon.svg
   # Typography - using system fonts for performance
   font:
     text: Inter           # Modern, readable sans-serif font
@@ -106,7 +109,9 @@ markdown_extensions:
 # Plugins – adds date plugin for freshness on GH Pages
 plugins:
   - search
+  - same-dir
   - autorefs
+  - section-index
   - awesome-nav    # was: awesome-pages
   - minify:
       minify_html: true  # Compresses output for faster GH Pages loads
@@ -117,6 +122,8 @@ plugins:
       fallback_to_build_date: false
       timezone: Asia/Karachi
       locale: en                    # Keeps English month/day names
+      exclude:
+      - index.md
 
 # Extra content – enhances GH Pages sharing/SEO
 extra:
@@ -128,8 +135,8 @@ extra:
     - icon: fontawesome/solid/globe
       link: https://ibtisam-iq.com
   generator: false  # Hides "Built with MkDocs" (clean look)
-  copyright: "© 2025 Ibtisam IQ. All rights reserved."  # NEW: Footer copyright
+  copyright: "© 2026 Ibtisam IQ. All rights reserved."  # NEW: Footer copyright
 
 extra_css:
-  - stylesheets/extra.css  # Loads your custom styles
+  - docs/stylesheets/extra.css  # Loads your custom styles
 

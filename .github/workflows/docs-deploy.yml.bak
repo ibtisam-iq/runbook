@@ -40,7 +40,7 @@ jobs:
       - name: Build site
         run: mkdocs build --strict
 
-      - name: QA – broken links (lychee – fastest & most reliable)
+      - name: QA - broken links (lychee - fastest & most reliable)
         uses: lycheeverse/lychee-action@v2.8.0
         with:
           args: >
@@ -51,7 +51,7 @@ jobs:
               --exclude "x\.com"
           fail: true  # Fail the job if any broken links are found
 
-      - name: QA – HTML validation
+      - name: QA - HTML validation
         # html5validator misinterprets shell-command placeholder tokens like <none>,
         # <hash>, <name>, <namespace>, <pending> in MkDocs-rendered code blocks as
         # literal HTML tags. This produces two false-positive error families:
@@ -82,11 +82,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6.2.0
         with:
          python-version: "3.11"
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('requirements.txt') }}
