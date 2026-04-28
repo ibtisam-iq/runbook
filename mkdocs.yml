@@ -20,12 +20,15 @@ theme:
   # custom_dir: docs/overrides
   favicon: images/favicon.ico
   logo: images/favicon.svg
+  # Typography - using system fonts for performance
+  font:
+    text: Inter           # Modern, readable sans-serif font
+    code: Roboto Mono     # Monospace font for code blocks
   language: en
   features:
     - navigation.sections  # Grouped sections (your CNCF-style)
     - navigation.tabs      # Top tabs
-    - navigation.top       # Back-to-top
-    - navigation.indexing  # NEW: Improves search indexing for GH Pages crawlers
+    - navigation.top       # Back-to-top button
     - navigation.expand    # Auto-expand sections
     - navigation.tabs.sticky  # Keeps tabs visible when scrolling
     - content.code.copy
@@ -38,8 +41,15 @@ theme:
     - search.suggest
     - toc.follow
     - search.highlight
-    - toc.integrate  
+    - toc.integrate
     - search.share         # NEW: Share buttons work seamlessly on GH Pages
+
+    # Navigation enhancements
+    - navigation.instant.progress # Shows loading progress bar for instant navigation
+    - navigation.path             # Shows breadcrumb path above page title
+    - navigation.prune            # Only renders visible navigation (improves performance)
+    - navigation.footer           # Previous/next page links in footer
+    - content.tooltips            # Enables rich tooltips for abbreviations/glossary
   palette:
     - scheme: default
       primary: indigo
