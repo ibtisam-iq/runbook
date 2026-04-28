@@ -44,7 +44,7 @@ jobs:
         uses: lycheeverse/lychee-action@v2.8.0
         with:
           args: |
-              -- ./site/**/*.html \
+              ./site/**/*.html \
               --no-progress \
               --accept 200,429 \
               --exclude "linkedin\.com" \
