@@ -68,7 +68,8 @@ jobs:
             "Unclosed element" \
             "not allowed as child" \
             "End tag" \
-            "were open elements"
+            "were open elements" \
+            "tabindex"
 
       #- name: QA – Markdown formatting
       #  run: mdformat --check docs --no-validate
