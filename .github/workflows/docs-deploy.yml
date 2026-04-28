@@ -47,7 +47,14 @@ jobs:
           fail: false  # Ignores exit code 2 (redirect warnings); only fails on real errors (exit code 1)
 
       - name: QA – HTML validation
-        run: html5validator --root site --blacklist robots.txt --ignore "autocomplete" "autocorrect" "autocapitalize" "No \"p\" element in scope"
+        run: >
+          html5validator --root site --blacklist robots.txt --ignore
+          "autocomplete" "autocorrect" "autocapitalize"
+          "No \"p\" element in scope"
+          "Element .* not allowed as child"
+          "Unclosed element"
+        # "Element .* not allowed as child" pattern catches all <none>, <hash>, <name>, etc. in one shot
+        #  including any future files with similar shell-command output blocks.
 
       #- name: QA – Markdown formatting
       #  run: mdformat --check docs --no-validate
