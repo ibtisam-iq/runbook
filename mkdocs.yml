@@ -107,7 +107,7 @@ markdown_extensions:
 plugins:
   - search
   - autorefs
-  - awesome-pages  # Your hierarchical nav magic
+  - awesome-nav    # was: awesome-pages
   - minify:
       minify_html: true  # Compresses output for faster GH Pages loads
   - git-revision-date-localized:
