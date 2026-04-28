@@ -64,14 +64,14 @@ Minikube automatically deploys a CNI, kubelet, scheduler, and controller manager
 Kind runs Kubernetes **inside Docker containers**.
 It is clean, fast, ephemeral, and perfect for labs.
 
-To create a Kind cluster, infra-bootstrap provides two configurations:
+To create a Kind cluster, silver-stack provides two configurations:
 
 ---
 
 ## **A) Kind with Calico CNI**
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/k8s-kind-calico.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/k8s-kind-calico.sh | sudo bash
 ```
 
 This configuration:

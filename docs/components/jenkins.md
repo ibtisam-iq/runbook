@@ -12,7 +12,7 @@ CI/CD agent for pipelines. Installs core + plugins for builds/testing.
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/jenkins-setup.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/jenkins-setup.sh | sudo bash
 ```
 
 ## What It Installs

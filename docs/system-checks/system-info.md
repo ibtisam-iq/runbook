@@ -12,7 +12,7 @@ Updates OS, prompts hostname change, displays key info (IP, MAC, network, DNS, k
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/system-checks/sys-info.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/system-checks/sys-info.sh | sudo bash
 ```
 
 ## What It Does

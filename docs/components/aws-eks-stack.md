@@ -12,7 +12,7 @@ Command-line tool for AWS services. Installs CLI + configures credentials for cl
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/aws-eks-stack.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/aws-eks-stack.sh | sudo bash
 ```
 
 ## Options
@@ -21,19 +21,19 @@ curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scrip
 ### Install tools only:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/aws-eks-stack.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/aws-eks-stack.sh | sudo bash
 ```
 
 ### Install + configure AWS automatically:
 
 ```bash  
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/aws-eks-stack.sh | sudo bash --auto-config
+curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/aws-eks-stack.sh | sudo bash --auto-config
 ```
 
 ### With custom profile entry:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/aws-eks-stack.sh | sudo bash --auto-config --profile
+curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/aws-eks-stack.sh | sudo bash --auto-config --profile
 ```
 
 ## What It Installs

@@ -12,7 +12,7 @@ Containerized artifact repository for Maven, Docker, npm. Runs as Docker service
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/services/nexus-cont.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/services/nexus-cont.sh | sudo bash
 ```
 
 ## What It Does

@@ -12,7 +12,7 @@ Container engine for building/running images. Installs daemon + CLI for local de
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/docker-setup.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/docker-setup.sh | sudo bash
 ```
 
 

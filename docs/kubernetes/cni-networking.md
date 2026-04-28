@@ -11,7 +11,7 @@
 
 A Kubernetes cluster created with kubeadm will **not schedule pods** until a **Container Network Interface (CNI)** is installed.
 
-The infra-bootstrap CNI installer simplifies this process by:
+The silver-stack CNI installer simplifies this process by:
 
 - Allowing you to choose Calico, Flannel, or Weave
 - Applying the correct upstream manifest
@@ -42,10 +42,10 @@ Without a CNI plugin:
 
 # 🚀 Install CNI (Interactive Script)
 
-Run the infra-bootstrap CNI script:
+Run the silver-stack CNI script:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/k8s-cni-setup.sh | bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/k8s-cni-setup.sh | bash
 ```
 
 The script will:
@@ -60,7 +60,7 @@ The script will:
 
 # 📦 Supported CNI Plugins
 
-Below are the plugins supported by infra-bootstrap with descriptions and use cases.
+Below are the plugins supported by silver-stack with descriptions and use cases.
 
 ## 1. **Calico** (Recommended)
 
@@ -228,7 +228,7 @@ kubectl delete -f <CNI manifest>
 kubectl delete pods -n kube-system --all
 ```
 
-Then reinstall using the infra-bootstrap script.
+Then reinstall using the silver-stack script.
 
 # 📘 Official Documentation
 

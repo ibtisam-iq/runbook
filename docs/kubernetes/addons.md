@@ -20,7 +20,7 @@ They are optional components that enable:
 - L7 traffic control
 - North-south and east-west networking
 
-This page covers **the add-ons installed by infra-bootstrap**, including:
+This page covers **the add-ons installed by silver-stack**, including:
 
 1. **Gateway API CRDs**
 1. **NGINX Gateway Fabric**
@@ -57,7 +57,7 @@ The add-ons below provide:
 To install all add-ons:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/gateway-stack-installation.sh | bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/gateway-stack-installation.sh | bash
 ```
 
 (The script name is assumed; rename accordingly if needed.)
@@ -72,7 +72,7 @@ The script installs:
 
 ---
 
-# 🧱 Add-Ons Installed by infra-bootstrap
+# 🧱 Add-Ons Installed by silver-stack
 
 Below is exactly what your script does and why it matters.
 

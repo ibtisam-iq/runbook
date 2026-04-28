@@ -20,7 +20,7 @@ Pre-configured CI/CD lab server: One script bootstraps Jenkins + Docker, kubectl
 ## Run It (Direct)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/servers/Jenkins-Server.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/servers/Jenkins-Server.sh | sudo bash
 ```
 
 ## Customize (Optional)
@@ -28,7 +28,7 @@ curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scrip
 Download and edit:
 
 ```bash
-curl -O https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/servers/Jenkins-Server.sh
+curl -O https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/servers/Jenkins-Server.sh
 chmod +x Jenkins-Server.sh
 nano Jenkins-Server.sh  # Add/remove tools (e.g., skip Trivy)
 sudo ./Jenkins-Server.sh

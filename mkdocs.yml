@@ -1,12 +1,12 @@
 # Basic site metadata – required for GH Pages title/previews
-site_name: "Infra Bootstrap"
+site_name: "runbook"  # Your site title (appears in browser tab and GH Pages title)
 site_description: "Comprehensive guide to bootstrapping Kubernetes, servers, and tools for modern infra."
 site_author: "Muhammad Ibtisam"  # NEW: For SEO/Open Graph on GH Pages
-site_url: "https://bootstrap.ibtisam-iq.com"  # Your custom domain (if using; GH Pages supports CNAME)
+site_url: "https://runbook.ibtisam-iq.com"  # Your custom domain (if using; GH Pages supports CNAME)
 
 # Repository integration – enables "Edit this page" links on GH Pages
-repo_url: "https://github.com/ibtisam-iq/infra-bootstrap"
-repo_name: "infra-bootstrap"  # GitHub slug for buttons
+repo_url: "https://github.com/ibtisam-iq/runbook"  # URL to your GitHub repo (for edit/view buttons)
+repo_name: "runbook"  # GitHub slug for buttons
 edit_uri: edit/main/docs/  # NEW: Path to edit files (assumes 'main' branch; change if 'master')
 
 # Build & output config – optimizes for GH Pages static hosting

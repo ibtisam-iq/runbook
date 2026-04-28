@@ -12,7 +12,7 @@ Vulnerability scanner for containers/images. Installs CLI for SBOM and vuln. che
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/trivy-setup.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/trivy-setup.sh | sudo bash
 ```
 
 ## What It Installs

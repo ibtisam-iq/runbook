@@ -12,7 +12,7 @@ Audits installed DevOps tools. Runs preflight, lists versions (Ansible, AWS CLI,
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/system-checks/version-check.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/system-checks/version-check.sh | sudo bash
 ```
 
 ## What It Verifies
@@ -24,7 +24,7 @@ curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scrip
 
 ```
 ╔════════════════════════════════════════════════════════╗
-║ infra-bootstrap — Installed Tools & Versions
+║ silver-stack — Installed Tools & Versions
 ╚════════════════════════════════════════════════════════╝
 
 [INFO]    Preflight check running...

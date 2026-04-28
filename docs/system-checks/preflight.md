@@ -12,7 +12,7 @@ Initial system validation before bootstrapping. Checks root, deps (curl/bash), i
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/system-checks/preflight.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/system-checks/preflight.sh | sudo bash
 ```
 
 ## What It Verifies
@@ -41,5 +41,5 @@ curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scrip
 [ OK ]    systemd is available – service-based components can be managed.
 
 [ OK ]    Preflight checks completed successfully.
-[INFO]    Your system is ready to run infra-bootstrap scripts.
+[INFO]    Your system is ready to run silver-stack scripts.
 ```

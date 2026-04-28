@@ -12,7 +12,7 @@ K8s CLI tools: kubectl for commands, eksctl for EKS clusters. Installs both for 
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/kubernetes-cli.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/kubernetes-cli.sh | sudo bash
 ```
 
 ## What It Installs

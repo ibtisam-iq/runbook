@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to build a **self-managed Kubernetes cluster** using `kubeadm` combined with the infra-bootstrap automation scripts.
+This guide explains how to build a **self-managed Kubernetes cluster** using `kubeadm` combined with the silver-stack automation scripts.
 
 This method follows the real sequence used by cluster operators:
 
@@ -23,7 +23,7 @@ This method follows the real sequence used by cluster operators:
 Run the following on the machine you want to become the **primary control plane**:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/infra-bootstrap/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/silver-stack/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash
 ```
 
 This script:
@@ -46,7 +46,7 @@ If you want **multi-control-plane** (HA) setup:
 Run **the same script** on your additional control plane nodes:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/infra-bootstrap/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/silver-stack/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash
 ```
 
 During initialization of the first node, kubeadm prints the **control-plane join command**, e.g.:
@@ -73,7 +73,7 @@ kubeadm token create --print-join-command
 On every node you want to convert into a **worker**, run:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/infra-bootstrap/scripts/kubernetes/entrypoints/init-worker-node.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/silver-stack/scripts/kubernetes/entrypoints/init-worker-node.sh | sudo bash
 ```
 
 This script:
@@ -111,10 +111,10 @@ kubeadm token create --print-join-command
 
 Kubernetes will not schedule pods until a CNI is installed.
 
-To deploy a CNI via infra-bootstrap:
+To deploy a CNI via silver-stack:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/k8s-cni-setup.sh | bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/k8s-cni-setup.sh | bash
 ```
 
 This script:

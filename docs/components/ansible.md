@@ -12,7 +12,7 @@ Configuration management tool for automating deployments and orchestration. Inst
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/ansible-setup.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/ansible-setup.sh | sudo bash
 ```
 
 ## What It Installs

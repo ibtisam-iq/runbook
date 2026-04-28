@@ -12,7 +12,7 @@ Bastion/jump server for lab access: One script sets up Terraform, Ansible, kubec
 ## Run It (Direct)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/servers/Jumpbox.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/servers/Jumpbox.sh | sudo bash
 ```
 
 ## Customize (Optional)
@@ -20,7 +20,7 @@ curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scrip
 Download and edit:
 
 ```bash
-curl -O https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/servers/Jumpbox.sh
+curl -O https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/servers/Jumpbox.sh
 chmod +x Jumpbox.sh
 nano Jumpbox.sh  # Add/remove tools (e.g., skip Helm)
 sudo ./Jumpbox.sh

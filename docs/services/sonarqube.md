@@ -12,7 +12,7 @@ Containerized code quality & security scanner (with Postgres backend). Runs as D
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/services/sonarqube-cont.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/services/sonarqube-cont.sh | sudo bash
 ```
 
 ## What It Does

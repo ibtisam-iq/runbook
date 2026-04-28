@@ -20,7 +20,7 @@ Run preflight early—catches issues upfront.
 ## Usage Example
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/system-checks/preflight.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/system-checks/preflight.sh | sudo bash
 ```
 
 Warnings? Fix and retry. Disposable labs start clean.

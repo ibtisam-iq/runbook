@@ -12,7 +12,7 @@ Lightweight container runtime for K8s/CRI. Installs daemon + config for efficien
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/containerd-setup.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/containerd-setup.sh | sudo bash
 ```
 
 ## What It Installs

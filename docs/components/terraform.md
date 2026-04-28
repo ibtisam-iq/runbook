@@ -12,7 +12,7 @@ IaC tool for provisioning infra. Installs CLI + providers for AWS/Azure/GCP.
 ## Installation Command
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/components/terraform-setup.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/components/terraform-setup.sh | sudo bash
 ```
 
 ## What It Installs

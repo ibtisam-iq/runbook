@@ -17,7 +17,7 @@ Clone and bootstrap:
 
 ```bash
 # Check system
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/system-checks/preflight.sh | sudo bash  
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/system-checks/preflight.sh | sudo bash  
 ```
 
 ## Sections Overview
