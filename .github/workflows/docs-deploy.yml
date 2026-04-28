@@ -43,13 +43,12 @@ jobs:
       - name: QA – broken links (lychee – fastest & most reliable)
         uses: lycheeverse/lychee-action@v2.8.0
         with:
-          args: |
-              ./site/**/*.html \
-              --no-progress \
-              --accept 200,429 \
-              --exclude "linkedin\.com" \
+          args: >
+              ./site/**/*.html
+              --no-progress
+              --accept 200,429
+              --exclude "linkedin\.com"
               --exclude "x\.com"
-              # --exclude-mail
           fail: true  # Fail the job if any broken links are found
 
       - name: QA – HTML validation
