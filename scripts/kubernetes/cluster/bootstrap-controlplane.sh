@@ -127,7 +127,7 @@ blank
 echo "• Kubernetes requires a CNI plugin before pods can be scheduled."
 echo "• Supported CNIs: Calico, Flannel"
 echo
-cmd "curl -fsSL $INSTALL_CNI_URL | bash"
+cmd "curl -fsSL $INSTALL_CNI_URL | sudo bash"
 blank
 
 footer "Kubernetes control plane bootstrap completed"

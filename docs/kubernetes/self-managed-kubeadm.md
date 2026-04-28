@@ -23,7 +23,7 @@ This method follows the real sequence used by cluster operators:
 Run the following on the machine you want to become the **primary control plane**:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/K8s-Control-Plane-Init.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/infra-bootstrap/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash
 ```
 
 This script:
@@ -46,7 +46,7 @@ If you want **multi-control-plane** (HA) setup:
 Run **the same script** on your additional control plane nodes:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/K8s-Control-Plane-Init.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/infra-bootstrap/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash
 ```
 
 During initialization of the first node, kubeadm prints the **control-plane join command**, e.g.:
@@ -73,7 +73,7 @@ kubeadm token create --print-join-command
 On every node you want to convert into a **worker**, run:
 
 ```bash
-curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/scripts/kubernetes/K8s-Node-Init.sh | sudo bash
+curl -sL https://raw.githubusercontent.com/ibtisam-iq/infra-bootstrap/main/infra-bootstrap/scripts/kubernetes/entrypoints/init-worker-node.sh | sudo bash
 ```
 
 This script:

@@ -8,4 +8,5 @@ nav:
   - Local Lightweight: local-lightweight.md  # Custom: As-is, but explicit
   - CNI Networking: cni-networking.md  # Custom: Matches your guide focus
   - Addons: addons.md  # Custom: Simple; add "Kubernetes Addons" if preferred
+  - Gateway API: install-gateway-api.md  # Custom: As-is, but explicit
 
