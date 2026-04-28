@@ -47,18 +47,20 @@ jobs:
           fail: false  # Ignores exit code 2 (redirect warnings); only fails on real errors (exit code 1)
 
       - name: QA – HTML validation
-        # html5validator flags placeholder tokens like <none>, <hash>, <name>, etc.
-        # from command/output examples in MkDocs pages as if they were real HTML tags.
-        # That creates two noisy false-positive families:
-        # 1) `Element "..." not allowed as child ...`
-        # 2) `End tag "..." seen, but there were open elements.`
-        # We ignore those validator messages here and keep real HTML validation enabled.
+        # html5validator misinterprets shell-command placeholder tokens like <none>,
+        # <hash>, <name>, <namespace>, <pending> in MkDocs-rendered code blocks as
+        # literal HTML tags. This produces two false-positive error families:
+        #   1) "Unclosed element ..."         — when placeholders appear inside <code>/<pre>
+        #   2) "Element ... not allowed as child" + cascading "End tag" / "were open elements"
+        #      — when placeholders appear outside block-level elements
+        # All other real HTML validation errors remain enforced.
         run: |
           html5validator --root site --blacklist robots.txt --ignore \
             "autocomplete" \
             "autocorrect" \
             "autocapitalize" \
             "No \"p\" element in scope" \
+            "Unclosed element" \
             "not allowed as child" \
             "End tag" \
             "were open elements"
