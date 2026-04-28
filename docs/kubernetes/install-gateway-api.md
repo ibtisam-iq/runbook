@@ -92,12 +92,19 @@ kubectl kustomize \
 Verify:
 ```bash
 kubectl get crd | grep gateway.networking.k8s.io
-# Expected output:
-# gatewayclasses.gateway.networking.k8s.io
-# gateways.gateway.networking.k8s.io
-# httproutes.gateway.networking.k8s.io
-# grpcroutes.gateway.networking.k8s.io
-# referencegrants.gateway.networking.k8s.io
+```
+
+Expected Output:
+```text
+ibtisam@dev-machine:~ $ k get crd | grep gateway.networking.k8s.io
+backendtlspolicies.gateway.networking.k8s.io            2026-04-28T11:20:25Z
+gatewayclasses.gateway.networking.k8s.io                2026-04-28T11:20:25Z
+gateways.gateway.networking.k8s.io                      2026-04-28T11:20:25Z
+grpcroutes.gateway.networking.k8s.io                    2026-04-28T11:20:25Z
+httproutes.gateway.networking.k8s.io                    2026-04-28T11:20:26Z
+listenersets.gateway.networking.k8s.io                  2026-04-28T11:20:26Z
+referencegrants.gateway.networking.k8s.io               2026-04-28T11:20:26Z
+tlsroutes.gateway.networking.k8s.io                     2026-04-28T11:20:26Z
 ```
 
 ### Step 2 — Install NGF Controller
