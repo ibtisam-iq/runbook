@@ -16,17 +16,17 @@ jobs:
   build-and-quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0  # Ensures full git history for git-revision-date-localized plugin
 
       - name: Setup Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/pip
           key: pip-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
@@ -41,10 +41,16 @@ jobs:
         run: mkdocs build --strict
 
       - name: QA – broken links (lychee – fastest & most reliable)
-        uses: lycheeverse/lychee-action@v2
+        uses: lycheeverse/lychee-action@v2.8.0
         with:
-          args: ./site/**/*.html --no-progress --accept 200,429 # --exclude-mail
-          fail: false  # Ignores exit code 2 (redirect warnings); only fails on real errors (exit code 1)
+          args: |
+              -- ./site/**/*.html \
+              --no-progress \
+              --accept 200,429 \
+              --exclude "linkedin\.com" \
+              --exclude "x\.com"
+              # --exclude-mail
+          fail: true  # Fail the job if any broken links are found
 
       - name: QA – HTML validation
         # html5validator misinterprets shell-command placeholder tokens like <none>,
@@ -113,7 +119,7 @@ jobs:
       - name: Create CNAME file
         run: echo "bootstrap.ibtisam-iq.com" > site/CNAME
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./site
