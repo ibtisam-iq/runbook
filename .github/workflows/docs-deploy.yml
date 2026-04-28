@@ -1,4 +1,4 @@
-name: Infra-Bootstrap Documentation Pipeline
+name: runbook Documentation Pipeline
 
 on:
   push:
