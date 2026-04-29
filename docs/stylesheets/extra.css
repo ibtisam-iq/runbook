@@ -1,51 +1,472 @@
-/* Base styles (apply to all screen sizes unless overridden) */
+/* =============================================================================
+   RUNBOOK — extra.css
+   Inspired by: Kubernetes docs, Docker docs, Cloudflare dev docs
+   Color identity: Deep Teal — infrastructure, terminal, production systems
+   ============================================================================= */
+
+
+/* =============================================================================
+   1. BRAND TOKENS
+   "primary: custom" in mkdocs.yml hands full color control to here.
+   Light = crisp white with teal accent (readable docs feel)
+   Dark  = deep slate with bright teal (terminal/infra feel)
+   ============================================================================= */
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color:         #00838f;   /* deep teal */
+  --md-primary-fg-color--light:  #4fb3bf;
+  --md-primary-fg-color--dark:   #005662;
+  --md-primary-bg-color:         #ffffff;
+  --md-primary-bg-color--light:  #ffffff;
+  --md-accent-fg-color:          #00acc1;
+  --md-typeset-a-color:          #00838f;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color:         #26c6da;   /* bright cyan on dark */
+  --md-primary-fg-color--light:  #80deea;
+  --md-primary-fg-color--dark:   #00acc1;
+  --md-primary-bg-color:         #0d1117;
+  --md-primary-bg-color--light:  #161b22;
+  --md-accent-fg-color:          #4dd0e1;
+  --md-typeset-a-color:          #26c6da;
+  --md-default-bg-color:         #0d1117;
+  --md-default-bg-color--light:  #161b22;
+  --md-default-bg-color--lighter:#1c2128;
+  --md-default-fg-color:         #e6edf3;
+  --md-default-fg-color--light:  #8b949e;
+  --md-default-fg-color--lighter:#484f58;
+  --md-default-fg-color--lightest:#30363d;
+}
+
+
+/* =============================================================================
+   2. GRID & LAYOUT
+   ============================================================================= */
+
 .md-grid {
-  max-width: none !important; /* Allow it to take full width */
+  max-width: none !important;
+  margin: 0 auto;
   padding-left: 1rem !important;
   padding-right: 1rem !important;
 }
 
-/* Styles for even smaller screens (e.g., narrow phones) */
-@media screen and (max-width: 479px) {
-  .md-grid {
-    max-width: none !important; /* Allow it to take full width */
-    padding-left: 0.25rem !important;
-    padding-right: 0.25rem !important;
-  }
-}
-
-/* Styles for smaller screens (e.g., tablets and phones) */
 @media screen and (max-width: 767px) {
   .md-grid {
-    max-width: none !important; /* Allow it to take full width */
     padding-left: 0.5rem !important;
     padding-right: 0.5rem !important;
   }
 }
 
-/* Styles for larger screens (if you want to adjust beyond the base) */
-@media screen and (min-width: 1201px) {
+@media screen and (max-width: 479px) {
   .md-grid {
-    max-width: none !important; /* Allow it to take full width */
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
   }
 }
 
-/* Change "Last Updated" label */
+
+/* =============================================================================
+   3. HEADER
+   Dark header on both themes — consistent branding, terminal feel
+   ============================================================================= */
+
+.md-header {
+  background-color: #0d1117 !important;
+  border-bottom: 1px solid #21262d;
+  box-shadow: 0 1px 0 #21262d, 0 4px 24px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: box-shadow 0.3s ease;
+}
+
+.md-header__title {
+  font-weight: 800 !important;
+  font-size: 1.05rem !important;
+  letter-spacing: -0.01em;
+  color: #e6edf3 !important;
+  transition: opacity 0.2s ease;
+}
+
+.md-header__title:hover {
+  opacity: 0.85;
+}
+
+.md-header__button.md-logo {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.md-header__button.md-logo:hover {
+  transform: scale(1.08);
+  opacity: 0.85;
+}
+
+.md-header__button:not(.md-logo) {
+  border-radius: 6px;
+  color: #8b949e !important;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+
+.md-header__button:not(.md-logo):hover {
+  color: #e6edf3 !important;
+  background: #21262d !important;
+  transform: scale(1.08);
+}
+
+
+/* =============================================================================
+   4. SEARCH
+   ============================================================================= */
+
+.md-search__form {
+  background: #161b22 !important;
+  border: 1px solid #30363d !important;
+  border-radius: 8px !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.md-search__form:focus-within {
+  border-color: #26c6da !important;
+  box-shadow: 0 0 0 3px rgba(38, 198, 218, 0.15) !important;
+}
+
+.md-search__input {
+  color: #e6edf3 !important;
+  font-size: 0.875rem !important;
+  font-weight: 500;
+}
+
+.md-search__input::placeholder {
+  color: #484f58 !important;
+}
+
+
+/* =============================================================================
+   5. NAV TABS
+   Animated underline on hover/active — signals active section clearly
+   ============================================================================= */
+
+.md-tabs {
+  background-color: #0d1117 !important;
+  border-bottom: 1px solid #21262d !important;
+}
+
+.md-tabs__item {
+  position: relative;
+}
+
+.md-tabs__link {
+  font-weight: 700 !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: #8b949e !important;
+  opacity: 1 !important;
+  position: relative;
+  transition: color 0.2s ease !important;
+}
+
+.md-tabs__link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #26c6da;
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+
+.md-tabs__link:hover::after,
+.md-tabs__item--active .md-tabs__link::after {
+  width: 100%;
+}
+
+.md-tabs__link:hover {
+  color: #e6edf3 !important;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: #e6edf3 !important;
+  font-weight: 800 !important;
+}
+
+
+/* =============================================================================
+   6. LEFT SIDEBAR NAVIGATION
+   Clean hierarchy with hover indent + teal active state
+   ============================================================================= */
+
+.md-nav__title {
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  padding-bottom: 0.4rem;
+}
+
+.md-nav__link {
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 0.3rem 0.6rem !important;
+  transition: background 0.15s ease, color 0.15s ease, padding-left 0.2s ease;
+}
+
+.md-nav__link:hover {
+  background: rgba(38, 198, 218, 0.07);
+  padding-left: 1rem !important;
+  color: var(--md-primary-fg-color) !important;
+}
+
+.md-nav__link--active {
+  font-weight: 700 !important;
+  color: var(--md-primary-fg-color) !important;
+  background: rgba(38, 198, 218, 0.1);
+  border-left: 3px solid var(--md-primary-fg-color);
+  padding-left: 0.8rem !important;
+}
+
+
+/* =============================================================================
+   7. TYPOGRAPHY
+   Runbooks need crisp, scannable headings — bigger, bolder, clearer hierarchy
+   ============================================================================= */
+
+.md-typeset {
+  font-size: 1.0rem;
+  line-height: 1.8;
+  color: var(--md-default-fg-color);
+}
+
+/* H1 — page title: large and commanding */
+.md-typeset h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  margin-bottom: 0.5rem;
+  border-bottom: 2px solid var(--md-primary-fg-color);
+  padding-bottom: 0.5rem;
+}
+
+/* H2 — major sections: bold with teal underline */
+.md-typeset h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  margin-top: 2.5rem;
+  border-bottom: 1.5px solid var(--md-primary-fg-color);
+  padding-bottom: 0.3rem;
+}
+
+/* H3 — sub-sections */
+.md-typeset h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.4;
+  margin-top: 1.75rem;
+}
+
+/* H4 — inline labels */
+.md-typeset h4 {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  opacity: 0.65;
+  margin-top: 1.5rem;
+}
+
+.md-typeset p {
+  max-width: 72ch;
+  margin-bottom: 1.25rem;
+  line-height: 1.8;
+}
+
+/* Lead paragraph — right after H1 */
+.md-typeset h1 + p {
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  opacity: 0.8;
+  font-weight: 400;
+  max-width: 64ch;
+}
+
+.md-typeset strong {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+}
+
+/* Lists: give breathing room */
+.md-typeset ul li,
+.md-typeset ol li {
+  margin-bottom: 0.35rem;
+  line-height: 1.75;
+}
+
+
+/* =============================================================================
+   8. CODE BLOCKS
+   Runbooks are code-heavy — make code blocks pop with teal left border
+   ============================================================================= */
+
+.md-typeset pre {
+  border-radius: 10px;
+  border-left: 4px solid var(--md-primary-fg-color);
+  font-size: 0.875rem;
+}
+
+.md-typeset code {
+  font-size: 0.875em;
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  background: rgba(38, 198, 218, 0.1);
+  color: var(--md-primary-fg-color);
+  font-weight: 500;
+}
+
+/* Inline code in headings — don't let it overflow */
+.md-typeset h1 code,
+.md-typeset h2 code,
+.md-typeset h3 code {
+  font-size: 0.85em;
+}
+
+
+/* =============================================================================
+   9. ADMONITIONS
+   Color-coded callout blocks — critical for runbooks (note/warning/danger)
+   ============================================================================= */
+
+.md-typeset .admonition {
+  border-radius: 8px;
+  border-left-width: 4px;
+  font-size: 0.9375rem;
+}
+
+.md-typeset .admonition-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  letter-spacing: 0.02em;
+}
+
+
+/* =============================================================================
+   10. TABLES
+   Technical tables need clear borders, readable sizing, and teal headers
+   ============================================================================= */
+
+.md-typeset table:not([class]) {
+  font-size: 0.9375rem !important;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset table:not([class]) th {
+  font-weight: 700;
+  font-size: 0.8rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(38, 198, 218, 0.08);
+  border-bottom: 2px solid var(--md-primary-fg-color);
+  padding: 0.6rem 0.75rem;
+}
+
+.md-typeset table:not([class]) td {
+  font-size: inherit !important;
+  font-weight: 400;
+  padding: 0.5rem 0.75rem;
+  vertical-align: top;
+  line-height: 1.75;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+
+/* =============================================================================
+   11. LAST UPDATED
+   ============================================================================= */
+
 .md-source-file__fact::before {
   content: "Last Updated: ";
   font-weight: 600;
 }
 
-/* Hide clock icon before "Last Updated" date */
 .md-source-file__fact svg {
   display: none !important;
 }
 
-/* Add PKT timezone after the date*/
 .md-source-file__fact::after {
   content: " PKT";
   font-weight: 600;
   color: var(--md-default-fg-color);
+}
+
+
+/* =============================================================================
+   12. FOOTER
+   ============================================================================= */
+
+.md-footer {
+  margin-top: 3rem;
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-social__link {
+  border-radius: 6px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.md-social__link:hover {
+  transform: translateY(-3px) scale(1.1);
+  opacity: 1 !important;
+}
+
+
+/* =============================================================================
+   13. CONTENT TABS (e.g., OS-specific command tabs)
+   ============================================================================= */
+
+.md-typeset .tabbed-labels > label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 6px 6px 0 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.md-typeset .tabbed-labels > label:hover {
+  color: var(--md-primary-fg-color) !important;
+}
+
+
+/* =============================================================================
+   14. PROGRESS BAR (navigation.instant.progress)
+   ============================================================================= */
+
+.md-progress {
+  background: var(--md-primary-fg-color) !important;
+  height: 3px;
+}
+
+
+/* =============================================================================
+   15. RESPONSIVE TYPOGRAPHY
+   ============================================================================= */
+
+@media screen and (max-width: 767px) {
+  .md-typeset h1 { font-size: 1.6rem; }
+  .md-typeset h2 { font-size: 1.2rem; }
+  .md-typeset h3 { font-size: 1.05rem; }
+  .md-typeset p  { max-width: 100%; }
+
+  .md-tabs__link {
+    font-size: 0.72rem !important;
+    letter-spacing: 0.04em !important;
+  }
 }
