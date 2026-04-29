@@ -43,63 +43,114 @@ A runbook entry captures:
 
 ## Part 2 — Repository Structure
 
-All entries live under `docs/` in the runbook repository. The folder structure follows domains.
-Each domain maps to a real operational area:
+All runbook entries live at the **root level** of the repository — not inside `docs/`.
+The `docs/` folder is reserved for MkDocs configuration files and internal meta documentation
+that is not published to the website.
+
+The actual content tree is:
 
 ```
-docs/
-├── index.md
-├── bootstrap/          # bare-metal node prep, kubeadm cluster init, OS-level setup
-├── kubernetes/         # all k8s workload and cluster operations
-│   ├── networking/     # CNI, ingress, gateway API, DNS, TLS
-│   ├── storage/        # PV, PVC, StorageClass, CSI drivers
-│   ├── security/       # RBAC, PSA, network policies, secrets management
-│   ├── workloads/      # deployments, statefulsets, jobs, resource limits
-│   └── observability/  # metrics, logging, tracing, dashboards
-├── ci-cd/              # Jenkins pipelines, GitHub Actions workflows, ArgoCD
-├── containers/         # Docker, image builds, registries, Compose
-├── linux/              # shell, networking, systemd, package management
-├── cloud/              # AWS (EKS, ECS, EC2, IAM, S3, Route53)
-├── databases/          # MySQL, PostgreSQL, init, backup, access
-├── security/           # SSL/TLS certs, firewall, SSH hardening
-└── self-hosted/        # Nexus, SonarQube, monitoring stack, reverse proxies
+/ (repository root)
+├── index.md                    # site homepage
+├── bootstrap/                  # bare-metal node prep, OS-level setup before k8s
+├── cloud/                      # AWS (EKS, ECS, EC2, IAM, S3, Route53)
+├── containers/                 # Docker, image builds, registries, Compose
+├── delivery/                   # CI/CD — Jenkins, GitHub Actions, ArgoCD
+├── iac/                        # Infrastructure as Code — Terraform, Ansible
+├── incident-response/          # postmortems, outage analysis, recovery procedures
+├── kubernetes/
+│   ├── addons.md               # cluster add-ons (metrics-server, dashboard, etc.)
+│   ├── cni-networking.md       # CNI plugin setup (Flannel, Calico, Cilium)
+│   ├── local-lightweight.md    # local clusters (kind, k3s, minikube)
+│   ├── self-managed-kubeadm.md # kubeadm cluster bootstrap on bare-metal/EC2
+│   ├── autoscaling/            # HPA, VPA, KEDA, cluster autoscaler
+│   ├── cluster-setup/          # kubeconfig, contexts, multi-cluster access
+│   ├── gitops/                 # ArgoCD, Flux, GitOps patterns
+│   ├── networking/             # Gateway API, Ingress, DNS, TLS, service mesh
+│   ├── security/               # RBAC, PSA, network policies, secrets management
+│   ├── storage/                # PV, PVC, StorageClass, CSI drivers
+│   ├── troubleshooting/        # node/pod/network debugging procedures
+│   └── workloads/              # deployments, statefulsets, jobs, resource limits
+├── linux/                      # shell, networking, systemd, package management
+├── macOS/                      # macOS-specific tooling and configuration
+├── networking/                 # host/OS-level networking (not Kubernetes)
+├── observability/             # Prometheus, Grafana, Loki, alerting
+├── security/                   # SSL/TLS certs, firewall, SSH hardening (host-level)
+├── self-hosted/                # Nexus, SonarQube, monitoring stack, reverse proxies
+├── storage/                    # host/OS-level storage (not Kubernetes)
+├── windows/                    # Windows-specific tooling and configuration
+└── docs/                       # MkDocs config + internal meta only (NOT content)
+    └── _meta/                  # internal docs not published to the site
 ```
 
 **How to determine the correct path:**
-1. Identify the primary domain (e.g., Kubernetes networking → `docs/kubernetes/networking/`)
-2. If the task spans two domains, place it in the domain where someone would first look for it
-3. The filename must match the task, not the tool (e.g., `install-gateway-api.md` not `helm-install.md`)
+1. Identify the primary domain from the list above
+2. If the task is Kubernetes-specific, place it inside the relevant `kubernetes/` subfolder
+3. If the task is host/OS-level (e.g., iptables on a Linux node), place it under `linux/` or `networking/`, not `kubernetes/`
+4. If the task spans two domains, place it where someone would first look for it
+5. Never place new content entries inside `docs/` — that folder is not for runbook entries
 
 ---
 
 ## Part 3 — When to Generate One File vs Multiple
 
 Generate **one file** when the entire task is a single cohesive operation
-(e.g., installing a controller end-to-end).
+(e.g., standing up a controller end-to-end including verification).
 
 Generate **multiple files** when the conversation covered genuinely separate topics
 that would be looked up independently at different times. Examples:
 
-- Installing a tool AND configuring it for a specific app → two files
+- Configuring a tool AND then applying it for a specific application → two files
 - A debugging session that revealed both a networking fix AND a storage fix → two files
-- Three different controllers installed with different approaches → one file per controller,
-  or one combined file if the comparison between them is the main value
+- Two controllers compared and installed differently → one combined file if comparison is the value;
+  separate files if each installation is long enough to stand alone
 
-When multiple files are needed, output each one separately with its full path:
+When multiple files are needed, output each one with its full path:
 ```
-File 1: docs/kubernetes/networking/install-gateway-api.md
-File 2: docs/kubernetes/networking/configure-httproute.md
+File 1: kubernetes/networking/configure-gateway-api.md
+File 2: kubernetes/networking/configure-httproute.md
 ```
 
 ---
 
 ## Part 4 — File Naming Rules
 
-- Lowercase, hyphen-separated: `install-nginx-gateway-fabric.md`
-- Name describes the task, not the tool: `expose-service-nodeport.md` not `kubectl-patch.md`
-- Past-tense or infinitive both acceptable: `install-` or `installed-` — be consistent
-- No version numbers in filenames (versions go inside the file): `install-envoy-gateway.md` not `install-envoy-gateway-v1.7.md`
-- If the file covers two tightly related things, a combined name is fine: `install-and-configure-cert-manager.md`
+### The Core Principle
+
+The filename must describe **what was done to what** — the action verb determines
+whether this was an installation, a configuration, a setup, a debug session, or a patch.
+Choose the verb that most accurately reflects the nature of the task.
+
+### Verb Guide
+
+| Verb | When to use | Examples |
+|---|---|---|
+| `install-` | A single tool/binary installed via one or two commands | `install-ansible.md`, `install-helm.md` |
+| `configure-` | A feature, add-on, or API that requires multiple steps across resources | `configure-gateway-api.md`, `configure-rbac.md` |
+| `setup-` | An end-to-end environment or system brought to a working state | `setup-kubeadm-cluster.md`, `setup-nexus-registry.md` |
+| `deploy-` | A workload or application placed onto a cluster/server | `deploy-bankapp.md`, `deploy-prometheus-stack.md` |
+| `debug-` | A troubleshooting session that diagnosed and resolved an issue | `debug-pod-crashloopbackoff.md` |
+| `patch-` | A targeted fix applied to an existing running resource | `patch-deployment-hostnetwork.md` |
+| `migrate-` | Data or config moved from one system to another | `migrate-pvc-storageclass.md` |
+| `harden-` | Security hardening applied to a system or workload | `harden-ssh-access.md` |
+
+### Examples of Correct vs Wrong Names
+
+| Wrong | Correct | Why |
+|---|---|---|
+| `install-gateway-api.md` | `configure-gateway-api.md` | Gateway API is not a single tool — it is a spec implemented by a controller; the task is configuration across CRDs, controller, and GatewayClass |
+| `helm-install.md` | `install-nginx-gateway-fabric.md` | Name the subject, not the tool used |
+| `kubeadm.md` | `setup-kubeadm-cluster.md` | Verb + subject makes the file self-describing |
+| `fix-dns.md` | `debug-coredns-resolution-failure.md` | Be specific about what was broken |
+| `gateway.md` | `configure-envoy-gateway.md` | Too vague — no verb, no specificity |
+
+### Other Rules
+
+- Lowercase, hyphen-separated only: `configure-gateway-api.md`
+- No version numbers in filenames: versions belong inside the file, not the name
+- No `how-to-` prefix: `configure-tls-termination.md` not `how-to-configure-tls.md`
+- Combined name is acceptable when two tightly coupled steps are inseparable:
+  `install-and-configure-cert-manager.md`
 
 ---
 
@@ -109,17 +160,17 @@ Every runbook entry follows this structure. Sections marked **Required** must al
 Sections marked **If applicable** are included only when the content warrants them.
 
 ```markdown
-# [Tool/Task] — [What was accomplished]        ← Required. Specific, not generic.
+# [Subject] — [Outcome]                          ← Required. Specific, not generic.
 
-## Context                                       ← Required.
-## What Was Installed / Done                     ← Required. One-line summary table or list.
-## Conceptual Overview                           ← If applicable. Only if concepts are non-obvious.
-## Prerequisites                                 ← Required if dependencies exist.
-## Installation / Steps                          ← Required. The core procedure.
-## Verification                                  ← Required. Always verify — never skip.
-## Troubleshooting                               ← If applicable. Only real issues encountered.
-## Key Decisions                                 ← If applicable. Non-obvious choices made.
-## Related                                       ← If applicable. Links to related runbook entries.
+## Context                                         ← Required.
+## What Was Installed / Done                       ← Required. Summary table or list.
+## Conceptual Overview                             ← If applicable. Non-obvious concepts only.
+## Prerequisites                                   ← Required if dependencies exist.
+## Installation / Steps                            ← Required. The core procedure.
+## Verification                                    ← Required. Always verify — never skip.
+## Troubleshooting                                 ← If applicable. Real issues only.
+## Key Decisions                                   ← If applicable. Non-obvious choices made.
+## Related                                         ← If applicable. Links to related entries.
 ```
 
 ### Title Format
@@ -129,9 +180,9 @@ Sections marked **If applicable** are included only when the content warrants th
 ```
 
 Examples:
-- `# Kubernetes Gateway API — Complete Setup Guide` ✅
-- `# How to Install the Gateway API` ❌ (instructional tone — wrong)
-- `# Gateway API Installation` ❌ (too flat — no outcome stated)
+- `# Kubernetes Gateway API — NGINX and Envoy Controller Setup` ✅
+- `# How to Install the Gateway API` ❌ (instructional tone)
+- `# Gateway API Installation` ❌ (no outcome stated)
 
 ---
 
@@ -139,12 +190,13 @@ Examples:
 
 ### Tone
 
-This is an operational record written in the first-person past tense.
-It is not a tutorial. It is not directed at a reader.
+This is an operational record. It is not a tutorial. It is not directed at a reader.
+Write in third-person present tense (stating facts about the system) or
+past tense (what happened during the session). Never second-person.
 
 **DO write like this:**
 > NGF does not bundle CRDs. They are installed separately using NGF's version-pinned reference
-> so the CRD version matches the controller exactly.
+> so the CRD schema matches the controller's expected API version exactly.
 
 > On bare-metal, the Gateway controller's Service stays in `<pending>` external IP forever
 > if left as `LoadBalancer` type.
@@ -186,14 +238,12 @@ httproutes.gateway.networking.k8s.io        2026-04-28T11:20:26Z
 ```
 ````
 
-Never write `# Expected output: <your output here>` or `# You should see something like:`.
-Use the actual output from the session.
+Never write `<your output here>` or `You should see something like:`.
+Use only the actual output from the conversation.
 
 ### Comparison Tables
 
-When two or more approaches, tools, or configurations differ in important ways,
-show the differences in a table — not in prose. The table must have a header row
-and the first column must be the dimension being compared.
+When two or more approaches differ in important ways, use a table — not prose.
 
 ```markdown
 | | NGINX Gateway Fabric | Envoy Gateway |
@@ -203,9 +253,7 @@ and the first column must be the dimension being compared.
 | **Namespace** | `nginx-gateway` | `envoy-gateway-system` |
 ```
 
-### Admonitions (Callout Blocks)
-
-Use `>` blockquotes for important notes. Lead with a bold label:
+### Admonitions
 
 ```markdown
 > **Why this matters:** ...
@@ -214,39 +262,30 @@ Use `>` blockquotes for important notes. Lead with a bold label:
 > **Warning:** ...
 ```
 
-Do not use emoji in section headings or admonitions.
+No emoji in headings or admonitions.
 
 ### Code Blocks
 
 - Always specify the language: ` ```bash `, ` ```yaml `, ` ```text `
 - Use ` ```text ` for terminal output — never ` ```bash ` for output
-- Variable substitution: define variables at the top of the block, then use them
-
-```bash
-HTTP_NODEPORT=30080
-HTTPS_NODEPORT=31443
-
-sudo iptables -t nat -A PREROUTING -p tcp --dport 80  -j REDIRECT --to-port $HTTP_NODEPORT
-sudo iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port $HTTPS_NODEPORT
-```
+- Define variables at the top of a block before using them
 
 ### What to Omit
 
-- Version numbers in section headings (they belong in code blocks only)
-- Steps that are standard and obvious to anyone in this field
-  (`kubectl apply -f` on a simple manifest does not need explanation)
+- Version numbers in section headings
+- Obvious steps that need no explanation
 - Marketing language ("powerful", "seamless", "robust")
-- Future tense ("this will allow you to", "once installed, you can")
-- Any sentence starting with "In this guide" / "This tutorial" / "Follow these steps"
+- Future tense ("this will allow", "once installed, you can")
+- Sentences starting with "In this guide" / "This tutorial" / "Follow these steps"
 
 ---
 
 ## Part 7 — Verification Section Rules
 
-Every runbook entry must end with a verification section that:
-1. Shows the exact command used to confirm the task succeeded
-2. Shows the exact expected output (from the actual session)
-3. Explains what a failing output looks like and what it means
+Every entry must include a verification section with:
+1. The exact command used to confirm success
+2. The exact expected output from the session
+3. What a failing output looks like and what it means
 
 ````markdown
 ## Verification
@@ -269,11 +308,10 @@ If `ACCEPTED=False`, the controller pod has not started — check `kubectl get p
 
 ## Part 8 — Troubleshooting Section Rules
 
-Include a Troubleshooting section only for issues that were actually encountered during the session.
-Do not fabricate common errors that did not occur.
+Include only issues that were actually encountered. Do not fabricate errors.
 
-Each entry in the troubleshooting section must have:
-1. The exact error message or symptom observed
+Each entry needs:
+1. The exact error or symptom observed
 2. What caused it
 3. The exact fix applied
 
@@ -283,7 +321,7 @@ Each entry in the troubleshooting section must have:
 ### `no matches for kind "Gateway" in version "gateway.networking.k8s.io/v1"`
 
 **Cause:** Gateway API CRDs were not installed before applying the Gateway manifest.
-**Fix:** Install CRDs first (Step 1), then re-apply the Gateway.
+**Fix:** Install CRDs first, then re-apply.
 
 ### Pod stuck in `CrashLoopBackOff` after hostNetwork patch
 
@@ -302,11 +340,12 @@ kubectl rollout restart deployment/<name> -n <namespace>
 | Rule | Correct | Wrong |
 |---|---|---|
 | Title format | `# Subject — Outcome` | `# How to Install X` |
-| Tone | Past tense, operational | "You need to...", "Follow these steps" |
-| Why explanations | Inline `>` blockquote after the command | Buried in prose paragraphs |
-| Terminal output | Actual output from the session | Placeholder like `<your output>` |
+| Tone | Operational, no second-person | "You need to...", "Follow these steps" |
+| Why explanations | Inline `>` blockquote after the command | Buried in prose |
+| Terminal output | Actual output from the session | `<your output here>` |
 | Comparisons | Markdown table | Prose list of differences |
 | Troubleshooting | Real issues encountered only | Fabricated common errors |
 | Verification | Command + expected output + failure meaning | "Run this to check" |
-| Filenames | `install-gateway-api.md` | `how-to-install-the-gateway-api.md` |
-| Code language | Always specified (bash/yaml/text) | Bare triple backtick |
+| File location | Root-level domain folder (e.g., `kubernetes/networking/`) | Inside `docs/` |
+| Verb in filename | Matches the task type (`configure-`, `setup-`, `install-`) | Generic or tool-named (`helm-install.md`) |
+| Code language | Always specified (`bash`/`yaml`/`text`) | Bare triple backtick |
