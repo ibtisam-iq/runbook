@@ -1,89 +1,123 @@
-# Basic site metadata – required for GH Pages title/previews
-site_name: "runbook"
+# Basic site metadata
+site_name: "Runbook"
 site_description: "Operational runbooks for Kubernetes, bare-metal infrastructure, DevSecOps pipelines, and platform tooling — written after doing the actual work."
 site_author: "Muhammad Ibtisam"
-site_url: "https://runbook.ibtisam-iq.com"  # Your custom domain (if using; GH Pages supports CNAME)
+site_url: "https://runbook.ibtisam-iq.com"
 
-# Repository integration – enables "Edit this page" links on GH Pages
-repo_url: "https://github.com/ibtisam-iq/runbook"  # URL to your GitHub repo (for edit/view buttons)
-repo_name: "runbook"  # GitHub slug for buttons
-edit_uri: edit/main/  # NEW: Path to edit files (assumes 'main' branch; change if 'master')
+# Repository integration
+repo_url: "https://github.com/ibtisam-iq/runbook"
+repo_name: "ibtisam-iq/runbook"
+edit_uri: edit/main/
 
-# Build & output config – optimizes for GH Pages static hosting
+# Build & output
 docs_dir: .
-site_dir: site/  # Output folder (default; GH Pages serves from root of gh-pages branch)
-use_directory_urls: true  # Clean URLs (e.g., /kubernetes/ instead of /kubernetes/index.html)
-# strict: true  # NEW: Enforce strict link checking during build/deploy (prevents 404s on GH Pages)
+site_dir: site/
+use_directory_urls: true
 exclude_docs: |
   README.md
 
-# Theme: Material with GH Pages-friendly features
+# Live reload watch paths
+watch:
+  - docs
+  - mkdocs.yml
+
+# Build validation
+validation:
+  omitted_files: warn
+  absolute_links: relative_to_docs
+  unrecognized_links: warn
+  anchors: warn
+  nav:
+    omitted_files: info
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: relative_to_docs
+    unrecognized_links: warn
+
+# Theme
 theme:
   name: material
   custom_dir: docs/overrides
   favicon: assets/icons/favicon.ico
   logo: assets/icons/favicon.svg
-  # Typography - using system fonts for performance
   font:
-    text: Inter           # Modern, readable sans-serif font
-    code: Roboto Mono     # Monospace font for code blocks
+    text: Inter
+    code: Roboto Mono
   language: en
   features:
-    - navigation.sections  # Grouped sections (your CNCF-style)
-    - navigation.tabs      # Top tabs
-    - navigation.top       # Back-to-top button
-    # - navigation.expand    # Auto-expand sections
-    - navigation.tabs.sticky  # Keeps tabs visible when scrolling
+    # Navigation
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.path
+    - navigation.prune
+    - navigation.top
+    - navigation.footer
+    # TOC
+    - toc.follow
+    # Search
+    - search.suggest
+    - search.highlight
+    - search.share
+    # Content
     - content.code.copy
     - content.code.annotate
-    - content.tabs.link
-    - navigation.instant   # SPA-like loading (fast on GH Pages CDN)
-    - content.action.edit  # Ties to repo_uri
-    - content.action.view
     - content.code.select
-    - search.suggest
-    - toc.follow
-    - search.highlight
-    # - toc.integrate
-    - search.share         # NEW: Share buttons work seamlessly on GH Pages
-
-    # Navigation enhancements
-    - navigation.instant.progress # Shows loading progress bar for instant navigation
-    - navigation.path             # Shows breadcrumb path above page title
-    - navigation.prune            # Only renders visible navigation (improves performance)
-    - navigation.footer           # Previous/next page links in footer
-    - content.tooltips            # Enables rich tooltips for abbreviations/glossary
+    - content.tabs.link
+    - content.tooltips
+    - content.action.edit
+    - content.action.view
   palette:
-    - scheme: default
-      primary: indigo
-      accent: blue
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/weather-night
+        icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
-      primary: indigo
-      accent: blue
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/weather-sunny
+        icon: material/brightness-4
         name: Switch to light mode
   icon:
-    logo: material/book  # NEW: Simple icon for GH Pages favicon/meta
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
 
-# Markdown extensions – unchanged, but ensures TOC/links render correctly on GH Pages
+# Markdown extensions
 markdown_extensions:
+  - abbr
   - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
   - toc:
       permalink: true
-      toc_depth: 0
-      baselevel: 2
-  - footnotes
-  - def_list
+      permalink_title: "Link to this section"
+      toc_depth: 3
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
   - pymdownx.highlight:
       use_pygments: true
       line_spans: __span
+      pygments_lang_class: true
+      anchor_linenums: true
+      linenums_style: pymdownx-inline
   - pymdownx.inlinehilite
   - pymdownx.snippets:
-      base_path: docs
+      base_path: ['.']
+      check_paths: false
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -92,50 +126,73 @@ markdown_extensions:
   - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: false
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  - pymdownx.tasklist
+  - pymdownx.betterem:
+      smart_enable: all
   - pymdownx.mark
-  - pymdownx.arithmatex
-  - pymdownx.keys
-  - pymdownx.magiclink
   - pymdownx.caret
   - pymdownx.tilde
+  - pymdownx.keys
+  - pymdownx.magiclink
   - pymdownx.smartsymbols
-  - codehilite
-  - md_in_html
+  - pymdownx.arithmatex:
+      generic: true
 
-# Plugins – adds date plugin for freshness on GH Pages
+# Plugins
 plugins:
-  - search
+  - search:
+      lang: en
+      separator: '[\s\-\.]+'
   - same-dir
   - autorefs
-  - awesome-nav    # was: awesome-pages - awesome-nav        # ← MUST come before section-index
-  # - section-index  # a folder only becomes a clickable section if it has an index.md
+  - awesome-nav
   - minify:
-      minify_html: true  # Compresses output for faster GH Pages loads
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+      cache_safe: true
   - git-revision-date-localized:
-      type: custom                  # Use custom formatting
-      custom_format: "%B %d, %Y %I:%M:%S %p"  # Your desired format (AM/PM)
+      type: custom
+      custom_format: "%B %d, %Y %I:%M:%S %p"
       enable_creation_date: false
       fallback_to_build_date: false
       timezone: Asia/Karachi
-      locale: en                    # Keeps English month/day names
+      locale: en
       exclude:
-      - index.md
+        - index.md
 
-# Extra content – enhances GH Pages sharing/SEO
+# Extra
 extra:
   social:
     - icon: fontawesome/brands/linkedin
       link: https://www.linkedin.com/in/ibtisam-iq/
+      name: Connect on LinkedIn
     - icon: fontawesome/brands/github
       link: https://github.com/ibtisam-iq
+      name: Follow on GitHub
     - icon: fontawesome/solid/globe
       link: https://ibtisam-iq.com
-  generator: false  # Hides "Built with MkDocs" (clean look)
-  copyright: "© 2026 Ibtisam IQ. All rights reserved."  # NEW: Footer copyright
+      name: Personal Website
+  generator: false
+
+copyright: >-
+  Copyright &copy; 2026
+  <a href="https://www.linkedin.com/in/ibtisam-iq/" target="_blank" rel="noopener">Muhammad Ibtisam</a>.
+  All rights reserved.
 
 extra_css:
-  - docs/stylesheets/extra.css  # Loads your custom styles
+  - docs/stylesheets/extra.css
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
