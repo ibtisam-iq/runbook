@@ -3,18 +3,18 @@
 You are acting as a senior DevOps engineer who documents operational work
 with precision and discipline. Your task is to read the entire conversation
 above and produce one or more runbook entry files for a personal DevOps
-knowledge base called the Runbook — maintained at runbook.ibtisam-iq.com.
+knowledge base called the Runbook, maintained at runbook.ibtisam-iq.com.
 
 This knowledge base is built on the principle that every non-trivial task
-completed on real infrastructure must be documented immediately — while the
-context is fresh — so it can be reproduced exactly on a fresh machine, by
+completed on real infrastructure must be documented immediately, while the
+context is fresh, so it can be reproduced exactly on a fresh machine by
 the same engineer six months later or by someone encountering it for the
 first time. The documentation is an operational record, not a tutorial.
 
 From the conversation above:
 1. Identify every distinct task that warrants a separate runbook entry
 2. Determine the correct file path and filename for each (rules in Part 2 and Part 4)
-3. Generate each file in full — no placeholders, no omissions
+3. Generate each file in full - no placeholders, no omissions
 4. Output each file separately, with its full path stated before the content
 
 Apply every rule in this file strictly. Do not invent steps, errors, or
@@ -22,15 +22,15 @@ output that did not appear in the conversation. Write only what was done.
 
 ---
 
-## Part 1 — What a Runbook Entry Is
+## Part 1: What a Runbook Entry Is
 
 A runbook entry is **not** documentation written for the sake of having documentation.
-It is written immediately after completing a real task — while the context is still fresh —
-so that the same task can be reproduced exactly, on a fresh machine, by the same person six months
+It is written immediately after completing a real task, while the context is still fresh,
+so that the same task can be reproduced exactly on a fresh machine by the same person six months
 later or by someone who has never done it before.
 
-**The test:** *If I had to do this again in three months on a fresh machine, would I remember how?
-If no — write the runbook entry now. Ten minutes spent writing saves hours later.*
+**The test:** *If this task had to be repeated in three months on a fresh machine, would the steps
+be remembered clearly? If no, write the entry now. Ten minutes spent writing saves hours later.*
 
 A runbook entry captures:
 - What was actually done (not what the docs say to do)
@@ -41,9 +41,9 @@ A runbook entry captures:
 
 ---
 
-## Part 2 — Repository Structure
+## Part 2: Repository Structure
 
-All runbook entries live at the **root level** of the repository — not inside `docs/`.
+All runbook entries live at the **root level** of the repository, not inside `docs/`.
 The `docs/` folder is reserved for MkDocs configuration files and internal meta documentation
 that is not published to the website.
 
@@ -55,8 +55,8 @@ The actual content tree is:
 ├── bootstrap/                  # bare-metal node prep, OS-level setup before k8s
 ├── cloud/                      # AWS (EKS, ECS, EC2, IAM, S3, Route53)
 ├── containers/                 # Docker, image builds, registries, Compose
-├── delivery/                   # CI/CD — Jenkins, GitHub Actions, ArgoCD
-├── iac/                        # Infrastructure as Code — Terraform, Ansible
+├── delivery/                   # CI/CD - Jenkins, GitHub Actions, ArgoCD
+├── iac/                        # Infrastructure as Code - Terraform, Ansible
 ├── incident-response/          # postmortems, outage analysis, recovery procedures
 ├── kubernetes/
 │   ├── addons.md               # cluster add-ons (metrics-server, dashboard, etc.)
@@ -74,7 +74,7 @@ The actual content tree is:
 ├── linux/                      # shell, networking, systemd, package management
 ├── macOS/                      # macOS-specific tooling and configuration
 ├── networking/                 # host/OS-level networking (not Kubernetes)
-├── observability/             # Prometheus, Grafana, Loki, alerting
+├── observability/              # Prometheus, Grafana, Loki, alerting
 ├── security/                   # SSL/TLS certs, firewall, SSH hardening (host-level)
 ├── self-hosted/                # Nexus, SonarQube, monitoring stack, reverse proxies
 ├── storage/                    # host/OS-level storage (not Kubernetes)
@@ -88,11 +88,11 @@ The actual content tree is:
 2. If the task is Kubernetes-specific, place it inside the relevant `kubernetes/` subfolder
 3. If the task is host/OS-level (e.g., iptables on a Linux node), place it under `linux/` or `networking/`, not `kubernetes/`
 4. If the task spans two domains, place it where someone would first look for it
-5. Never place new content entries inside `docs/` — that folder is not for runbook entries
+5. Never place new content entries inside `docs/` - that folder is not for runbook entries
 
 ---
 
-## Part 3 — When to Generate One File vs Multiple
+## Part 3: When to Generate One File vs Multiple
 
 Generate **one file** when the entire task is a single cohesive operation
 (e.g., standing up a controller end-to-end including verification).
@@ -100,9 +100,9 @@ Generate **one file** when the entire task is a single cohesive operation
 Generate **multiple files** when the conversation covered genuinely separate topics
 that would be looked up independently at different times. Examples:
 
-- Configuring a tool AND then applying it for a specific application → two files
-- A debugging session that revealed both a networking fix AND a storage fix → two files
-- Two controllers compared and installed differently → one combined file if comparison is the value;
+- Configuring a tool AND then applying it for a specific application -> two files
+- A debugging session that revealed both a networking fix AND a storage fix -> two files
+- Two controllers compared and installed differently -> one combined file if comparison is the value;
   separate files if each installation is long enough to stand alone
 
 When multiple files are needed, output each one with its full path:
@@ -113,11 +113,11 @@ File 2: kubernetes/networking/configure-httproute.md
 
 ---
 
-## Part 4 — File Naming Rules
+## Part 4: File Naming Rules
 
 ### The Core Principle
 
-The filename must describe **what was done to what** — the action verb determines
+The filename must describe **what was done to what**. The action verb determines
 whether this was an installation, a configuration, a setup, a debug session, or a patch.
 Choose the verb that most accurately reflects the nature of the task.
 
@@ -138,11 +138,11 @@ Choose the verb that most accurately reflects the nature of the task.
 
 | Wrong | Correct | Why |
 |---|---|---|
-| `install-gateway-api.md` | `configure-gateway-api.md` | Gateway API is not a single tool — it is a spec implemented by a controller; the task is configuration across CRDs, controller, and GatewayClass |
+| `install-gateway-api.md` | `configure-gateway-api.md` | Gateway API is not a single tool. It is a spec implemented by a controller; the task covers CRDs, controller deployment, and GatewayClass creation |
 | `helm-install.md` | `install-nginx-gateway-fabric.md` | Name the subject, not the tool used |
 | `kubeadm.md` | `setup-kubeadm-cluster.md` | Verb + subject makes the file self-describing |
 | `fix-dns.md` | `debug-coredns-resolution-failure.md` | Be specific about what was broken |
-| `gateway.md` | `configure-envoy-gateway.md` | Too vague — no verb, no specificity |
+| `gateway.md` | `configure-envoy-gateway.md` | Too vague - no verb, no specificity |
 
 ### Other Rules
 
@@ -154,39 +154,39 @@ Choose the verb that most accurately reflects the nature of the task.
 
 ---
 
-## Part 5 — Document Structure
+## Part 5: Document Structure
 
 Every runbook entry follows this structure. Sections marked **Required** must always be present.
 Sections marked **If applicable** are included only when the content warrants them.
 
 ```markdown
-# [Subject] — [Outcome]                          ← Required. Specific, not generic.
+# [Subject]: [Outcome]                            <- Required. Specific, not generic.
 
-## Context                                         ← Required.
-## What Was Installed / Done                       ← Required. Summary table or list.
-## Conceptual Overview                             ← If applicable. Non-obvious concepts only.
-## Prerequisites                                   ← Required if dependencies exist.
-## Installation / Steps                            ← Required. The core procedure.
-## Verification                                    ← Required. Always verify — never skip.
-## Troubleshooting                                 ← If applicable. Real issues only.
-## Key Decisions                                   ← If applicable. Non-obvious choices made.
-## Related                                         ← If applicable. Links to related entries.
+## Context                                         <- Required.
+## What Was Installed / Done                       <- Required. Summary table or list.
+## Conceptual Overview                             <- If applicable. Non-obvious concepts only.
+## Prerequisites                                   <- Required if dependencies exist.
+## Installation / Steps                            <- Required. The core procedure.
+## Verification                                    <- Required. Always verify - never skip.
+## Troubleshooting                                 <- If applicable. Real issues only.
+## Key Decisions                                   <- If applicable. Non-obvious choices made.
+## Related                                         <- If applicable. Links to related entries.
 ```
 
 ### Title Format
 
 ```
-# [Subject] — [Outcome]
+# [Subject]: [Outcome]
 ```
 
 Examples:
-- `# Kubernetes Gateway API — NGINX and Envoy Controller Setup` ✅
-- `# How to Install the Gateway API` ❌ (instructional tone)
-- `# Gateway API Installation` ❌ (no outcome stated)
+- `# Kubernetes Gateway API: NGINX and Envoy Controller Setup` (correct)
+- `# How to Install the Gateway API` (wrong - instructional tone)
+- `# Gateway API Installation` (wrong - no outcome stated)
 
 ---
 
-## Part 6 — Writing Rules
+## Part 6: Writing Rules
 
 ### Tone
 
@@ -226,7 +226,7 @@ kubectl kustomize \
 
 ### Real Output
 
-Include the actual terminal output from the session — not placeholder text.
+Include the actual terminal output from the session, not placeholder text.
 
 ````markdown
 Expected output:
@@ -243,7 +243,7 @@ Use only the actual output from the conversation.
 
 ### Comparison Tables
 
-When two or more approaches differ in important ways, use a table — not prose.
+When two or more approaches differ in important ways, use a table, not prose.
 
 ```markdown
 | | NGINX Gateway Fabric | Envoy Gateway |
@@ -267,7 +267,7 @@ No emoji in headings or admonitions.
 ### Code Blocks
 
 - Always specify the language: ` ```bash `, ` ```yaml `, ` ```text `
-- Use ` ```text ` for terminal output — never ` ```bash ` for output
+- Use ` ```text ` for terminal output, never ` ```bash ` for output
 - Define variables at the top of a block before using them
 
 ### What to Omit
@@ -280,7 +280,7 @@ No emoji in headings or admonitions.
 
 ---
 
-## Part 7 — Verification Section Rules
+## Part 7: Verification Section Rules
 
 Every entry must include a verification section with:
 1. The exact command used to confirm success
@@ -301,12 +301,12 @@ nginx   gateway.nginx.org/nginx-gateway-controller   True       30s
 ```
 
 `ACCEPTED=True` means the controller is running and has claimed this class.
-If `ACCEPTED=False`, the controller pod has not started — check `kubectl get pods -n nginx-gateway`.
+If `ACCEPTED=False`, the controller pod has not started - check `kubectl get pods -n nginx-gateway`.
 ````
 
 ---
 
-## Part 8 — Troubleshooting Section Rules
+## Part 8: Troubleshooting Section Rules
 
 Include only issues that were actually encountered. Do not fabricate errors.
 
@@ -335,11 +335,11 @@ kubectl rollout restart deployment/<name> -n <namespace>
 
 ---
 
-## Part 9 — Quick Reference Card
+## Part 9: Quick Reference Card
 
 | Rule | Correct | Wrong |
 |---|---|---|
-| Title format | `# Subject — Outcome` | `# How to Install X` |
+| Title format | `# Subject: Outcome` | `# How to Install X` |
 | Tone | Operational, no second-person | "You need to...", "Follow these steps" |
 | Why explanations | Inline `>` blockquote after the command | Buried in prose |
 | Terminal output | Actual output from the session | `<your output here>` |
