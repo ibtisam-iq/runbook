@@ -1,3 +1,4 @@
 title: Networking
 arrange:
   - ...
+  - Install & Configure Gateway API: configure-gateway-api.md

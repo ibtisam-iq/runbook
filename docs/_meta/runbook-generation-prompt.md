@@ -277,6 +277,7 @@ No emoji in headings or admonitions.
 - Marketing language ("powerful", "seamless", "robust")
 - Future tense ("this will allow", "once installed, you can")
 - Sentences starting with "In this guide" / "This tutorial" / "Follow these steps"
+- The em dash character (—) anywhere in the document - use a colon or plain hyphen instead
 
 ---
 
