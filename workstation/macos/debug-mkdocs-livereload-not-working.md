@@ -8,16 +8,25 @@ change. The repository (`ibtisam-iq/runbook`) uses `docs_dir: .` (repository roo
 source), enabled by the `same-dir` plugin. This is an atypical setup that introduces a
 file-watching loop that standard configurations do not have.
 
+After the initial fix (downgrading `click`), a second issue surfaced: changes to actual content
+files (e.g., `workstation/*.md`) were not triggering a rebuild even though `.` was listed in
+watched paths. This was caused by `watchdog` using macOS FSEvents, which misses changes in deep
+directory trees when the watched root contains hundreds of files including `.venv/` and `.git/`.
+Forcing polling mode resolved it completely, and also enabled true browser auto-refresh without
+any manual reload.
+
 ## What Was Done
 
 | Item | Detail |
 |---|---|
-| Root cause | `click > 8.2.1` silently broke MkDocs file watching |
+| Root cause 1 | `click > 8.2.1` silently broke MkDocs file watching |
+| Root cause 2 | macOS FSEvents backend misses changes in large directory trees |
 | Secondary cause | `docs_dir: .` with `site_dir: site/` creates an infinite rebuild loop |
 | Fix 1 | Downgraded `click` to `8.2.1` |
 | Fix 2 | Added `watch:` block to `mkdocs.yml` |
 | Fix 3 | Moved `site_dir` to `/tmp/mkdocs-runbook/` to break the loop |
-| Dev command | `mkdocs serve --livereload --dirtyreload --watch-theme` |
+| Fix 4 | Installed `watchdog[watchmedo]` and forced polling mode via env var |
+| Dev command | `WATCHDOG_FORCE_POLLING=1 mkdocs serve --livereload --dirtyreload --watch-theme` |
 
 ## Prerequisites
 
@@ -80,11 +89,28 @@ exclude_docs: |
   site/
 ```
 
-### 5. Serve with all required flags
+### 5. Install watchdog with watchmedo extras
 
 ```bash
-mkdocs serve --livereload --dirtyreload --watch-theme
+pip install "watchdog[watchmedo]"
 ```
+
+> **Why:** The base `watchdog` install does not always include the polling backend. The
+> `watchmedo` extras ensure the full watchdog toolkit is available, including the
+> `WATCHDOG_FORCE_POLLING` mode used in the next step.
+
+### 6. Serve with polling mode and all required flags
+
+```bash
+WATCHDOG_FORCE_POLLING=1 mkdocs serve --livereload --dirtyreload --watch-theme
+```
+
+> **Why `WATCHDOG_FORCE_POLLING=1`:** On macOS, `watchdog` uses FSEvents as its backend by
+> default. FSEvents is unreliable on large directory trees - it silently misses file changes
+> in subdirectories when the watched root contains thousands of files (`.venv/`, `.git/`,
+> all content folders). Forcing polling mode makes `watchdog` check every file on a timer
+> instead, which is slightly slower but 100% reliable. Changes are detected within 1-2 seconds
+> of saving.
 
 > **Why `--livereload`:** Forces live reload explicitly. Newer MkDocs versions stopped enabling
 > it by default.
@@ -95,10 +121,10 @@ mkdocs serve --livereload --dirtyreload --watch-theme
 > **Why `--watch-theme`:** Ensures changes inside
 > `.venv/.../material/templates` are also picked up, covering Material theme template changes.
 
-### 6. Optional - save as a shell alias
+### 7. Save as a shell alias
 
 ```bash
-alias mkserve="mkdocs serve --livereload --dirtyreload --watch-theme"
+alias mkserve="WATCHDOG_FORCE_POLLING=1 mkdocs serve --livereload --dirtyreload --watch-theme"
 ```
 
 Add to `~/.zshrc` so the command is available across sessions.
@@ -119,7 +145,8 @@ INFO    -  [23:12:03] Detected file changes
 ```
 
 All watched paths must appear in the `Watching paths for changes:` line. The `Detected file
-changes` line confirms auto-reload is active on edits.
+changes` line confirms polling is active and file changes are being picked up across the full
+directory tree without any manual browser refresh.
 
 Failing indicator: if `Watching paths for changes:` does not appear at all after starting the
 server, `click` has not been downgraded yet.
@@ -147,10 +174,24 @@ pip install "click==8.2.1"
 
 **Cause:** `watch:` block is missing from `mkdocs.yml` and `--watch-theme` flag is not passed.
 
-**Fix:** Add the `watch:` block (Step 3) and use the full serve command (Step 5).
+**Fix:** Add the `watch:` block (Step 3) and use the full serve command (Step 6).
+
+### Content file changes detected in terminal but browser does not refresh
+
+**Cause:** `watchdog` FSEvents backend on macOS misses changes in large directory trees.
+
+**Fix:**
+
+```bash
+pip install "watchdog[watchmedo]"
+WATCHDOG_FORCE_POLLING=1 mkdocs serve --livereload --dirtyreload --watch-theme
+```
 
 ## Key Decisions
 
+- `WATCHDOG_FORCE_POLLING=1` was chosen over native FSEvents because the repository root
+  contains `.venv/`, `.git/`, and all content folders together, making the FSEvents backend
+  unreliable at this scale on macOS.
 - `--dirtyreload` was chosen over standard reload because the full site build took 106 seconds.
   Dirty reload rebuilds only the changed page, making the feedback loop usable.
 - `site_dir` was set to `/tmp/mkdocs-runbook/` rather than a relative path like `../site/` to
