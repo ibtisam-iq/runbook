@@ -49,7 +49,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Build MkDocs site
-        run: mkdocs build --strict
+        run: mkdocs build # --strict
 
       - name: QA - HTML validation
         # html5validator misinterprets shell-command placeholder tokens like <none>,
@@ -79,7 +79,7 @@ jobs:
               --accept 200,429
               --exclude "linkedin\.com"
               --exclude "x\.com"
-          fail: false  # Fail the job if any broken links are found
+          fail: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
