@@ -1,10 +1,10 @@
-# Runbook Repository — Architecture & Design Decisions
+# Runbook Repository - Architecture & Design Decisions
 
 ## Overview
 
-This repository is a personal, living knowledge base for DevOps and platform engineering. It is not a tutorial site, not a blog, and not a scratchpad. Every file in this repo was written after the knowledge was earned in production or hands-on practice. The structure is intentional — designed so that any folder name tells you exactly what domain it owns and exactly what kind of content lives inside it.
+This repository is a personal, living knowledge base for DevOps and platform engineering. It is not a tutorial site, not a blog, and not a scratchpad. Every file in this repo was written after the knowledge was earned in production or hands-on practice. The structure is intentional - designed so that any folder name tells you exactly what domain it owns and exactly what kind of content lives inside it.
 
-The goal is simple: when a task comes up — installing a tool, debugging a Kubernetes cluster, setting up a self-hosted service, understanding a new project before containerizing it — the answer should already be here, one folder deep.
+The goal is simple: when a task comes up - installing a tool, debugging a Kubernetes cluster, setting up a self-hosted service, understanding a new project before containerizing it - the answer should already be here, one folder deep.
 
 ---
 
@@ -31,7 +31,10 @@ runbook/
 │   └── aws/
 ├── iac/
 ├── self-hosted/
-└── incident-response/
+├── incident-response/
+└── workstation/
+    ├── windows/
+    └── macos/
 ```
 
 ---
@@ -40,9 +43,9 @@ runbook/
 
 ### `bootstrap/`
 
-**Purpose:** Installing tools and setting up machines from scratch — fast.
+**Purpose:** Installing tools and setting up machines from scratch - fast.
 
-This is where every installation runbook lives. The design philosophy is: one file per tool, and each file has two sections. The first section walks through the official installation commands one by one, with brief context for each step. The second section contains a single-command reference that invokes the corresponding automation script from the `silver-stack` repository — so a fresh server can be fully provisioned by running one command, not thirty.
+This is where every installation runbook lives. The design philosophy is: one file per tool, and each file has two sections. The first section walks through the official installation commands one by one, with brief context for each step. The second section contains a single-command reference that invokes the corresponding automation script from the `silver-stack` repository - so a fresh server can be fully provisioned by running one command, not thirty.
 
 Tools covered include Docker, Kubernetes node dependencies (containerd, kubeadm, kubelet, kubectl), Helm, Terraform, Jenkins, SonarQube, Nexus, ArgoCD, and Prometheus/Grafana. New tools get added here every time they're installed for the first time.
 
@@ -68,7 +71,7 @@ The automation scripts live in a separate repository (`silver-stack`). This fold
 
 ### `linux/`
 
-**Purpose:** Linux system administration — the foundation everything else runs on.
+**Purpose:** Linux system administration - the foundation everything else runs on.
 
 Covers OS-level work: setting up a fresh server, configuring users and permissions, managing storage at the block level, networking from the OS side (interfaces, routes, firewall rules), hardening, and diagnosing system-level failures.
 
@@ -85,7 +88,7 @@ linux/
 
 ### `containers/`
 
-**Purpose:** Everything below Kubernetes — images, registries, and the container runtime.
+**Purpose:** Everything below Kubernetes - images, registries, and the container runtime.
 
 This domain focuses on the build side of containers: writing efficient Dockerfiles, understanding layer caching, multi-stage builds, and pushing images to registries. It is intentionally separated from Kubernetes because container knowledge is a prerequisite to Kubernetes knowledge, and the two are often confused.
 
@@ -121,9 +124,9 @@ kubernetes/
 
 ### `networking/`
 
-**Purpose:** Infrastructure-level networking — DNS, TLS, load balancers, ingress/gateway controllers, VPNs, and firewalls.
+**Purpose:** Infrastructure-level networking - DNS, TLS, load balancers, ingress/gateway controllers, VPNs, and firewalls.
 
-This domain is about the network layer that sits between the internet and the application. It does not duplicate Kubernetes networking (which lives in `kubernetes/networking/`) — it covers the host and infrastructure side: DNS records and resolvers, TLS certificate management, Nginx/HAProxy configuration, VPN tunnels between servers, and firewall rules at the OS or cloud level.
+This domain is about the network layer that sits between the internet and the application. It does not duplicate Kubernetes networking (which lives in `kubernetes/networking/`) - it covers the host and infrastructure side: DNS records and resolvers, TLS certificate management, Nginx/HAProxy configuration, VPN tunnels between servers, and firewall rules at the OS or cloud level.
 
 ```
 networking/
@@ -139,7 +142,7 @@ networking/
 
 ### `storage/`
 
-**Purpose:** Persistent data — block storage, object storage, databases, and backup/restore procedures.
+**Purpose:** Persistent data - block storage, object storage, databases, and backup/restore procedures.
 
 ```
 storage/
@@ -153,9 +156,9 @@ storage/
 
 ### `delivery/`
 
-**Purpose:** Getting code from a developer's laptop to a running service — CI pipelines, CD deployments, artifact management, GitOps workflows, and project runtime identification.
+**Purpose:** Getting code from a developer's laptop to a running service - CI pipelines, CD deployments, artifact management, GitOps workflows, and project runtime identification.
 
-The `project-runtimes/` subfolder deserves a specific explanation. When a new project arrives — a Java service, a Node.js API, a Python script — the first job of a DevOps engineer is to understand how that project runs before writing any pipeline or Dockerfile. This folder contains one file per language/runtime, answering the question: "I just cloned this repo. What do I look at first, and what commands do I run to build and test it?"
+The `project-runtimes/` subfolder deserves a specific explanation. When a new project arrives - a Java service, a Node.js API, a Python script - the first job of a DevOps engineer is to understand how that project runs before writing any pipeline or Dockerfile. This folder contains one file per language/runtime, answering the question: "I just cloned this repo. What do I look at first, and what commands do I run to build and test it?"
 
 ```
 delivery/
@@ -190,7 +193,7 @@ security/
 
 ### `observability/`
 
-**Purpose:** Knowing what is happening inside running systems — metrics, logs, traces, and alerts.
+**Purpose:** Knowing what is happening inside running systems - metrics, logs, traces, and alerts.
 
 ```
 observability/
@@ -204,7 +207,7 @@ observability/
 
 ### `cloud/`
 
-**Purpose:** Cloud provider-specific knowledge — IAM, VPCs, compute, and managed services.
+**Purpose:** Cloud provider-specific knowledge - IAM, VPCs, compute, and managed services.
 
 Cloud content is organized by provider. AWS is the primary target and has its own subdirectories. GCP and Azure folders exist as placeholders that will be populated as experience grows.
 
@@ -223,7 +226,7 @@ cloud/
 
 ### `iac/`
 
-**Purpose:** Infrastructure as Code — provisioning, state management, and reusable modules.
+**Purpose:** Infrastructure as Code - provisioning, state management, and reusable modules.
 
 Covers Terraform workflows: writing resources, managing remote state, structuring modules, handling provider versions, and running plans safely in CI. Will expand to include Pulumi or OpenTofu as needed.
 
@@ -238,7 +241,7 @@ iac/
 
 ### `self-hosted/`
 
-**Purpose:** Software that is deployed and operated personally — not managed by a cloud provider, not SaaS.
+**Purpose:** Software that is deployed and operated personally - not managed by a cloud provider, not SaaS.
 
 This is one of the most distinctive parts of the repository. Every tool here was set up from scratch: configuring the service, writing the systemd unit or Docker Compose file, setting up reverse proxies, managing TLS, and handling upgrades. Services currently running or planned include:
 
@@ -268,26 +271,45 @@ self-hosted/
 
 ### `incident-response/`
 
-**Purpose:** Structured playbooks for when things go wrong — not debugging notes, but step-by-step response procedures for known failure scenarios.
+**Purpose:** Structured playbooks for when things go wrong - not debugging notes, but step-by-step response procedures for known failure scenarios.
+
+---
+
+### `workstation/`
+
+**Purpose:** Personal workstation setup and configuration for client machines running Windows or macOS.
+
+This domain is deliberately separate from `linux/`. Linux in this repository refers to the server OS - the substrate that Kubernetes, Docker, and every self-hosted service runs on. `workstation/` covers the development laptop: installing productivity software, configuring the local development environment, and any client-machine-specific procedures that come up occasionally.
+
+Content volume here will always be low. A Windows machine might accumulate two or three files over several years. That is by design - this is not an active infrastructure domain, it is a personal reference shelf for workstation tasks.
+
+```
+workstation/
+├── windows/
+│   └── activate-office-2019.md
+└── macos/
+```
 
 ---
 
 ## Design Principles
 
-**One domain, one folder.** No content lives in two places. If something could belong to both `kubernetes/` and `security/`, it belongs in `kubernetes/security/` — the more specific location wins.
+**One domain, one folder.** No content lives in two places. If something could belong to both `kubernetes/` and `security/`, it belongs in `kubernetes/security/` - the more specific location wins.
 
-**Tone is first-person past tense.** Every file in this repo was written after the work was done. The writing reflects what was built, what commands were run, and what was learned — not instructions directed at a future reader.
+**Tone is first-person past tense.** Every file in this repo was written after the work was done. The writing reflects what was built, what commands were run, and what was learned - not instructions directed at a future reader.
 
 **Scripts live in `silver-stack`, documentation lives here.** Automation scripts (`.sh`, YAML manifests, Terraform modules) are maintained in the `silver-stack` repository. This runbook links to them by URL. No duplication. If a script changes, the documentation points to the latest version automatically.
 
 **Bootstrap is its own domain.** Installation runbooks are not scattered across domain folders. Everything about getting a tool onto a machine lives in `bootstrap/`, regardless of what the tool is used for. This makes it fast to find installation steps without knowing which domain the tool belongs to.
 
-**`project-runtimes/` is detective work, not operations.** The files in `delivery/project-runtimes/` are not about deploying applications — they are about identifying how an application is structured and built before any DevOps work begins. This distinction is intentional and matters.
+**`project-runtimes/` is detective work, not operations.** The files in `delivery/project-runtimes/` are not about deploying applications - they are about identifying how an application is structured and built before any DevOps work begins. This distinction is intentional and matters.
+
+**`workstation/` is a reference shelf, not an active domain.** Windows and macOS entries accumulate slowly and rarely. Keeping them under one parent folder prevents two thin folders sitting at root level alongside heavyweight infrastructure domains like `kubernetes/` and `cloud/`.
 
 ---
 
 ## How Content Is Added
 
-When a new tool is installed for the first time, a file is created in `bootstrap/` before anything else. When a self-hosted service is set up, a folder is created inside `self-hosted/` for its documentation. When a Kubernetes issue is debugged and resolved, the resolution is captured in `kubernetes/troubleshooting/`. When a new project language or framework is encountered, the runtime identification steps go into `delivery/project-runtimes/`.
+When a new tool is installed for the first time, a file is created in `bootstrap/` before anything else. When a self-hosted service is set up, a folder is created inside `self-hosted/` for its documentation. When a Kubernetes issue is debugged and resolved, the resolution is captured in `kubernetes/troubleshooting/`. When a new project language or framework is encountered, the runtime identification steps go into `delivery/project-runtimes/`. When a workstation task comes up on a Windows or macOS machine, the notes go into the appropriate subfolder under `workstation/`.
 
 The repository grows by doing, not by planning.

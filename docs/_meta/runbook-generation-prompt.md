@@ -72,13 +72,14 @@ The actual content tree is:
 │   ├── troubleshooting/        # node/pod/network debugging procedures
 │   └── workloads/              # deployments, statefulsets, jobs, resource limits
 ├── linux/                      # shell, networking, systemd, package management
-├── macOS/                      # macOS-specific tooling and configuration
 ├── networking/                 # host/OS-level networking (not Kubernetes)
 ├── observability/              # Prometheus, Grafana, Loki, alerting
 ├── security/                   # SSL/TLS certs, firewall, SSH hardening (host-level)
 ├── self-hosted/                # Nexus, SonarQube, monitoring stack, reverse proxies
 ├── storage/                    # host/OS-level storage (not Kubernetes)
-├── windows/                    # Windows-specific tooling and configuration
+├── workstation/                # personal workstation setup (client machines only)
+│   ├── windows/                # Windows workstation tooling and configuration
+│   └── macos/                  # macOS workstation tooling and configuration
 └── docs/                       # MkDocs config + internal meta only (NOT content)
     └── _meta/                  # internal docs not published to the site
 ```
@@ -88,7 +89,8 @@ The actual content tree is:
 2. If the task is Kubernetes-specific, place it inside the relevant `kubernetes/` subfolder
 3. If the task is host/OS-level (e.g., iptables on a Linux node), place it under `linux/` or `networking/`, not `kubernetes/`
 4. If the task spans two domains, place it where someone would first look for it
-5. Never place new content entries inside `docs/` - that folder is not for runbook entries
+5. Workstation tasks (Windows/macOS client machine setup) go under `workstation/windows/` or `workstation/macos/` - never at root level
+6. Never place new content entries inside `docs/` - that folder is not for runbook entries
 
 ---
 
@@ -277,7 +279,7 @@ No emoji in headings or admonitions.
 - Marketing language ("powerful", "seamless", "robust")
 - Future tense ("this will allow", "once installed, you can")
 - Sentences starting with "In this guide" / "This tutorial" / "Follow these steps"
-- The em dash character (—) anywhere in the document - use a colon or plain hyphen instead
+- The em dash character anywhere in the document - use a colon or plain hyphen instead
 
 ---
 
@@ -348,5 +350,6 @@ kubectl rollout restart deployment/<name> -n <namespace>
 | Troubleshooting | Real issues encountered only | Fabricated common errors |
 | Verification | Command + expected output + failure meaning | "Run this to check" |
 | File location | Root-level domain folder (e.g., `kubernetes/networking/`) | Inside `docs/` |
+| Workstation files | `workstation/windows/` or `workstation/macos/` | `windows/` or `macOS/` at root |
 | Verb in filename | Matches the task type (`configure-`, `setup-`, `install-`) | Generic or tool-named (`helm-install.md`) |
 | Code language | Always specified (`bash`/`yaml`/`text`) | Bare triple backtick |
