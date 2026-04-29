@@ -1,0 +1,19 @@
+title: Home
+arrange:
+  - index.md
+  - kubernetes
+  - linux
+  - containers
+  - networking
+  - cloud
+  - delivery
+  - iac
+  - observability
+  - security
+  - self-hosted
+  - storage
+  - bootstrap
+  - incident-response
+  - macOS
+  - windows
+  - ...

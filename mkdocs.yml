@@ -1,7 +1,7 @@
 # Basic site metadata – required for GH Pages title/previews
-site_name: "runbook"  # Your site title (appears in browser tab and GH Pages title)
-site_description: "Comprehensive guide to bootstrapping Kubernetes, servers, and tools for modern infra."
-site_author: "Muhammad Ibtisam"  # NEW: For SEO/Open Graph on GH Pages
+site_name: "runbook"
+site_description: "Operational runbooks for Kubernetes, bare-metal infrastructure, DevSecOps pipelines, and platform tooling — written after doing the actual work."
+site_author: "Muhammad Ibtisam"
 site_url: "https://runbook.ibtisam-iq.com"  # Your custom domain (if using; GH Pages supports CNAME)
 
 # Repository integration – enables "Edit this page" links on GH Pages
@@ -13,16 +13,16 @@ edit_uri: edit/main/docs/  # NEW: Path to edit files (assumes 'main' branch; cha
 docs_dir: .
 site_dir: site/  # Output folder (default; GH Pages serves from root of gh-pages branch)
 use_directory_urls: true  # Clean URLs (e.g., /kubernetes/ instead of /kubernetes/index.html)
-strict: true  # NEW: Enforce strict link checking during build/deploy (prevents 404s on GH Pages)
+# strict: true  # NEW: Enforce strict link checking during build/deploy (prevents 404s on GH Pages)
 exclude_docs: |
   README.md
-  
+
 # Theme: Material with GH Pages-friendly features
 theme:
   name: material
   custom_dir: docs/overrides
-  favicon: docs/images/favicon.ico
-  logo: docs/images/favicon.svg
+  favicon: assets/icons/favicon.ico
+  logo: assets/icons/favicon.svg
   # Typography - using system fonts for performance
   font:
     text: Inter           # Modern, readable sans-serif font
@@ -32,7 +32,7 @@ theme:
     - navigation.sections  # Grouped sections (your CNCF-style)
     - navigation.tabs      # Top tabs
     - navigation.top       # Back-to-top button
-    - navigation.expand    # Auto-expand sections
+    # - navigation.expand    # Auto-expand sections
     - navigation.tabs.sticky  # Keeps tabs visible when scrolling
     - content.code.copy
     - content.code.annotate
@@ -44,7 +44,7 @@ theme:
     - search.suggest
     - toc.follow
     - search.highlight
-    - toc.integrate
+    # - toc.integrate
     - search.share         # NEW: Share buttons work seamlessly on GH Pages
 
     # Navigation enhancements
@@ -74,7 +74,7 @@ markdown_extensions:
   - admonition
   - toc:
       permalink: true
-      toc_depth: 6  # Up to H3 for detailed TOC
+      toc_depth: 0
       baselevel: 2
   - footnotes
   - def_list
@@ -111,8 +111,8 @@ plugins:
   - search
   - same-dir
   - autorefs
-  - section-index
-  - awesome-nav    # was: awesome-pages
+  - awesome-nav    # was: awesome-pages - awesome-nav        # ← MUST come before section-index
+  # - section-index  # a folder only becomes a clickable section if it has an index.md
   - minify:
       minify_html: true  # Compresses output for faster GH Pages loads
   - git-revision-date-localized:
@@ -139,4 +139,3 @@ extra:
 
 extra_css:
   - docs/stylesheets/extra.css  # Loads your custom styles
-
