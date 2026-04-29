@@ -7,7 +7,7 @@ site_url: "https://runbook.ibtisam-iq.com"  # Your custom domain (if using; GH P
 # Repository integration – enables "Edit this page" links on GH Pages
 repo_url: "https://github.com/ibtisam-iq/runbook"  # URL to your GitHub repo (for edit/view buttons)
 repo_name: "runbook"  # GitHub slug for buttons
-edit_uri: edit/main/docs/  # NEW: Path to edit files (assumes 'main' branch; change if 'master')
+edit_uri: edit/main/  # NEW: Path to edit files (assumes 'main' branch; change if 'master')
 
 # Build & output config – optimizes for GH Pages static hosting
 docs_dir: .
