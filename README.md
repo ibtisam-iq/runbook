@@ -1,15 +1,16 @@
-# Runbooks
+# Runbook
 
 [![Docs](https://github.com/ibtisam-iq/runbook/actions/workflows/deploy.yml/badge.svg)](https://github.com/ibtisam-iq/runbook/actions/workflows/deploy.yml)
 [![Site](https://img.shields.io/badge/Live-runbook.ibtisam--iq.com-01696f)](https://runbook.ibtisam-iq.com)
 
-Operational runbooks for Kubernetes, bare-metal infrastructure, DevSecOps pipelines, and platform tooling — written after doing the actual work.
+My documented steps from real implementation work — bare-metal infrastructure, DevSecOps pipelines, Kubernetes, cloud environments, and platform tooling.
+What I ran, what broke, and how I fixed it.
 
 Each page documents something I ran on real infrastructure: the exact steps, the decision points, and the things that failed before I got it right. Reusable scripts and manifests referenced here live in [SilverStack](https://github.com/ibtisam-iq/silver-stack).
 
 ---
 
-## How This Fits Into My Engineering System
+## Engineering System
 
 ```mermaid
 flowchart LR
