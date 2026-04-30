@@ -1,4 +1,4 @@
-# Ci Pipelines
+# CI Pipelines
 
 > 🚧 This section is a work in progress. Content will be added soon.
 

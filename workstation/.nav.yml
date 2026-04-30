@@ -1,0 +1,6 @@
+title: Workstation
+nav:
+  - index.md
+  - windows
+  - macos
+  - "*"

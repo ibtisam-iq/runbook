@@ -1,0 +1,150 @@
+
+site_name: "runbook"
+site_description: "Operational runbooks for Kubernetes, bare-metal infrastructure, DevSecOps pipelines, and platform tooling — written after doing the actual work."
+site_author: "Muhammad Ibtisam"
+site_url: "https://runbook.ibtisam-iq.com"
+
+repo_url: "https://github.com/ibtisam-iq/runbook"
+repo_name: "runbook"
+edit_uri: edit/main/  # NEW: Path to edit files (assumes 'main' branch; change if 'master')
+
+# Build & output config – optimizes for GH Pages static hosting
+docs_dir: .
+# site_dir: site/     # Output folder (default; GH Pages serves from root of gh-pages branch)
+use_directory_urls: true
+# strict: true
+# exclude_docs: |
+#  README.md
+
+# Theme: Material with GH Pages-friendly features
+theme:
+  name: material
+  custom_dir: docs/overrides
+  favicon: assets/icons/favicon.ico
+  logo: assets/icons/favicon.svg
+  # Typography - using system fonts for performance
+  font:
+    text: Inter           # Modern, readable sans-serif font
+    code: Roboto Mono     # Monospace font for code blocks
+  language: en
+  features:
+    - navigation.sections    # Grouped sections in the sidebar
+    - navigation.tabs        # Top tabs
+    - navigation.top         # Back-to-top button
+    # - navigation.expand    # Auto-expand sections
+    - navigation.tabs.sticky # Keeps tabs visible when scrolling
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - navigation.instant   # SPA-like loading (fast on GH Pages CDN)
+    - content.action.edit  # Ties to repo_uri
+    - content.action.view
+    - content.code.select
+    - search.suggest
+    - toc.follow
+    - search.highlight
+    # - toc.integrate
+    - search.share         # NEW: Share buttons work seamlessly on GH Pages
+
+    # Navigation enhancements
+    - navigation.instant.progress # Shows loading progress bar for instant navigation
+    - navigation.path             # Shows breadcrumb path above page title
+    - navigation.prune            # Only renders visible navigation (improves performance)
+    - navigation.footer           # Previous/next page links in footer
+    - content.tooltips            # Enables rich tooltips for abbreviations/glossary
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    logo: material/book  # NEW: Simple icon for GH Pages favicon/meta
+
+# Markdown extensions – unchanged, but ensures TOC/links render correctly on GH Pages
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+      toc_depth: 0
+      baselevel: 2
+  - footnotes
+  - def_list
+  - pymdownx.highlight:
+      use_pygments: true
+      line_spans: __span
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: docs
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.tasklist
+  - pymdownx.mark
+  - pymdownx.arithmatex
+  - pymdownx.keys
+  - pymdownx.magiclink
+  - pymdownx.caret
+  - pymdownx.tilde
+  - pymdownx.smartsymbols
+  - codehilite
+  - md_in_html
+
+# Plugins – adds date plugin for freshness on GH Pages
+plugins:
+  - search
+  - same-dir
+  - autorefs
+  - awesome-nav    # was: awesome-pages - awesome-nav        # ← MUST come before section-index
+  #- section-index  # a folder only becomes a clickable section if it has an index.md
+  - minify:
+      minify_html: true  # Compresses output for faster GH Pages loads
+  - git-revision-date-localized:
+      type: custom                  # Use custom formatting
+      custom_format: "%B %d, %Y %I:%M:%S %p"
+      enable_creation_date: false
+      fallback_to_build_date: false
+      timezone: Asia/Karachi
+      locale: en                    # Keeps English month/day names
+      exclude:
+      - index.md
+
+# Extra content – enhances GH Pages sharing/SEO
+extra:
+  social:
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/in/ibtisam-iq/
+    - icon: fontawesome/brands/github
+      link: https://github.com/ibtisam-iq
+    - icon: fontawesome/solid/globe
+      link: https://ibtisam-iq.com
+  generator: false  # Hides "Built with MkDocs" (clean look)
+  copyright: "© 2026 Ibtisam IQ. All rights reserved."  # NEW: Footer copyright
+
+extra_css:
+  - docs/stylesheets/extra.css
+
+watch:
+  - docs/overrides
+  - docs/stylesheets
+  - mkdocs.yml
+
+site_dir: /tmp/mkdocs-runbook/     # ← CHANGE: move outside repo to break the loop
+exclude_docs: |
+  README.md
+  site/

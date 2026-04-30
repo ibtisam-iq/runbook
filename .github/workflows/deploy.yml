@@ -10,6 +10,8 @@ on:
       - "README.md"        # GitHub repo landing page only
       - ".gitignore"       # repo config
       - ".mdformat.toml"   # local markdown formatter config
+      - "docs/_archive/**" # Old but worth keeping, replaced implementations, rollback/reference material
+      - "docs/_drafts/**"  # Ignore the drafts folder (works in progress; not part of the live site)
       - "docs/_meta/**"    # documentation metadata
   pull_request:
     branches:
@@ -19,6 +21,8 @@ on:
       - "README.md"
       - ".gitignore"
       - ".mdformat.toml"
+      - "docs/_archive/**"
+      - "docs/_drafts/**"
       - "docs/_meta/**"
   workflow_dispatch:
 

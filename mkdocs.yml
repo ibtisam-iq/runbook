@@ -12,13 +12,28 @@ edit_uri: edit/main/
 # Build & output
 docs_dir: .
 site_dir: site/
-use_directory_urls: true
+use_directory_urls: true      # Use pretty URLs (e.g., /page/ instead of /page.html), default: true
+# strict: true                  # Treat warnings as errors
 exclude_docs: |
   README.md
+  .venv/*
+  .stratchpad/*
+  scripts/*
+  .github/*
+  requirements*.txt
+  mkdocs.yml
+  CNAME
+  .gitignore
+  .mdformat.toml
+
+draft_docs: |
+  incident-response/*
+  
+  docs/_meta/*
+  docs/_drafts/*
 
 # Live reload watch paths
 watch:
-  - docs
   - mkdocs.yml
 
 # Build validation
@@ -55,7 +70,7 @@ theme:
     - navigation.tabs.sticky
     - navigation.sections
     - navigation.path
-    - navigation.prune
+    #- navigation.prune
     - navigation.top
     - navigation.footer
     # TOC
@@ -72,6 +87,8 @@ theme:
     - content.tooltips
     - content.action.edit
     - content.action.view
+    - navigation.expand
+    - navigation.indexes
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -104,7 +121,7 @@ markdown_extensions:
   - toc:
       permalink: true
       permalink_title: "Link to this section"
-      toc_depth: 3
+      toc_depth: 2
       slugify: !!python/object/apply:pymdownx.slugs.slugify
         kwds:
           case: lower
@@ -185,6 +202,9 @@ extra:
       link: https://ibtisam-iq.com
       name: Personal Website
   generator: false
+
+hooks:
+  - hooks/same_dir_fix.py
 
 copyright: >-
   Copyright &copy; 2026

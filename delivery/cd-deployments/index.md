@@ -1,4 +1,4 @@
-# Cd Deployments
+# CD Deployments
 
 > 🚧 This section is a work in progress. Content will be added soon.
 

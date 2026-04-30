@@ -158,12 +158,13 @@
 .md-tabs__link {
   font-weight: 700 !important;
   font-size: 0.78rem !important;
-  letter-spacing: 0.08em !important;
-  text-transform: uppercase !important;
+  /*letter-spacing: 0.08em !important; */       /* ← remove this too */
+  /* text-transform: uppercase !important; */   /* ← remove this */
   color: #8b949e !important;
   opacity: 1 !important;
   position: relative;
   transition: color 0.2s ease !important;
+  font-weight: 600 !important;
 }
 
 .md-tabs__link::after {

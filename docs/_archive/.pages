@@ -1,0 +1,17 @@
+nav:
+  - Home: index.md
+  - kubernetes # Points to folder; awesome-pages pulls in its .pages for subsections
+  - linux
+  - containers
+  - networking
+  - cloud
+  - delivery
+  - iac
+  - observability
+  - security
+  - self-hosted
+  - storage
+  - bootstrap
+  - incident-response
+  - workstation
+  - ...
