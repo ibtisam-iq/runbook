@@ -82,7 +82,8 @@ jobs:
             "not allowed as child" \
             "End tag" \
             "were open elements" \
-            "tabindex"
+            "tabindex" \
+            "aria-labelledby"
 
       - name: QA — Check for broken links
         uses: lycheeverse/lychee-action@v2.8.0
