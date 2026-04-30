@@ -1,3 +1,13 @@
-.venv
+# OS generated files
 .DS_Store
-.stratchpad
+Thumbs.db
+
+# Virtual environment
+.venv/
+
+# Scratch files
+.scratchpad
+
+# Byte-compiled / cached Python files
+__pycache__/
+*.pyc
