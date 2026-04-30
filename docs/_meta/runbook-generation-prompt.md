@@ -353,3 +353,76 @@ kubectl rollout restart deployment/<name> -n <namespace>
 | Workstation files | `workstation/windows/` or `workstation/macos/` | `windows/` or `macOS/` at root |
 | Verb in filename | Matches the task type (`configure-`, `setup-`, `install-`) | Generic or tool-named (`helm-install.md`) |
 | Code language | Always specified (`bash`/`yaml`/`text`) | Bare triple backtick |
+| Root folder structure | Fixed - never add new root domains | `gateway-api/` at root |
+| `docs/` folder usage | Internal meta only - no runbook entries | `docs/kubernetes/configure-rbac.md` |
+| External links | Official project sources only, always hyperlinked | Stack Overflow, Medium posts |
+
+## Part 10: Placement, Boundary, and Link Rules
+
+### Rule 1: Root Folder Structure is Immutable
+
+The root-level domain folders are fixed. They will not change, and no new root-level folder
+will ever be created. The complete set is defined in Part 2.
+
+Sub-folders inside each domain are not fixed. They are templates — placeholders that represent
+the intended structure. They can be created, renamed, or nested deeper as content demands.
+
+**Decision flow when placing a new file:**
+1. Identify the correct root domain folder from the list in Part 2
+2. Determine the appropriate sub-folder inside that domain
+3. If that sub-folder does not exist yet, create it — this is expected and correct
+4. Place the file inside the sub-folder
+
+**What is never allowed:**
+- Creating a new root-level folder alongside the existing domains
+- Placing a file directly at the repository root (except `index.md`)
+
+```
+CORRECT: kubernetes/networking/configure-gateway-api.md   (existing root, new sub-folder if needed)
+WRONG:   gateway-api/configure-gateway-api.md             (new root-level folder)
+```
+
+---
+
+### Rule 2: The `docs/` Folder Never Contains Runbook Content
+
+The `docs/` folder exists solely for MkDocs configuration, navigation definitions, and internal
+meta documentation (such as this file). It is not served as content on the website.
+
+The website at `runbook.ibtisam-iq.com` serves content from the root-level domain folders only.
+Any file placed inside `docs/` will not appear on the live site.
+
+**The rule:** Every runbook entry — every file that captures operational work — must be placed
+inside a root-level domain folder, never inside `docs/`.
+
+```
+CORRECT: kubernetes/security/configure-rbac.md
+CORRECT: delivery/configure-github-actions-runner.md
+WRONG:   docs/kubernetes/configure-rbac.md
+WRONG:   docs/delivery/configure-github-actions-runner.md
+```
+
+---
+
+### Rule 3: Official Links Only, All Hyperlinked
+
+When writing a runbook entry, every external resource consulted during the work session must
+be included as a hyperlink in the document.
+
+**Only official sources are linked:**
+- The official GitHub repository of the tool or plugin
+- The official documentation site published by the project itself
+  (e.g., `kubernetes.io`, `helm.sh`, `docs.docker.com`, `argoproj.github.io`)
+
+**Never link:**
+- Stack Overflow answers
+- Medium or blog posts
+- Third-party tutorials or unofficial guides
+- Any site that is writing *about* the tool rather than *being* the tool's authoritative source
+
+**The test:** Is this URL published and maintained by the project team themselves? If yes, link it.
+If it is someone else's commentary on the project, omit it.
+
+Links go in the `## Related` section at the bottom of the entry, or inline as hypertext
+on the first mention of the resource within the document body — whichever makes the reference
+clearest to a reader navigating the entry.
