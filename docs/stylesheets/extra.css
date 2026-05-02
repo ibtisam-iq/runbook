@@ -249,8 +249,8 @@
   letter-spacing: -0.025em;
   line-height: 1.2;
   margin-bottom: 0.5rem;
-  border-bottom: 2px solid var(--md-primary-fg-color);
-  padding-bottom: 0.5rem;
+  /* border-bottom: 2px solid var(--md-primary-fg-color); */
+  /* padding-bottom: 0.5rem; */
 }
 
 /* H2 — major sections: bold with teal underline */

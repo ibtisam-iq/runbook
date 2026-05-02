@@ -153,6 +153,7 @@ Choose the verb that most accurately reflects the nature of the task.
 - No `how-to-` prefix: `configure-tls-termination.md` not `how-to-configure-tls.md`
 - Combined name is acceptable when two tightly coupled steps are inseparable:
   `install-and-configure-cert-manager.md`
+- No `[cite:XX]` markers
 
 ---
 

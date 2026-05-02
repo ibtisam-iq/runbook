@@ -100,7 +100,7 @@ The actual content tree is:
 2. If the artifact is a Docker image or container build, place it under `containers/`
 3. If the artifact is a CI/CD pipeline or workflow, place it under `delivery/`
 4. If the artifact is a self-hosted tool (Jenkins, SonarQube, Nexus), place it under `self-hosted/`
-5. Place entries here only when the subject is the client machine itself - installing or configuring software on a personal Windows or macOS laptop. This covers package managers (Homebrew, Winget), CLI tools, IDEs, dotfiles, and any software installed directly on the developer's machine.  
+5. Place entries here only when the subject is the client machine itself - installing or configuring software on a personal Windows or macOS laptop. This covers package managers (Homebrew, Winget), CLI tools, IDEs, dotfiles, and any software installed directly on the developer's machine.
 - This folder is not for container builds, server setups, or dev environments that run inside Docker/VMs. A Docker image built for iximiuz Playground is a container artifact. It belongs in `containers/` (for the image build) and `delivery/` (for the CI pipeline). The fact that a tool is used only by the developer does not make it a workstation entry.
 7. If the task spans two domains, place it where someone would first look for it
 8. Never place new content entries inside `docs/` - that folder is not for runbook entries
@@ -168,6 +168,7 @@ Choose the verb that most accurately reflects the nature of the work.
 - No `how-to-` prefix: `build-dev-machine-rootfs.md` not `how-to-build-dev-machine-rootfs.md`
 - Combined name is acceptable when two tightly coupled build steps are inseparable:
   `build-and-push-dev-machine-rootfs.md`
+- No `[cite:XX]` markers
 
 ---
 

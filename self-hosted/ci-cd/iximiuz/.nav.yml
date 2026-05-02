@@ -1,0 +1,5 @@
+title: Iximiuz CI/CD Stack
+nav:
+  - Journey: self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md
+  - Infrastructure & Orchestration: setup-cicd-stack-orchestration.md
+  - Operations: cicd-stack-operations.md
