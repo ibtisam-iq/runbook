@@ -2,22 +2,20 @@
 
 ## Context
 
-Ubuntu 24.04 Rootfs is the **base image for all SilverStack iximiuz playground machines** - every other rootfs in this stack builds `FROM` this image.
+Ubuntu 24.04 Rootfs is the **base image for all SilverStack iximiuz playground machines** - every other rootfs in this stack (`FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`) builds on top of it.
 
-It is used directly by images like Dev Machine, Jenkins, Nexus, and SonarQube, which assume this base is already systemd‑enabled, SSH‑ready, and equipped with a curated set of DevOps tools.
+It is consumed directly by child images such as Dev Machine, Jenkins, Nexus, and SonarQube. Those images assume this base is already systemd-enabled, SSH-ready, and equipped with a curated DevOps toolset.
+
+> **Important:** This image is **not a regular Docker application image**. It is a **microVM rootfs** designed for the [iximiuz Labs](https://labs.iximiuz.com) platform, which boots it as a full virtual machine using its own kernel and init system. When the platform boots the VM, systemd becomes PID 1 automatically - the image itself does **not** need a `CMD` or `ENTRYPOINT`. Attempting to validate this image with plain `docker run` will **not** produce a working systemd environment; see [Verification](#verification) for the correct approach.
 
 The image is defined under:
 
 - README: [`iximiuz/rootfs/ubuntu/README.md`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/README.md)
 - Dockerfile: [`iximiuz/rootfs/ubuntu/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/Dockerfile)
 - Scripts: [`iximiuz/rootfs/ubuntu/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/ubuntu/scripts)
-- System‑wide prompt: [`iximiuz/rootfs/ubuntu/configs/profile.d/00-prompt.sh`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/configs/profile.d/00-prompt.sh)
+- System-wide prompt: [`iximiuz/rootfs/ubuntu/configs/profile.d/00-prompt.sh`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/configs/profile.d/00-prompt.sh)
 - Welcome banner: [`iximiuz/rootfs/ubuntu/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/welcome)
 - CI workflow: [`.github/workflows/build-ubuntu-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-ubuntu-rootfs.yml)
-
-Although it can be used directly as a playground rootfs by adapting manifests (for example by editing
-[`iximiuz/manifests/dev-machine.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/dev-machine.yml)
-to point at `ubuntu-24-04-rootfs` instead of Dev Machine), its **primary purpose** is to act as a **clean, consistent base for child images**.
 
 ---
 
@@ -25,107 +23,120 @@ to point at `ubuntu-24-04-rootfs` instead of Dev Machine), its **primary purpose
 
 Ubuntu 24.04 Rootfs must:
 
-- Provide a **fully unminimized, systemd‑enabled Ubuntu 24.04** base with correct boot behavior in iximiuz microVMs.
-- Configure **SSH** with key‑based auth only and appropriate defaults for playground use.
+- Provide a **fully unminimized, systemd-enabled Ubuntu 24.04** environment that behaves like a real server inside iximiuz microVMs.
+- Configure **SSH** with key-based authentication only, optimized for low-latency playground access.
 - Deliver a **sane default shell environment**: custom PS1 prompt, bash completion, vim, fzf, ripgrep, and Git configuration helpers.
-- Ship a small but powerful **DevOps toolset** (arkade, jq/yq/fx, task/just, btop, cfssl, code‑server, websocat) that child images can rely on.
-- Provide a consistent **per‑user experience** by creating a non‑root `$USER` (default `ibtisam`) with tuned `.bashrc`, `.gitconfig`, and `.vimrc`.
-- Be built reproducibly via **GitHub Actions**, multi‑arch, tagged, and published to GHCR as `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs`.
+- Ship a curated **DevOps toolset** (arkade, jq/yq/fx, task/just, btop, cfssl, code-server, websocat) that child images can rely on without re-installing.
+- Create a consistent **non-root interactive user** (`$USER`, default `ibtisam`) with tuned `.bashrc`, `.gitconfig`, and `.vimrc`.
+- Be built reproducibly via **GitHub Actions**, published multi-arch to GHCR as `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs`.
 
 ---
 
 ## Architecture / Conceptual Overview
 
-At a high level, the base rootfs image:
+### How iximiuz Uses This Image
 
-- Starts from the official `ubuntu:24.04` image and runs `unminimize` to get a full userland.
-- Installs systemd, SSH, and a standard Linux troubleshooting toolkit (curl, traceroute, mtr, net-tools, nftables, socat, etc.).
-- Cleans up container‑specific artifacts and ensures machine IDs are empty so each VM can generate its own identity at boot.
-- Adds a **systemd “examiner” service** via the `set-up-systemd-examiner-service.sh` script so child images can easily inspect service state.
-- Installs **system‑wide** tools via “get‑*” scripts (arkade, common CLIs, btop, cfssl, websocat, fx).
-- Installs **user‑specific** tools and customizations twice: once for `root`, then again for the non‑root `$USER` created by `add-user.sh`.
+The iximiuz Labs platform boots playground machines by mounting the OCI image as a **block device filesystem (rootfs)** for a microVM. The platform's own kernel and bootloader handle VM initialization - this is **not Docker container execution**. This means:
 
-The result is a **VM‑ready Ubuntu base** that behaves like a small server, not a minimal container. Child images can safely assume:
+- **systemd as PID 1** is guaranteed by the platform's boot process, not by anything inside the image.
+- **SSH host keys** are intentionally absent from the image (deleted during build). The iximiuz platform regenerates them at VM first boot.
+- **Machine IDs** (`/etc/machine-id`, `/var/lib/dbus/machine-id`) are intentionally emptied during build so each VM generates its own unique identity on first boot.
+- `/.dockerenv` is removed during build to prevent systemd from treating the environment as a container.
 
-- systemd is PID 1 and can manage services.
-- SSH is configured and enabled.
+### What the Image Provides
+
+The base rootfs:
+
+1. Starts from `ubuntu:24.04` and runs `unminimize` to restore full userland (man pages, locales, standard tools).
+2. Installs systemd, SSH, and a standard Linux troubleshooting toolkit.
+3. Cleans container-specific artifacts and empties machine IDs.
+4. Adds a **systemd "examiner" service** (via `set-up-systemd-examiner-service.sh`) so child images can inspect service state programmatically.
+5. Installs **system-wide** tools via `get-*` scripts (arkade, common CLIs, btop, cfssl, websocat, fx).
+6. Installs **user-specific** tools and customizations for both `root` and the non-root `$USER`.
+
+Child images can safely assume:
+
+- systemd is the init system and manages services.
+- SSH is configured and enabled (host keys are regenerated by the platform at boot).
 - The interactive `$USER` exists with a consistent shell experience.
-- Utility tools and the “examiner” service are already present.
+- Core utility tools and the examiner service are already present.
 
 ---
 
-## Key Decisions
+## Key Design Decisions
 
-- **Use unminimized Ubuntu instead of slim images**
-  Running `unminimize` ensures man pages, locales, and standard tools are available, which is valuable for hands‑on labs and debugging.
+- **Unminimized Ubuntu** - `unminimize` ensures man pages, locales, and standard tools are available, which is essential for hands-on labs.
 
-- **Mask noisy/irrelevant services**
-  Services like `networkd-dispatcher` are masked to reduce noise in journald for lab environments where dynamic network configuration is not needed.
+- **No `CMD` or `ENTRYPOINT` in the image** - iximiuz boots the VM with its own kernel. The image must not define an entrypoint. Adding one would conflict with how the platform mounts and boots the rootfs.
 
-- **SSH key‑only authentication**
-  Password authentication is disabled and SSH is tuned (e.g., `UseDNS no`, `AddressFamily inet`) to reduce latency and tighten security in shared environments.
+- **SSH host keys intentionally deleted** - `rm -f /etc/ssh/ssh_host_*` is done during build so every VM instance gets unique host keys. The `sshd-keygen` systemd units are masked to prevent Ubuntu's built-in key generation from running; the iximiuz platform handles key generation at VM boot.
 
-- **Script‑driven base tooling**
-  All tool installation and customization is handled by small scripts under `scripts/` so the Dockerfile remains readable and base behavior is easily extended or reused by other projects.
+- **Machine IDs emptied at build time** - ensures each VM generates its own D-Bus and systemd machine identity on first boot.
 
-- **Single base for all rootfs images**
-  For long‑term maintainability, all service images (Dev Machine, Jenkins, Nexus, SonarQube, etc.) share this common base, ensuring consistent behavior and reducing duplicated setup.
+- **`networkd-dispatcher.service` masked** - reduces journald noise for lab environments where dynamic networkd reconfiguration is not needed.
+
+- **Script-driven tooling** - small focused scripts under `scripts/` keep the Dockerfile readable and allow child images to reuse or override individual setup steps.
+
+- **Single base for all rootfs images** - Dev Machine, Jenkins, Nexus, SonarQube, and future images all build `FROM` this base, ensuring consistent behavior and eliminating duplicated setup.
 
 ---
 
-## Source Layout and Inputs
-
-From [`iximiuz/rootfs/ubuntu/README.md`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/README.md):
+## Source Layout
 
 ```text
 ubuntu/
 ├── Dockerfile
-├── welcome
+├── welcome                            # Welcome banner (copied to $HOME/.welcome)
 ├── configs/
 │   └── profile.d/
-│       └── 00-prompt.sh       # System-wide PS1 prompt
+│       └── 00-prompt.sh               # System-wide PS1 prompt (login shells)
 └── scripts/
-    ├── add-user.sh
-    ├── customize-bashrc.sh
-    ├── customize-git.sh
-    ├── customize-vimrc.sh
-    ├── get-arkade.sh
-    ├── get-btop.sh
-    ├── get-cfssl.sh
-    ├── get-code-server.sh
-    ├── get-common-tools.sh
-    ├── get-fzf.sh
-    ├── get-websocat.sh
+    ├── add-user.sh                    # Creates non-root $USER
+    ├── customize-bashrc.sh            # Appends to ~/.bashrc (prompt, welcome, fzf, etc.)
+    ├── customize-git.sh               # Sets ~/.gitconfig defaults
+    ├── customize-vimrc.sh             # Sets ~/.vimrc defaults
+    ├── get-arkade.sh                  # Installs arkade
+    ├── get-btop.sh                    # Installs btop at $BTOP_VERSION
+    ├── get-cfssl.sh                   # Installs cfssl at $CFSSL_VERSION
+    ├── get-code-server.sh             # Installs code-server (VS Code in browser)
+    ├── get-common-tools.sh            # Installs jq, yq, task, just, etc.
+    ├── get-fzf.sh                     # Installs fzf
+    ├── get-websocat.sh                # Installs websocat at $WEBSOCAT_VERSION
     └── set-up-systemd-examiner-service.sh
 ```
 
-Key components:
+> **Note on `welcome` file placement:** `customize-bashrc.sh` appends logic to `~/.bashrc` that displays and then **permanently deletes** `~/.welcome` on the first interactive login. The `COPY welcome $HOME/.welcome` instruction must therefore appear **after** all `RUN` script steps so the file is not consumed during a non-interactive build layer.
 
-- Dockerfile: [`iximiuz/rootfs/ubuntu/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/Dockerfile)
-- Prompt script: [`configs/profile.d/00-prompt.sh`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/configs/profile.d/00-prompt.sh)
-- Scripts directory: [`iximiuz/rootfs/ubuntu/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/ubuntu/scripts)
-- Welcome: [`iximiuz/rootfs/ubuntu/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/welcome)
+---
 
-> **Why this matters:** Every child image expects these base behaviors and tools; if you change the base scripts or Dockerfile, it can affect the entire stack.
+## Build Arguments
+
+| ARG | Default | Description |
+|---|---|---|
+| `USER` | `ibtisam` | Non-root interactive user to create |
+| `BTOP_VERSION` | `1.4.4` | btop release version |
+| `CFSSL_VERSION` | `1.6.5` | cfssl release version |
+| `WEBSOCAT_VERSION` | `1.14.1` | websocat release version |
+| `ARKADE_BIN_DIR` | `/usr/local/bin` | Installation path for arkade |
+| `BUILD_DATE` | _(set by CI)_ | OCI label: image creation timestamp |
+| `VCS_REF` | _(set by CI)_ | OCI label: git commit SHA |
 
 ---
 
 ## Prerequisites
 
-To build Ubuntu 24.04 Rootfs:
-
-- Docker (with Buildx for multi‑arch if you want to mirror CI).
-- A local checkout of `[github.com/ibtisam-iq/silver-stack](https://github.com/ibtisam-iq/silver-stack)` with the `iximiuz/rootfs/ubuntu` tree.
+- Docker with Buildx (for multi-arch builds mirroring CI).
+- A local checkout of [`github.com/ibtisam-iq/silver-stack`](https://github.com/ibtisam-iq/silver-stack) with the `iximiuz/rootfs/ubuntu` tree.
 - Network access to fetch packages and GitHub releases referenced by the `get-*` scripts.
-- For CI, a GitHub repository with permissions to push to GHCR.
+- For CI: a GitHub repository with `packages: write` permission to push to GHCR.
 
 ---
 
-## Installation / Build Steps
+## Build Steps
 
-### 1. Local base image build
+### 1. Local Build
 
-From `iximiuz/rootfs/ubuntu`:
+From the `iximiuz/rootfs/ubuntu/` directory:
 
 ```bash
 IMAGE_NAME="ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest"
@@ -142,182 +153,172 @@ docker build \
 
 The Dockerfile performs the following major steps:
 
-1. **Unminimize Ubuntu and install base packages**
+**Step 1 - Unminimize Ubuntu and install base packages**
 
-    - Starts from `ubuntu:24.04`.
-    - Copies `unminimize` from `ubuntu:22.04`.
-    - Installs system packages: systemd, SSH prerequisites, debugging tools (`curl`, `htop`, `mtr`, `traceroute`, etc.).
-    - Runs `yes | unminimize` to restore full userland.
-    - Masks `networkd-dispatcher.service` to reduce noise.
-    - Clears MOTD, removes `/.dockerenv`, and empties machine IDs so each VM gets its own identity.
+- Starts from `ubuntu:24.04`.
+- Copies `unminimize` from `ubuntu:22.04` (Ubuntu 24.04 dropped it from its own image).
+- Installs system packages: `systemd`, SSH prerequisites, and a debugging toolkit (`curl`, `htop`, `mtr`, `traceroute`, `nftables`, `socat`, etc.).
+- Runs `yes | unminimize` to restore the full userland.
+- Masks `networkd-dispatcher.service` to reduce journald noise.
+- Removes `/etc/update-motd.d/*`, `/.dockerenv`, and empties machine IDs for per-VM identity generation.
+- Sets `root` password to `root`.
 
-2. **Configure SSH**
+**Step 2 - Configure SSH**
 
-    - Installs `openssh-server`.
-    - Appends configuration enabling only key‑based auth, optimizing for IPv4, disabling DNS lookups, and raising `MaxAuthTries` to tolerate multiple keys.
-    - Masks `sshd-keygen` units, disables the SSH socket, removes socket overrides, enables `ssh.service`, and removes any pre‑generated host keys so they are created at first boot.
+- Installs `openssh-server`.
+- Appends to `/etc/ssh/sshd_config`: key-based auth only (`AuthenticationMethods publickey`), IPv4-only (`AddressFamily inet`), DNS disabled (`UseDNS no`), `MaxAuthTries 50`, `PrintLastLog no`.
+- Masks `sshd-keygen@.service` and `sshd-keygen.target` (platform regenerates host keys at VM boot).
+- Disables socket activation (`ssh.socket`), removes socket override files, enables `ssh.service`.
+- Deletes all pre-generated host keys (`rm -f /etc/ssh/ssh_host_*`) - each VM gets unique keys from the platform.
 
-3. **Systemd examiner service**
+**Step 3 - Systemd examiner service**
 
-    - Copies `examiner*` binaries into `/usr/local/bin`.
-    - Runs `set-up-systemd-examiner-service.sh` from scripts to register a systemd service for examining system state.
+- Copies `examiner*` binaries to `/usr/local/bin`.
+- Runs `set-up-systemd-examiner-service.sh` which creates `/etc/systemd/system/examiner.service` and symlinks it into `multi-user.target.wants`.
 
-4. **System‑wide prompt and tools**
+**Step 4 - System-wide prompt and tools**
 
-    - Copies `configs/profile.d/00-prompt.sh` into `/etc/profile.d` and marks it executable to set a consistent PS1 prompt system‑wide.
-    - Runs the following scripts under `scripts/` to install tools globally:
-        - `get-arkade.sh` - installs `arkade` into `ARKADE_BIN_DIR` (default `/usr/local/bin`).
-        - `get-common-tools.sh` - fetches `jq`, `yq`, `fx`, `task`, `just`, etc.
-        - `get-btop.sh` - installs `btop` at the version given by `BTOP_VERSION`.
-        - `get-cfssl.sh` - installs `cfssl` at `CFSSL_VERSION`.
-        - `get-websocat.sh` - installs `websocat` at `WEBSOCAT_VERSION`.
-    - Pipes `curl https://fx.wtf/install.sh | sh` to install `fx`.
+- Copies `configs/profile.d/00-prompt.sh` to `/etc/profile.d/` and marks it executable. This sets a colored PS1 for **login shells**. Non-login interactive shells get their PS1 from `~/.bashrc` (set by `customize-bashrc.sh`).
+- Installs tools system-wide: `get-arkade.sh`, `get-common-tools.sh`, `get-btop.sh`, `get-cfssl.sh`, `get-websocat.sh`, and `curl https://fx.wtf/install.sh | sh`.
 
-5. **Root user customizations**
+**Step 5 - Root user customizations**
 
-    - Runs `get-fzf.sh`, `customize-bashrc.sh`, `customize-git.sh`, and `customize-vimrc.sh` to tune the root user’s shell, Git config, and vimrc.
+- Runs `get-fzf.sh`, `customize-bashrc.sh`, `customize-git.sh`, and `customize-vimrc.sh` for `root`.
 
-6. **Create non‑root user**
+**Step 6 - Create non-root user**
 
-    - Executes `add-user.sh` to create the `$USER` (default `ibtisam`) with appropriate groups and home directory.
-    - Switches to `USER $USER` and sets `HOME=/home/$USER`.
+- Runs `add-user.sh` to create `$USER` (default: `ibtisam`, UID 1001) with `sudo` group membership and passwordless `NOPASSWD:ALL` sudoers entry.
+- Switches to `USER $USER`, sets `HOME=/home/$USER`.
 
-7. **User‑specific tools and welcome**
+**Step 7 - User-specific tools and welcome (order matters)**
 
-    - Copies `welcome` to `$HOME/.welcome` so the base image itself has a friendly banner on login.
-    - Runs `get-code-server.sh`, `get-fzf.sh`, `customize-bashrc.sh`, `customize-git.sh` (with `USER=$USER`), and `customize-vimrc.sh` again for the non‑root user.
+- Runs `get-code-server.sh`, `get-fzf.sh`, `customize-bashrc.sh`, `customize-git.sh` (with `USER=$USER`), and `customize-vimrc.sh` for the non-root user.
+- **Last instruction:** `COPY welcome $HOME/.welcome` - placed after all script `RUN` steps to ensure the file is not consumed during build.
 
-> **Why this matters:** All child images (Dev Machine, Jenkins, etc.) assume this base layer already has systemd, SSH, prompt, core tools, and an interactive `$USER` ready to go.
+> **No `CMD` or `ENTRYPOINT` is set.** The iximiuz platform boots the VM with its own kernel and does not execute the image as a Docker container. Setting an entrypoint here would be incorrect.
 
 ---
 
-### 2. Build and push via GitHub Actions
+### 2. Build and Push via GitHub Actions
 
-The canonical build path is defined in
-[`.github/workflows/build-ubuntu-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-ubuntu-rootfs.yml).
+The canonical build is defined in [`.github/workflows/build-ubuntu-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-ubuntu-rootfs.yml).
 
-Key behavior:
+**Triggers:**
 
-- **Triggers**
-    - Runs on `push` to `main` when anything under `iximiuz/rootfs/ubuntu/**` (except `README.md`) changes, or when the workflow itself changes.
-    - Runs on pull requests touching the same paths.
-    - Supports manual `workflow_dispatch` runs.
+- `push` to `main` when anything under `iximiuz/rootfs/ubuntu/**` (except `README.md`) changes, or when the workflow file changes.
+- Pull requests touching the same paths.
+- Manual `workflow_dispatch`.
 
-- **Environment**
-    - `IMAGE_NAME` is `ghcr.io/${{ github.repository_owner }}/ubuntu-24-04-rootfs`.
+**Key build behavior:**
 
-- **Build steps**
-    - Checkout repo (`actions/checkout@v4`).
-    - Set up QEMU and Buildx for `amd64` and `arm64`.
-    - Log into GHCR using `secrets.GITHUB_TOKEN`.
-    - Run `docker/metadata-action` to generate tags and labels, including:
-        - `latest` on the default branch.
-        - `sha-<short-sha>` tags.
-        - A date tag `YYYY-MM-DD`.
-        - License, base image name (`ubuntu:24.04`), URL, source, vendor, documentation, and authors.
-    - Run `docker/build-push-action` with:
-        - `context: ./iximiuz/rootfs/ubuntu`
-        - `file: ./iximiuz/rootfs/ubuntu/Dockerfile`
-        - `platforms: linux/amd64,linux/arm64`
-        - `push: true` for non‑PR events.
-        - `build-args` matching the local example (`USER`, `ARKADE_BIN_DIR`, `BTOP_VERSION`, `CFSSL_VERSION`, `WEBSOCAT_VERSION`).
-    - Print the final image digest.
-
-> **Why this matters:** Treating the workflow as the canonical builder ensures every child image sees a consistent base with reproducible tags and metadata.
+- Authenticates to GHCR via `secrets.GITHUB_TOKEN`.
+- Generates tags via `docker/metadata-action`: `latest` (default branch), `sha-<short-sha>`, `YYYY-MM-DD`.
+- Runs `docker/build-push-action` with `context: ./iximiuz/rootfs/ubuntu`, `platforms: linux/amd64`, `push: true` (non-PR events), and the `build-args` above.
+- Prints the final image digest on completion.
 
 ---
 
 ## Verification
 
-### Local VM behavior (quick check)
+### Correct: Inspect the Registry Image
 
-Run the container with systemd:
-
-```bash
-docker run -d \
-  --name ubuntu-rootfs-test \
-  --privileged \
-  --cgroupns=host \
-  -v /sys/fs/cgroup:/sys/fs/cgroup \
-  -p 7022:22 \
-  ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest
-```
-
-Inside:
-
-```bash
-docker exec ubuntu-rootfs-test systemctl is-system-running
-docker exec ubuntu-rootfs-test systemctl status ssh
-docker exec ubuntu-rootfs-test bash -lc 'echo $PS1'
-docker exec ubuntu-rootfs-test bash -lc 'cat ~/.welcome'
-```
-
-Expected to see:
-
-- systemd running without errors.
-- SSH service active.
-- Custom prompt applied.
-- Ubuntu 24.04 Rootfs welcome banner visible.
-
-### GHCR image check
-
-After CI or a manual push, verify that the registry holds the expected tags:
+After a CI push or manual `docker push`, verify image metadata:
 
 ```bash
 skopeo inspect docker://ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest \
-  | jq '.Name,.Labels."org.opencontainers.image.title",.Labels."org.opencontainers.image.base.name"'
+  | jq '{
+      name: .Name,
+      title: .Labels["org.opencontainers.image.title"],
+      base: .Labels["org.opencontainers.image.base.name"],
+      created: .Labels["org.opencontainers.image.created"]
+    }'
 ```
 
 Expected:
 
-- Name: `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs`
-- Title label: `Ubuntu 24.04 Rootfs`
-- Base name label: `ubuntu:24.04`.
+```json
+{
+  "name": "ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs",
+  "title": "Ubuntu 24.04 Rootfs",
+  "base": "ubuntu:24.04",
+  "created": "<build-date>"
+}
+```
+
+### Correct: Boot in an iximiuz Manifest
+
+The only valid way to verify runtime behavior (systemd, SSH, prompt, welcome) is to boot the image inside an iximiuz microVM. Use or adapt an existing manifest:
+
+```yaml
+# iximiuz/manifests/ubuntu-base-test.yml
+machines:
+  - name: ubuntu-base
+    drives:
+      - source: oci://ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest
+        mount: /
+        size: 50GiB
+```
+
+```bash
+labctl playground create --base flexbox ubuntu-base \
+  -f ./iximiuz/manifests/ubuntu-base-test.yml
+```
+
+Once the VM is running, connect and verify:
+
+```bash
+# Inside the VM via labctl ssh or the Labs terminal:
+systemctl is-system-running       # Expected: running
+systemctl status ssh              # Expected: active (running)
+echo $PS1                         # Expected: colored \u@\h:\w $ prompt
+cat ~/.welcome                    # Expected: banner on first login; file is deleted after
+```
+
+### Not Valid: Plain `docker run`
+
+Running this image with `docker run` (even with `--privileged --cgroupns=host`) does **not** produce a working systemd environment because:
+
+1. The image has no `CMD`/`ENTRYPOINT` - Docker falls back to the base Ubuntu shell (`/bin/bash`), not systemd.
+2. SSH host keys are intentionally absent - `sshd` will not start without them.
+3. The image is not designed or tested for Docker container execution.
+
+Errors like `System has not been booted with systemd as init system (PID 1)` or `cat: /home/ibtisam/.welcome: No such file or directory` when using `docker exec` are **expected** in this context - they confirm the image is correctly built for microVM use only.
 
 ---
 
 ## Integration and Usage
 
-### As a base for child images
-
-The primary integration pattern is in child Dockerfiles that start with:
+### As a Base for Child Images
 
 ```dockerfile
 FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest
 ```
 
-Examples include the Dev Machine Dockerfile at
-[`iximiuz/rootfs/dev/machine/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/dev/machine/Dockerfile), which layers workstation tooling on top of this base.
+Examples:
 
-Any new service image (e.g., future rootfs for databases, gateways, or other tools) should **reuse this base** instead of re‑implementing systemd + SSH + tooling.
+- **Jenkins rootfs**: [`iximiuz/rootfs/jenkins/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/jenkins/Dockerfile) - adds Java 21, Jenkins LTS, Nginx, and cloudflared.
+- **Dev Machine**: [`iximiuz/rootfs/dev/machine/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/dev/machine/Dockerfile) - layers workstation tooling.
 
-### Optional: direct use as a playground rootfs
+Guidelines for child Dockerfiles:
 
-Ubuntu 24.04 Rootfs is not primarily wired with its own manifest, but it can be used directly as a playground VM by modifying an existing manifest such as
-[`iximiuz/manifests/dev-machine.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/dev-machine.yml), replacing the drive source:
+1. Start with `USER root` to install services and system packages.
+2. Enable services with `systemctl enable <service>` during build.
+3. Place `COPY welcome $HOME/.welcome` **after** all `RUN customize-bashrc.sh` steps.
+4. End with `USER root` so the platform boots the VM with correct permissions.
+5. Set `CMD ["/lib/systemd/systemd"]` **only** if the child image also needs to run as a standalone Docker container (e.g., for `docker run`-based testing). The ubuntu base itself must not have this.
 
-```yaml
-drives:
-  - source: oci://ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest
-    mount: /
-    size: 50GiB
-```
+### Optional: Direct Use as a Playground Rootfs
 
-Then:
-
-```bash
-labctl playground create --base flexbox ubuntu-base -f <your-ubuntu-manifest>.yml
-```
-
-This gives you a “raw” base VM with the prompt, tooling, and welcome from Ubuntu 24.04 Rootfs, but typically you will use Dev Machine or other child images instead.
+The base image can be booted directly by pointing a manifest's drive at it (as shown in Verification above). Typically you would use Dev Machine or another child image instead.
 
 ---
 
 ## Related
 
-- Ubuntu 24.04 Rootfs README - [`iximiuz/rootfs/ubuntu/README.md`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/README.md)
-- Ubuntu 24.04 Rootfs Dockerfile - [`iximiuz/rootfs/ubuntu/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/Dockerfile)
-- Ubuntu scripts - [`iximiuz/rootfs/ubuntu/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/ubuntu/scripts)
-- Welcome banner - [`iximiuz/rootfs/ubuntu/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/welcome)
-- Build workflow - [`.github/workflows/build-ubuntu-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-ubuntu-rootfs.yml)
-- Example consumer (Dev Machine) - [`iximiuz/rootfs/dev/machine/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/dev/machine/Dockerfile)
+- [Ubuntu 24.04 Rootfs README](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/README.md)
+- [Ubuntu 24.04 Rootfs Dockerfile](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/Dockerfile)
+- [Scripts directory](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/ubuntu/scripts)
+- [Welcome banner](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/welcome)
+- [Build workflow](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-ubuntu-rootfs.yml)
+- [Jenkins rootfs (child image)](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/jenkins/Dockerfile)
+- [Dev Machine rootfs (child image)](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/dev/machine/Dockerfile)
