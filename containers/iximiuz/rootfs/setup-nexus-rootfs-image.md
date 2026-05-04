@@ -173,12 +173,14 @@ docker build \
 The Dockerfile performs the following sequence in order:
 
 **Step 1 — Inherit the base**
+
 - `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
 - `USER root` for all installation steps
 - ARGs declared: `USER`, `NEXUS_PORT`, `BUILD_DATE`, `VCS_REF`
 - `ENV` sets: `NEXUS_HOME=/opt/nexus`, `NEXUS_DATA=/opt/sonatype-work`, `NEXUS_PORT`, `JAVA_HOME`, `PATH` (Java bin prepended), `TZ=UTC`
 
 **Step 2 — Copy and parameterize configs**
+
 - `COPY configs/nginx.conf /etc/nginx/sites-available/nexus` → `sed` replaces `__NEXUS_PORT__`
 - `COPY configs/nexus.service /etc/systemd/system/nexus.service`
 - `COPY configs/sudoers.d/nexus-user /etc/sudoers.d/nexus-user`
@@ -187,9 +189,11 @@ The Dockerfile performs the following sequence in order:
 > Note: Dockerfile does **not** run `sed` on `nexus.service` for port substitution. The port is written directly into `nexus.properties` by `install-nexus.sh` at the next step.
 
 **Step 3 — Copy build-time scripts**
+
 - `COPY scripts/ /opt/nexus-scripts/` + `chmod +x *.sh`
 
 **Step 4 — Install Java 21 + Nexus CE** (`install-nexus.sh ${NEXUS_PORT}`)
+
 - Validates port argument.
 - Installs `openjdk-21-jdk` via apt.
 - Detects CPU arch (`x86_64` → `linux-x86_64`, `aarch64` → `linux-aarch_64`).
@@ -203,15 +207,17 @@ The Dockerfile performs the following sequence in order:
 - Creates `/opt/sonatype-work/jvm-prefs` and sets `nexus:nexus` ownership.
 
 **Step 5 — Configure Nginx** (`configure-nginx.sh`)
+
 - Installs `nginx` via apt.
 - Validates `/etc/nginx/sites-available/nexus` exists (COPY'd in Step 2).
 - Removes default Nginx site, enables Nexus site symlink.
 - Creates systemd override `/etc/systemd/system/nginx.service.d/override.conf`:
-  - `Type=simple`, `ExecStart=/usr/sbin/nginx -g 'daemon off;'`
-  - Required for systemd container compatibility.
+    - `Type=simple`, `ExecStart=/usr/sbin/nginx -g 'daemon off;'`
+    - Required for systemd container compatibility.
 - Runs `nginx -t` to validate config.
 
 **Step 6 — Enable systemd units**
+
 ```bash
 systemctl enable lab-init
 systemctl enable nginx
@@ -235,21 +241,25 @@ Validates 8 sections without starting services (systemd not running during build
 | 8. Users | Interactive `$USER` account; `sudoers.d/nexus-user` present |
 
 **Step 8 — Install cloudflared** (`install-cloudflared.sh`)
+
 - Adds Cloudflare apt repository and GPG key.
 - Installs `cloudflared`.
 
 **Step 9 — Fix ownership**
+
 - `chown -R ${USER}:${USER} /home/${USER}`
 
 **Step 10 — User customizations**
+
 - `USER $USER` + `ENV HOME=/home/$USER`
 - `COPY welcome $HOME/.welcome` → `sed -i` replaces `__NEXUS_PORT__`
 - `customize-bashrc.sh` (bind mount) appends to `~/.bashrc`:
-  - `nexus-status`, `nexus-logs`, `nexus-restart`, `nexus-start`, `nexus-stop`
-  - `nginx-status`, `nginx-logs`, `nginx-reload`
-  - Standard `ll`, `la`, `l` aliases
+    - `nexus-status`, `nexus-logs`, `nexus-restart`, `nexus-start`, `nexus-stop`
+    - `nginx-status`, `nginx-logs`, `nginx-reload`
+    - Standard `ll`, `la`, `l` aliases
 
 **Step 11 — Return to root + CMD**
+
 - `USER root` — required for `CMD ["/lib/systemd/systemd"]`.
 - `EXPOSE 22 80 ${NEXUS_PORT}`
 - `CMD ["/lib/systemd/systemd"]`
@@ -261,23 +271,25 @@ Validates 8 sections without starting services (systemd not running during build
 Canonical build: [`.github/workflows/build-nexus-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-nexus-rootfs.yml)
 
 **Triggers:**
+
 - `push` to `main` when files under `iximiuz/rootfs/nexus/**` (excluding `README.md`) or the workflow file change.
 - Pull requests with the same path filters.
 - Manual `workflow_dispatch`.
 
 **Key steps:**
+
 1. Checkout repository.
 2. Set up Docker Buildx (no QEMU — amd64 only, intentional).
 3. Log in to GHCR via `secrets.GITHUB_TOKEN`.
 4. Extract metadata via `docker/metadata-action`:
-   - Tags: `latest`, `community`, `3.89.1.02-community` (on default branch), `sha-<short>`, `YYYY-MM-DD`
-   - Labels include `org.opencontainers.image.base.name=ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
+    - Tags: `latest`, `community`, `3.89.1.02-community` (on default branch), `sha-<short>`, `YYYY-MM-DD`
+    - Labels include `org.opencontainers.image.base.name=ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
 5. `docker/build-push-action` with:
-   - `context: ./iximiuz/rootfs/nexus`
-   - `platforms: linux/amd64`
-   - `push: true` (non-PR only)
-   - `build-args: USER=ibtisam`, `NEXUS_PORT=8081`
-   - GHA layer cache enabled.
+    - `context: ./iximiuz/rootfs/nexus`
+    - `platforms: linux/amd64`
+    - `push: true` (non-PR only)
+    - `build-args: USER=ibtisam`, `NEXUS_PORT=8081`
+    - GHA layer cache enabled.
 6. Print final image digest.
 
 > **Known gap:** `BUILD_DATE` and `VCS_REF` are not passed as explicit `build-args`. The Dockerfile `LABEL` block will produce empty string OCI labels for `created` and `revision`. The `docker/metadata-action` does inject these into the OCI manifest labels at the image layer — but not via Dockerfile ARG interpolation.
