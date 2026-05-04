@@ -8,6 +8,8 @@ It turns the generic Ubuntu base into a fully provisioned environment with Docke
 
 > **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process, not through Docker. Running the image with `docker run` will not produce a working systemd, Docker daemon, or network services — see [Verification](#verification) for the correct approach.
 
+![](../../../assets/screenshots/silverstack-dev-machine-playground.png)
+
 All source artifacts live under:
 
 | Artifact | Path |
@@ -374,6 +376,8 @@ labctl playground create --base flexbox dev-machine -f dev-machine.yml
 Navigate to the URL printed by `labctl`, or open the playground from [labs.iximiuz.com/dashboard](https://labs.iximiuz.com/dashboard).
 
 Once connected, run the runtime verification steps listed in [Verification](#verification) above.
+
+![](../../../assets/screenshots/dev-machine-welcome.png)
 
 ---
 
