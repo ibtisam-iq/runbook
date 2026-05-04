@@ -1,8 +1,10 @@
-# Self‑Hosted CI/CD Stack - Jenkins, SonarQube, Nexus Operations
+# Self-Hosted CI/CD Stack - Jenkins, SonarQube, Nexus Operations
 
-This runbook captures the **post‑provisioning operational steps** that turn the SilverStack CI/CD Stack into a fully functional DevSecOps platform.
+This runbook covers the post-provisioning steps that turn the SilverStack CI/CD stack into a fully functional DevSecOps platform. It assumes the infra is already running (see [Setup - CI/CD Stack Orchestration](setup-cicd-stack-orchestration.md)) and Cloudflare Tunnels are live with valid SSL on:
 
-It assumes the infra is already up via the [**Setup - CI/CD Stack Orchestration**](setup-cicd-stack-orchestration.md) runbook and focuses on Jenkins, SonarQube, and Nexus configuration.
+- `https://jenkins.ibtisam-iq.com`
+- `https://sonar.ibtisam-iq.com`
+- `https://nexus.ibtisam-iq.com`
 
 ![](../../../assets/screenshots/cicd-stack-dev-machine-welcome.png)
 
@@ -10,267 +12,227 @@ It assumes the infra is already up via the [**Setup - CI/CD Stack Orchestration*
 
 ## Prerequisites and Assumptions
 
-Before starting:
-
-- The CI/CD stack playground is running from `iximiuz/manifests/cicd-stack.yml` and all four nodes are reachable from the Dev Machine.
-- Per‑service rootfs images (Jenkins, SonarQube, Nexus) have passed their local health checks - systemd services are active and `/health` endpoints return `200`.
-- Cloudflare Tunnels are configured so the following domains resolve with valid SSL:
-    - `https://jenkins.ibtisam-iq.com`
-    - `https://sonar.ibtisam-iq.com`
-    - `https://nexus.ibtisam-iq.com`
-
-> Node mapping: `jenkins-server`, `sonarqube-server`, and `nexus-server` as defined in `cicd-stack.yml`.
+- The CI/CD stack playground is running from [`iximiuz/manifests/cicd-stack.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/cicd-stack.yml) and all four nodes are reachable from Dev Machine.
+- All per-service systemd health checks have passed - `lab-init`, service daemon, Nginx are `active` on each node and `/health` returns 200.
+- `cloudflared` is running on `jenkins-server`, `sonarqube-server`, and `nexus-server` with the Cloudflare dashboard's tunnel routes configured to `localhost:80`.
 
 ---
 
-## Phase 1 - Jenkins Post‑Setup
+## Phase 1 - Jenkins Post-Setup
 
-All Jenkins operations are performed on `jenkins-server` after initial login to the Jenkins UI.
+All Jenkins operations are performed on `jenkins-server` unless noted otherwise.
 
-### Step 1 - Install pipeline tools on the Jenkins OS
+### Step 1 - Install Pipeline Tools on the Jenkins OS
 
-The Jenkins rootfs image includes a script `install-pipeline-tools` on `PATH` to install the CI/CD toolchain.
-
-From an SSH session on `jenkins-server`:
+The Jenkins rootfs image includes `install-pipeline-tools` on `PATH`. Run it once from an SSH session on `jenkins-server`:
 
 ```bash
 sudo install-pipeline-tools
 ```
 
-This installs the following tools system‑wide on the Jenkins server OS:
+This installs the following tools system-wide on the Jenkins **server OS** (not in Jenkins UI):
 
-- Maven `3.9.15`
-- Node.js `22 LTS` and npm
-- Python `3.12`
-- Docker `29.x`
-- Trivy `0.69.3` (pinned safe version)
-- AWS CLI v2
-- `kubectl` `1.35`, Helm `4.1.4`
-- Terraform `1.14.x`
-- Ansible `core 2.20`
+| Tool | Version |
+|---|---|
+| Maven | 3.9.15 |
+| Node.js (LTS) + npm | 22.x |
+| Python | 3.12 |
+| Docker | 29.x |
+| Trivy | 0.69.3 (pinned) |
+| AWS CLI | v2 |
+| kubectl | 1.35 |
+| Helm | 4.1.4 |
+| Terraform | 1.14.x |
+| Ansible core | 2.20 |
 
-All tools are installed on the system `PATH`, so Jenkins can use them via shell steps without additional UI configuration.
+All tools land on system `PATH` - Jenkins pipelines can use them via `sh` steps without any UI configuration.
 
-### Step 2 - Install Jenkins plugins
+### Step 2 - Unlock Jenkins and Complete Setup Wizard
 
-This step is a **post-setup** operation. The script cannot run until Jenkins has been fully initialized - the setup wizard completed, an admin user created, and the Jenkins URL saved under **Manage Jenkins → System → Jenkins URL**.
+1. Open the **Jenkins UI** tab or navigate to `https://jenkins.ibtisam-iq.com`.
+2. Jenkins prompts for the initial admin password. Retrieve it:
+   ```bash
+   sudo cat /var/lib/jenkins/.jenkins/secrets/initialAdminPassword
+   ```
+3. Complete the setup wizard:
+    - Install suggested plugins (or skip for manual selection later)
+    - Create the first admin user
+    - Set Jenkins URL to `https://jenkins.ibtisam-iq.com` - **this is required** for SonarQube webhooks and other callbacks
+
+### Step 3 - Unlock the Built-in Node
+
+By default Jenkins restricts the built-in node to 0 executors. Enable it:
+
+**Manage Jenkins → Nodes → Built-In Node → Configure**
+
+- Number of executors: `2`
+
+### Step 4 - Install Jenkins Plugins
+
+After the setup wizard is complete and an admin user exists:
 
 ```bash
 sudo install-plugins
 ```
 
-**Why it must run after setup, not before**
+The script:
 
-The script connects to Jenkins over HTTP/HTTPS using `jenkins-cli.jar`, which it downloads fresh from the running Jenkins instance on every run. This means Jenkins must be reachable, and a valid admin session must exist.
+1. Reads `jenkins.model.JenkinsLocationConfiguration.xml` to auto-detect the configured Jenkins URL. If Cloudflare tunnel is not yet configured, it falls back to prompting for `http://localhost:8080`.
+2. Prompts interactively for the admin username and password (password entry is hidden; never written to disk).
+3. Installs all plugins via `jenkins-cli.jar` over WebSocket (`-webSocket` flag, which bypasses reverse-proxy origin checks).
+4. Triggers a safe restart so all plugins become active without interrupting running builds.
 
-The initial admin password (written to `/var/lib/jenkins/.jenkins/secrets/initialAdminPassword`) is automatically removed by Jenkins as soon as the setup wizard is completed - so that password is intentionally not accepted here.
+> **This step must run after the setup wizard is completed.** The initial admin password (`initialAdminPassword`) is deleted by Jenkins as soon as the wizard finishes - the script uses your new admin credentials, not the initial password.
 
-**How the script works**
-
-1. **URL detection** - reads `jenkins.model.JenkinsLocationConfiguration.xml` to auto-detect the configured Jenkins URL. If no URL is found (e.g., Cloudflare tunnel not yet set up), it falls back to prompting for a URL manually (e.g., `http://localhost:8080`).
-2. **Credentials** - prompts interactively for the admin username and password. The password is entered via a hidden prompt; it is never written to disk, never echoed to the terminal, and never passed as a command-line argument.
-3. **Plugin installation** - invokes `jenkins-cli.jar` over WebSocket (`-webSocket` flag) to bypass reverse-proxy origin checks, then installs all plugins defined in the script.
-4. **Safe restart** - triggers a `safe-restart` so all plugins become active without interrupting any running builds.
-
-**Customization**
-
-The plugin list inside `/usr/local/bin/install-plugins` is organized by functional category inside the script. To skip a plugin, comment out its line with `#`. To add one, append its [official plugin ID](https://plugins.jenkins.io) in the relevant section.
-
-This step is optional if a fully manual UI-based installation is preferred, but the script is the recommended path for consistency across environments.
+To skip a plugin, comment out its line in `/usr/local/bin/install-plugins`. To add one, append its official plugin ID.
 
 ---
 
-## Phase 2 - Jenkins Initial Configuration
-
-### Step 3 - Unlock the built‑in node
-
-By default Jenkins restricts the built‑in node. Enable it to run jobs:
-
-1. In Jenkins UI: `Manage Jenkins → Nodes → Built-In Node → Configure`
-2. Set:  `Number of executors: 2`
-
-
-### Step 4 - Set Jenkins URL
-
-Ensure Jenkins uses the public URL (required for SonarQube webhooks and other callbacks):
-
-1. In Jenkins UI: `Manage Jenkins → System → Jenkins URL`
-2. Set:  `https://jenkins.ibtisam-iq.com`
-
----
-
-## Phase 3 - Credentials
+## Phase 2 - Credentials
 
 All credentials are created under:
+**Manage Jenkins → Credentials → System → Global credentials (unrestricted) → Add Credentials**
 
-```text
-Manage Jenkins → Credentials → System →
-  Global credentials (unrestricted) → Add Credentials
-```
+### Credential 1 - SonarQube Token
 
-### Credential 1 - SonarQube token
+First, create a dedicated CI user in SonarQube:
 
-Create a dedicated CI user in SonarQube first:
-
-1. In SonarQube UI:  `Administration → Security → Users → Create User`
+1. In SonarQube UI: **Administration → Security → Users → Create User**
     - Login: `jenkins-ci`
-    - Name:  `Jenkins CI`
+    - Name: `Jenkins CI`
     - Password: strong password
 
-2. As `jenkins-ci`, generate a token:
+2. Log in as `jenkins-ci`, then: **My Account → Security → Generate Token**
+    - Name: `jenkins-token`
+    - Type: `User Token`
 
-   ```text
-   My Account → Security → Generate Token
-   Name:  jenkins-token
-   Type:  User Token
+3. Add to Jenkins:
    ```
-
-3. Add to Jenkins as a **Secret text** credential:
-
-   ```text
    Kind:    Secret text
-   Secret:  squ_xxxxxxxxxxxxxxxxxxxxxxxxxxxx   ← SonarQube token
+   Secret:  squ_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
    ID:      sonarqube-token
    ```
 
 ### Credential 2 - GitHub
 
-Use a GitHub Personal Access Token (PAT) as the password:
+Create a GitHub PAT: **Settings → Developer settings → Personal access tokens → Tokens (classic)**
 
-1. In GitHub: `Settings → Developer settings → Personal access tokens → Tokens (classic)`
-    - Scopes: `repo`, `read:org`, `workflow`.
+- Scopes: `repo`, `read:org`, `workflow`
 
-2. Add in Jenkins as **Username with password**:
-
-   ```text
-   Kind:     Username with password
-   Username: ibtisam-iq
-   Password: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx   ← PAT
-   ID:       github-creds
-   ```
+Add to Jenkins:
+```
+Kind:     Username with password
+Username: ibtisam-iq
+Password: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ID:       github-creds
+```
 
 ### Credential 3 - Docker Hub
 
-Use a Docker Hub access token (not your main account password):
+Create a Docker Hub access token (not your account password): **Account Settings → Security → New Access Token**
 
-1. In Docker Hub: `Account Settings → Security → New Access Token`
-    - Name: `jenkins-ci`
-    - Scopes: Read, Write.
+- Name: `jenkins-ci`
+- Scopes: Read, Write
 
-2. Add in Jenkins:
-
-   ```text
-   Kind:     Username with password
-   Username: mibtisam
-   Password: dckr_pat_xxxxxxxxxxxxxxxxxxxx
-   ID:       docker-creds
-   ```
+Add to Jenkins:
+```
+Kind:     Username with password
+Username: mibtisam
+Password: dckr_pat_xxxxxxxxxxxxxxxxxxxx
+ID:       docker-creds
+```
 
 ### Credential 4 - Nexus
 
-Create a dedicated CI user in Nexus:
+Create a dedicated CI user in Nexus: **Security → Users → Create local user**
 
-1. In Nexus UI: `Security → Users → Create local user`
-    - User ID: `jenkins-ci`
-    - Password: strong password
-    - Roles: `nx-admin` + `nx-anonymous`.
+- User ID: `jenkins-ci`
+- Password: strong password
+- Roles: `nx-admin` + `nx-anonymous`
 
-2. Add in Jenkins:
-
-   ```text
-   Kind:     Username with password
-   Username: jenkins-ci
-   Password: <nexus password>
-   ID:       nexus-creds
-   ```
+Add to Jenkins:
+```
+Kind:     Username with password
+Username: jenkins-ci
+Password: <nexus password>
+ID:       nexus-creds
+```
 
 ### Credential 5 - GHCR
 
-Create a PAT with `write:packages`:
+Create a GitHub PAT with `write:packages` scope.
 
-1. In GitHub: create a PAT with `write:packages` scope.
-2. Add in Jenkins:
+Add to Jenkins:
+```
+Kind:     Username with password
+Username: ibtisam-iq
+Password: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ID:       ghcr-creds
+```
 
-   ```text
-   Kind:     Username with password
-   Username: ibtisam-iq
-   Password: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   ID:       ghcr-creds
-   ```
-
-> Reuse `github-creds` if its PAT already has `write:packages`.
+> If `github-creds` was created with a PAT that already has `write:packages`, reuse it and skip this step.
 
 ---
 
-## Phase 4 - Tool Configuration
+## Phase 3 - Tool Configuration
 
 ### Step 5 - Register SonarQube Scanner in Jenkins
 
-The only tool that requires explicit Jenkins UI configuration is the SonarQube Scanner (other tools are on the OS PATH).
+The only tool requiring explicit Jenkins UI registration is the SonarQube Scanner (all other tools are on OS `PATH`):
 
-1. In Jenkins: `Manage Jenkins → Tools → SonarQube Scanner installations → Add SonarQube Scanner`
-2. Configure:
+**Manage Jenkins → Tools → SonarQube Scanner installations → Add SonarQube Scanner**
 
-   ```text
-   Name:                 sonar-scanner
-   Install automatically: ✓
-   Version:              SonarQube Scanner (latest)
-   ```
+```
+Name:                  sonar-scanner
+Install automatically: ✓
+Version:               SonarQube Scanner (latest)
+```
 
-Maven, Docker, kubectl, Helm, Terraform, Ansible, AWS CLI, etc. do **not** need entries here because they are regular binaries discovered via PATH.
-
----
-
-## Phase 5 - Jenkins ↔ SonarQube Integration
-
-### Step 6 - Add SonarQube server in Jenkins
-
-Link Jenkins to the SonarQube instance using the previously created token:
-
-1. In Jenkins: `Manage Jenkins → System → SonarQube servers → Add SonarQube`
-2. Configure:
-
-   ```text
-   Name:               sonar-server
-   Server URL:         https://sonar.ibtisam-iq.com
-   Server auth token:  sonarqube-token   ← Secret text credential ID
-   ```
-
-Pipelines can now call `withSonarQubeEnv('sonar-server')` to inject scanner configuration.
-
-### Step 7 - Configure SonarQube webhook
-
-SonarQube must notify Jenkins when analysis completes so `waitForQualityGate` works.
-
-1. In SonarQube UI:  `Administration → Configuration → Webhooks → Create`
-2. Configure:
-
-   ```text
-   Name:   Jenkins
-   URL:    https://jenkins.ibtisam-iq.com/sonarqube-webhook/
-   Secret: (optional shared secret for HMAC validation)
-   ```
-
-Every analysis now triggers a POST to Jenkins at `/sonarqube-webhook/`.
-
-> **Note:** The trailing slash at the end of the webhook URL is **mandatory**. Omitting it will cause SonarQube to fail posting the analysis result back to Jenkins, and `waitForQualityGate` will hang indefinitely.
+Maven, Docker, kubectl, Helm, Terraform, Ansible, AWS CLI, and other binary tools do not need entries here - Jenkins discovers them via `PATH`.
 
 ---
 
-## Phase 6 - Nexus Maven Settings
+## Phase 4 - Jenkins ↔ SonarQube Integration
+
+### Step 6 - Add SonarQube Server in Jenkins
+
+**Manage Jenkins → System → SonarQube servers → Add SonarQube**
+
+```
+Name:               sonar-server
+Server URL:         https://sonar.ibtisam-iq.com
+Server auth token:  sonarqube-token   ← the Secret text credential ID from Phase 2
+```
+
+Pipelines can now call `withSonarQubeEnv('sonar-server')` to inject scanner configuration automatically.
+
+### Step 7 - Configure SonarQube Webhook
+
+SonarQube must notify Jenkins when analysis completes so `waitForQualityGate()` can function.
+
+**In SonarQube UI: Administration → Configuration → Webhooks → Create**
+
+```
+Name:   Jenkins
+URL:    https://jenkins.ibtisam-iq.com/sonarqube-webhook/
+Secret: (optional HMAC shared secret)
+```
+
+> **The trailing slash in the webhook URL is mandatory.** Omitting it causes SonarQube to fail posting the analysis result back to Jenkins, and `waitForQualityGate()` will hang indefinitely until it times out.
+
+---
+
+## Phase 5 - Nexus Maven Settings
 
 ### Step 8 - Configure `settings.xml` via Config File Provider
 
-Use the **Config File Provider** plugin to supply Maven with Nexus credentials without hardcoding them in source.
+Use the Config File Provider plugin to supply Maven with Nexus credentials without hardcoding them in source.
 
-1. In Jenkins: `Manage Jenkins → Managed files → Add a new Config → Global Maven settings.xml`
-2. Set ID:
+**Manage Jenkins → Managed files → Add a new Config → Global Maven settings.xml**
 
-   ```text
-   ID: maven-settings
-   ```
+- Set ID: `maven-settings`
 
-3. Use a complete `settings.xml` document:
+Use the full settings document:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -293,75 +255,63 @@ Use the **Config File Provider** plugin to supply Maven with Nexus credentials w
 </settings>
 ```
 
-4. In Jenkins pipelines, reference it via:
-
+Reference in Jenkins pipelines:
 ```groovy
 withMaven(globalMavenSettingsConfig: 'maven-settings') {
-  // mvn deploy ...
+    sh 'mvn deploy'
 }
 ```
 
-#### Common pitfalls
+#### Common Pitfalls
 
-**Issue 1 - Missing XML document wrapper**
+**Pitfall 1 - Missing XML document wrapper**
 
-A bare `<servers>...</servers>` block without the XML preamble and `<settings>` root element is invalid; Maven will ignore it and artifact deployment will fail with 401 Unauthorized.
-
-Wrong:
+A bare `<servers>...</servers>` block without the XML preamble and `<settings>` root element is invalid. Maven silently ignores it and artifact deployment fails with `401 Unauthorized`.
 
 ```xml
+<!-- Wrong -->
 <servers>
   <server>...</server>
 </servers>
+
+<!-- Correct: use the full document above -->
 ```
 
-Correct: full `settings` document as above.
+**Pitfall 2 - Unescaped special characters in passwords**
 
-**Issue 2 - Not escaping special characters in password**
+Passwords containing `&`, `<`, `>`, `"`, or `'` must be XML-escaped:
 
-Passwords containing `&`, `<`, `>`, `"` or `'` must be XML‑escaped or Maven will fail to parse `settings.xml`.
-
-| Character | Escaped |
-| --- | --- |
+| Character | Escaped form |
+|---|---|
 | `&` | `&amp;` |
 | `<` | `&lt;` |
 | `>` | `&gt;` |
 | `"` | `&quot;` |
 | `'` | `&apos;` |
 
-Example:
-
-```xml
-<password>P@ss&amp;Word!</password>
-```
+Example: `<password>P@ss&amp;Word!</password>`
 
 ---
 
-## Phase 7 - Nexus Docker Registry
+## Phase 6 - Nexus Docker Registry
 
-### Step 9 - Create Docker (hosted) repository
+### Step 9 - Create Docker (Hosted) Repository
 
-Create a Docker hosted repository in Nexus for container images.
+**Nexus UI: Settings → Repository → Repositories → Create repository → docker (hosted)**
 
-In Nexus UI:
+```
+Name:   docker-hosted
+Online: ✓
+```
 
-1. `Settings → Repository → Repositories → Create repository → docker (hosted)`
-2. Configure:
+Because Nexus is behind Cloudflare Tunnel and fronted by Nginx, use **path-based routing** instead of dedicated port connectors:
 
-   ```text
-   Name:   docker-hosted
-   Online: ✓
-   ```
-
-Because Nexus is behind Cloudflare Tunnel and fronted by Nginx, use **Path based routing** instead of dedicated ports:
-
-- Under *Repository Connectors*:
-
-  ```text
-  ● Path based routing   ← selected
+```
+Under Repository Connectors:
+  ● Path based routing    ← selected
   HTTP:  (unchecked)
   HTTPS: (unchecked)
-  ```
+```
 
 Docker clients then use the repository name in the URL path:
 
@@ -375,50 +325,43 @@ docker pull nexus.ibtisam-iq.com/docker-hosted/java-monolith:1.0.0
 
 ### Step 10 - Enable Docker Bearer Token Realm
 
-Docker authentication requires the Bearer Token realm.
+Docker authentication requires the Bearer Token realm:
 
-In Nexus UI:
+**Nexus UI: Security → Realms**
 
-1. `Security → Realms`
-2. Move **Docker Bearer Token Realm** from *Available* to *Active*.
-3. Save.
+Move **Docker Bearer Token Realm** from **Available** to **Active** → Save.
 
-Without this, `docker login nexus.ibtisam-iq.com` will fail with 401 even with correct credentials.
+> Without this, `docker login nexus.ibtisam-iq.com` fails with `401` even with correct credentials.
 
 ---
 
-## Phase 8 - Final Stack Readiness Checklist
+## Phase 7 - Stack Readiness Checklist
 
-After completing the steps above, the stack should be fully operational.
+After completing all phases above, verify the final state:
 
-| What | Status |
-| --- | --- |
-| Jenkins running with SSL | `https://jenkins.ibtisam-iq.com` reachable |
-| SonarQube running with SSL | `https://sonar.ibtisam-iq.com` reachable |
-| Nexus running with SSL | `https://nexus.ibtisam-iq.com` reachable |
-| 10 pipeline tools on Jenkins PATH | `mvn`, `node`, `docker`, `trivy`, `kubectl`, `helm`, `terraform`, `ansible`, `aws` available |
+| What | Expected Status |
+|---|---|
+| Jenkins UI with SSL | `https://jenkins.ibtisam-iq.com` returns 200 |
+| SonarQube UI with SSL | `https://sonar.ibtisam-iq.com` returns 200 |
+| Nexus UI with SSL | `https://nexus.ibtisam-iq.com` returns 200 |
+| 10 pipeline tools on PATH | `mvn`, `node`, `docker`, `trivy`, `kubectl`, `helm`, `terraform`, `ansible`, `aws` available via `which` |
 | Jenkins plugin bundle | Installed via `sudo install-plugins` |
 | Credentials | `sonarqube-token`, `github-creds`, `docker-creds`, `nexus-creds`, `ghcr-creds` present |
 | SonarQube Scanner | `sonar-scanner` configured in Jenkins Tools |
-| SonarQube server | `sonar-server` configured in Jenkins |
-| SonarQube webhook | Points to `/sonarqube-webhook/` on Jenkins |
-| Nexus Maven settings | `maven-settings` Config File present and valid |
-| Nexus Docker repository | `docker-hosted` created (path-based routing) |
-| Docker Bearer Token Realm | Enabled in Nexus |
+| SonarQube server | `sonar-server` configured in Jenkins System |
+| SonarQube webhook | Points to `/sonarqube-webhook/` on Jenkins (trailing slash present) |
+| Nexus Maven settings | `maven-settings` Config File present and valid XML |
+| Nexus Docker repository | `docker-hosted` created with path-based routing |
+| Docker Bearer Token Realm | Active in Nexus |
 
-At this point, run pipelines to:
-
-- Build projects with Maven/Node/Python.
-- Run SonarQube analysis and enforce quality gates.
-- Publish artifacts to Nexus (Maven + Docker).
-- Optionally push container images to GHCR using `ghcr-creds`.
+The stack is ready to run pipelines: build with Maven/Node/Python, run SonarQube analysis and enforce quality gates, publish artifacts to Nexus, and push container images to GHCR.
 
 ---
 
-## Related Documentation
+## Related
 
-- [**Setup - CI/CD Stack Orchestration**](self-hosted-cicd-stack-operations.md) - infra/topology, manifests, Dev Machine behavior.
-- [**Rootfs - Ubuntu 24.04 base**](../../../containers/iximiuz/rootfs/setup-ubuntu-24-04-rootfs-base-image.md) - foundational image shared by all nodes.
-- [**Rootfs - Jenkins Server**](../../../containers/iximiuz/rootfs/setup-jenkins-rootfs-image.md) - Jenkins LTS rootfs build and local testing.
-- [**Rootfs - SonarQube Server**](../../../containers/iximiuz/rootfs/setup-sonarqube-rootfs.md) - SonarQube + PostgreSQL rootfs build and healthchecks.
-- [**Rootfs - Nexus Server**](../../../containers/iximiuz/rootfs/setup-nexus-rootfs-image.md) - Nexus rootfs build and validation.
+- [Setup - CI/CD Stack Orchestration](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/setup-cicd-stack-orchestration/) - infra, topology, manifest, Dev Machine
+- [Journey runbook](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs/) - NAT, Cloudflare Tunnel, rootfs evolution
+- [Jenkins Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-jenkins-rootfs-image/)
+- [SonarQube Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-sonarqube-rootfs-image/)
+- [Nexus Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-nexus-rootfs-image/)
