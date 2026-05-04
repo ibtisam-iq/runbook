@@ -3,5 +3,5 @@ nav:
   - Setup Ubuntu 24.04 Rootfs Base Image: setup-ubuntu-24-04-rootfs-base-image.md
   - Setup Dev Machine Rootfs Image: setup-dev-machine-rootfs-image.md
   - Setup Jenkins Rootfs Image: setup-jenkins-rootfs-image.md
-  - Setup SonarQube Rootfs Image: setup-sonarqube-rootfs.md
+  - Setup SonarQube Rootfs Image: setup-sonarqube-rootfs-image.md
   - Setup Nexus Rootfs Image: setup-nexus-rootfs-image.md
