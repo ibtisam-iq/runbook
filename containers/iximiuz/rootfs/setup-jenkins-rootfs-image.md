@@ -4,9 +4,9 @@
 
 Jenkins LTS Rootfs is a production-grade Jenkins CI server image for iximiuz playgrounds. It boots Jenkins via systemd, with Nginx as a reverse proxy and `cloudflared` pre-installed for instant public access over a Cloudflare Tunnel.
 
-![](../../../assets/screenshots/silverstack-jenkins-server-playground.png)
-
 > **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, Docker daemon, or service behavior via `docker run` - use `labctl` instead (see [Verification](#verification)).
+
+![](../../../assets/screenshots/jenkins-server-drive-config.png)
 
 **Pipeline tools and plugins are intentionally NOT baked in.** Two post-setup scripts are placed on `PATH` and run by you after the VM is live - keeping the image lean and your toolchain choices explicit.
 
@@ -403,8 +403,6 @@ This is **expected and correct** - not a bug. Even with `--privileged`, a plain 
 
 ## Integration with iximiuz Labs
 
-Once the image is verified locally and pushed to GHCR, it can be launched as a custom iximiuz playground using the `labctl` CLI and a manifest file. Unlike iximiuz's built-in catalog labs, custom rootfs images cannot be started directly from the iximiuz UI - they require a manifest file to declare the machine drive source, resources, and tabs.
-
 ### Prerequisites
 
 Before proceeding, ensure the following are in place on the machine from which you will run `labctl` commands:
@@ -484,7 +482,7 @@ To start immediately, click **Start**.
 
 To review or adjust settings before starting, click ⋮ → **Configure**. This opens the Playground Settings page where machine drives, resources, network, and UI tabs can be inspected before launch.
 
-![](../../../assets/screenshots/jenkins-server-drive-config.png)
+![](../../../assets/screenshots/silverstack-jenkins-server-playground.png)
 
 ---
 
