@@ -215,20 +215,12 @@ After a CI push or manual `docker push`:
 ```bash
 skopeo inspect docker://ghcr.io/ibtisam-iq/dev-machine-rootfs:latest \
   | jq '{
-      name: .Name,
-      base: .Labels["org.opencontainers.image.base.name"],
-      created: .Labels["org.opencontainers.image.created"]
+      name:          .Name,
+      base:          .Labels["org.opencontainers.image.base.name"],
+      created:       .Labels["org.opencontainers.image.created"],
+      documentation: .Labels["org.opencontainers.image.documentation"],
+      authors:       .Labels["org.opencontainers.image.authors"]
     }'
-```
-
-Expected output:
-
-```json
-{
-  "name": "ghcr.io/ibtisam-iq/dev-machine-rootfs",
-  "base": "ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest",
-  "created": "<build-date>"
-}
 ```
 
 ---

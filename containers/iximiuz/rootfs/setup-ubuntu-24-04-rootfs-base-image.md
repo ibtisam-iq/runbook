@@ -227,20 +227,12 @@ After a CI push or manual `docker push`, verify image metadata:
 ```bash
 skopeo inspect docker://ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest \
   | jq '{
-      name: .Name,
-      base: .Labels["org.opencontainers.image.base.name"],
-      created: .Labels["org.opencontainers.image.created"]
+      name:          .Name,
+      base:          .Labels["org.opencontainers.image.base.name"],
+      created:       .Labels["org.opencontainers.image.created"],
+      documentation: .Labels["org.opencontainers.image.documentation"],
+      authors:       .Labels["org.opencontainers.image.authors"]
     }'
-```
-
-Expected:
-
-```json
-{
-  "name": "ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs",
-  "base": "ubuntu:24.04",
-  "created": "<build-date>"
-}
 ```
 
 ### Correct: Boot in an iximiuz Manifest
