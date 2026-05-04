@@ -2,28 +2,24 @@
 
 ## Context
 
-SonarQube Community Edition Rootfs is a **production‑grade SonarQube LTA image for iximiuz playgrounds**.
+SonarQube Community Edition Rootfs is a production-grade SonarQube LTA image for iximiuz playgrounds. It runs SonarQube 26.2 on top of PostgreSQL 18, with Nginx as a reverse proxy, all managed by systemd, and `cloudflared` pre-installed for Cloudflare Tunnel custom-domain access.
 
-It runs SonarQube on top of PostgreSQL 18 and Nginx, all managed by systemd, with `cloudflared` pre‑installed for Cloudflare Tunnel custom‑domain access.
+The image runs **three services** (PostgreSQL, Nginx, SonarQube) in addition to the init oneshot, making `lab-init.sh` significantly more complex - it performs live database provisioning at every boot.
 
-![](../../../assets/screenshots/silverstack-sonarqube-server-playground.png)
+> **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, service behavior, or SonarQube startup via `docker run` - use `labctl` instead (see [Verification](#verification)).
 
-It is defined under:
+![](../../../assets/screenshots/sonarqube-server-drive-config.png)
 
-- README: [`iximiuz/rootfs/sonarqube/README.md`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/README.md)
-- Dockerfile: [`iximiuz/rootfs/sonarqube/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/Dockerfile)
-- Scripts: [`iximiuz/rootfs/sonarqube/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/scripts)
-- Configs: [`iximiuz/rootfs/sonarqube/configs/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/configs)
-    - SonarQube unit: [`configs/sonarqube.service`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/sonarqube.service)
-    - lab-init unit: [`configs/systemd/lab-init.service`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/systemd/lab-init.service)
-    - sudoers: [`configs/sudoers.d/sonarqube-user`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/sudoers.d/sonarqube-user)
-    - Nginx config: [`configs/nginx.conf`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/nginx.conf)
-    - SonarQube config: [`configs/sonar.properties`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/sonar.properties)
-- Welcome banner: [`iximiuz/rootfs/sonarqube/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/welcome)
-- iximiuz manifest: [`iximiuz/manifests/sonarqube-server.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/sonarqube-server.yml)
-- CI workflow: [`.github/workflows/build-sonarqube-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-sonarqube-rootfs.yml)
+All source artifacts:
 
-The image brings up **PostgreSQL, SonarQube, and Nginx** in one VM, with SonarQube available on port 80 via Nginx and on `__SONARQUBE_PORT__` internally.
+| Artifact | Path |
+|---|---|
+| Dockerfile | [`iximiuz/rootfs/sonarqube/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/Dockerfile) |
+| Scripts | [`iximiuz/rootfs/sonarqube/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/scripts/) |
+| Configs | [`iximiuz/rootfs/sonarqube/configs/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/configs/) |
+| Welcome banner | [`iximiuz/rootfs/sonarqube/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/welcome) |
+| CI Workflow | [`.github/workflows/build-sonarqube-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-sonarqube-rootfs.yml) |
+| iximiuz Manifest | [`iximiuz/manifests/sonarqube-server.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/sonarqube-server.yml) |
 
 ---
 
@@ -31,255 +27,427 @@ The image brings up **PostgreSQL, SonarQube, and Nginx** in one VM, with SonarQu
 
 SonarQube Rootfs must:
 
-- Provide **SonarQube 26.2 Community Edition (LTA)** running on PostgreSQL 18 and Java 21, on top of `ubuntu-24-04-rootfs`.
-- Start services in the order `lab-init` → `postgresql` → `nginx` → `sonarqube` via systemd.
-- Configure SonarQube with a dedicated database `sonarqube` and role `sonar`, initialized at runtime by `lab-init.sh`.
-- Expose SonarQube through Nginx on port 80 and provide a `/health` endpoint for liveness checks.
-- Provide a pre‑installed `cloudflared` with a clear workflow in the welcome banner for Cloudflare Tunnel exposure.
-- Give the `sonar` daemon user a **limited sudo profile** for managing SonarQube, PostgreSQL, Nginx, and `journalctl` only.
-- Be built reproducibly using the CI workflow and published as `ghcr.io/ibtisam-iq/sonarqube-rootfs` with versioned and `community` tags.
+- Provide SonarQube 26.2 CE (LTA) running as `sonar` user on PostgreSQL 18, on top of `ubuntu-24-04-rootfs`.
+- Boot in the sequence `lab-init` → `postgresql` → `nginx` → `sonarqube` via systemd, with SonarQube accessible on **port 80** via Nginx on first boot.
+- Provision the PostgreSQL `sonar` role and `sonarqube` database **at runtime** (idempotently) via `lab-init.sh` - never at build time.
+- Configure SonarQube via a baked-in `sonar.properties` with pre-substituted port, JDBC credentials, JVM tuning, and Elasticsearch settings.
+- Apply Elasticsearch kernel parameters (`vm.max_map_count=524288`, `fs.file-max=131072`) at both build time (written to `/etc/sysctl.conf`) and runtime (applied by `lab-init.sh` via `sysctl -w`).
+- Provide `cloudflared` and clear setup instructions in the welcome banner.
+- Apply a **limited `sudo` profile** for the `sonar` daemon - service management and log inspection only.
+- Be built reproducibly via GitHub Actions and published as `ghcr.io/ibtisam-iq/sonarqube-rootfs` with `latest`, `community`, and `26.2.0-community` tags.
 
 ---
 
 ## Architecture / Conceptual Overview
 
-This image is a **three‑tier stack in a single VM**:
+This is a **four-tier stack in a single microVM**:
 
-- **Base OS & tools** - inherited from `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest` (systemd, SSH, shell tools, non‑root `ibtisam`).
-- **Data tier** - PostgreSQL 18 installed via `install-postgresql.sh`, running as `postgres` system user, database `sonarqube` and role `sonar` created at boot by `lab-init.sh`.
-- **App tier** - SonarQube 26.2 CE installed under `/opt/sonarqube`, running as `sonar` user, configured via `configs/sonar.properties`.
-- **Edge tier** - Nginx reverse proxy serving on port 80 and forwarding to internal `__SONARQUBE_PORT__` (default 9000), plus `/health` endpoint.
+| Tier | Component | Details |
+|---|---|---|
+| OS + Tools | `ubuntu-24-04-rootfs` | systemd, SSH, `ibtisam` user, shell config, base tools |
+| Data | PostgreSQL 18 | Via PGDG apt repo; DB provisioned at runtime by `lab-init.sh` |
+| App | SonarQube 26.2 CE | `/opt/sonarqube`; `sonar` user; configured via `sonar.properties` |
+| Edge | Nginx | Port 80 → `127.0.0.1:SONARQUBE_PORT`; `/health` endpoint |
 
-Systemd units:
+### Boot Sequence
 
-- `lab-init.service` - [`configs/systemd/lab-init.service`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/systemd/lab-init.service) - one‑shot init that runs `/opt/sonarqube-scripts/lab-init.sh` before PostgreSQL, Nginx, and SonarQube.
-- `postgresql.service` - installed/configured by `install-postgresql.sh`.
-- `sonarqube.service` - [`configs/sonarqube.service`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/configs/sonarqube.service) - runs `/opt/sonarqube/bin/linux-x86-64/sonar.sh console` as `sonar` user with tuned resource limits.
-- `nginx.service` - provisioned by the base image and further configured by `configure-nginx.sh` and `configs/nginx.conf`.
+```
+systemd (PID 1)
+  └── lab-init.service  [oneshot, Before=all services]
+        1. Generates SSH host keys (ephemeral per VM)
+        2. Creates /run/sshd, /run/nginx, /run/postgresql
+        3. Starts PostgreSQL cluster via pg_ctlcluster
+        4. Waits up to 30s for PostgreSQL ready
+        5. Creates role sonar (idempotent DO $$ block)
+        6. Creates database sonarqube owned by sonar (shell-level idempotency check)
+        7. Grants ALL PRIVILEGES on sonarqube to sonar
+        8. Fixes /opt/sonarqube ownership (sonar:sonar)
+        9. Applies: sysctl vm.max_map_count=524288, fs.file-max=131072
+          ↓ (After= constraint)
+  └── postgresql.service  [systemd-managed via PGDG]
+          ↓
+  └── nginx.service       [simple, daemon off]
+        Listens on :80 → proxies to 127.0.0.1:SONARQUBE_PORT
+          ↓
+  └── sonarqube.service   [simple]
+        /opt/sonarqube/bin/linux-x86-64/sonar.sh console
+        Runs as sonar:sonar
+        Requires=postgresql.service lab-init.service
+        OOMScoreAdjust=-900; LimitNOFILE=131072; LimitNPROC=8192
+```
 
-The **welcome banner** explains internal ports, default credentials, Cloudflare Tunnel steps, and helper commands like `sonar-status`, `pg-status`, and `nginx-reload`.
+> SonarQube embeds an **Elasticsearch node** inside the same process. Elasticsearch requires `vm.max_map_count ≥ 262144` (SonarQube recommends `524288`) and `fs.file-max ≥ 65536` (set to `131072` here). Both are applied at build time to `/etc/sysctl.conf` and re-applied at every boot by `lab-init.sh` because `sysctl` settings from `/etc/sysctl.conf` may not be loaded in the microVM's transient root filesystem.
+
+### Port and Config Substitution
+
+`__SONARQUBE_PORT__` is substituted via `sed` at build time in **three places**:
+
+| File | What changes |
+|---|---|
+| `/opt/sonarqube/conf/sonar.properties` | `sonar.web.port=__SONARQUBE_PORT__` |
+| `/etc/nginx/sites-available/sonarqube` | `upstream sonarqube { server 127.0.0.1:__SONARQUBE_PORT__ }` |
+| `$HOME/.welcome` | Displayed URL in the welcome banner |
+
+Note: Elasticsearch internal port is **always** `9001` (fixed in `sonar.properties`). Only the SonarQube web port is parameterized.
 
 ---
 
-## Source Layout and Inputs
+## Key Decisions
 
-From [`iximiuz/rootfs/sonarqube/README.md`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/README.md):
+**Database provisioning at runtime, not build time** - PostgreSQL cannot be initialized at Docker build time because the PostgreSQL cluster requires a live system with proper OS users, `/run/postgresql`, and a running `postgres` process. `lab-init.sh` performs all DB setup at each boot. The provisioning is **idempotent**: roles use `DO $$ BEGIN IF NOT EXISTS ... END $$` blocks, and database creation checks `pg_database` before running `CREATE DATABASE`. This means re-running `lab-init` on an existing VM is safe.
+
+**`pg_ctlcluster` over `service postgresql start`** - On Ubuntu/Debian, the `postgresql` systemd service is a "dummy" unit that wraps `pg_ctlcluster`. `lab-init.sh` calls `pg_ctlcluster 18 main start` directly for reliability inside the oneshot context, with a 30-second readiness poll before attempting any DB operations.
+
+**Elasticsearch sysctl applied twice** - `install-sonarqube.sh` writes the values to `/etc/sysctl.conf` and `/etc/security/limits.conf` at build time. `lab-init.sh` applies them live via `sysctl -w` at every boot. The double application is intentional: the microVM may not read `/etc/sysctl.conf` during its boot process, so the runtime application via `lab-init` is the reliable path.
+
+**`sonar.properties` is a real config file, not a template** - Unlike Jenkins and Nexus, SonarQube's configuration is complex enough to warrant a full `configs/sonar.properties` with all tunables explicitly set. Only `sonar.web.port` is parameterized. The file includes explicit JVM heap settings:
+- Web server: `-Xmx1G -Xms256m -XX:+UseG1GC`
+- Compute Engine (CE): `-Xmx2G -Xms512m -XX:+UseG1GC`
+- Elasticsearch: `-Xms1G -Xmx1G` (equal min/max to avoid heap resizing)
+
+These are sized for the manifest's `10GiB` RAM allocation.
+
+**Hardcoded JDBC credentials** - `sonar.properties` has `sonar.jdbc.username=sonar` and `sonar.jdbc.password=sonar_password`. `lab-init.sh` creates the role with `ENCRYPTED PASSWORD 'sonar_password'`. This is intentional for a lab image - changing either requires updating both files. Do not use these credentials in any production-adjacent deployment.
+
+**`sonarqube.service` is `Type=simple`, not `notify`** - SonarQube's startup script (`sonar.sh console`) does not implement `sd_notify`. `Type=simple` is correct. `Requires=postgresql.service lab-init.service` ensures systemd will not start SonarQube until both its data tier and the init oneshot are complete.
+
+**Limited `sudo` for `sonar` daemon** - `configs/sudoers.d/sonarqube-user` grants the `sonar` system user passwordless access to: `systemctl restart/stop/start/status sonarqube`, `systemctl restart/status postgresql`, `systemctl reload nginx`, and `journalctl`. Unlike Jenkins and Nexus which only cover their own service, SonarQube's sudoers also includes PostgreSQL restart - because SonarQube depends on a running database and the `sonar` user may need to recover from a DB failure.
+
+**`lab-init.service` is `Before=ssh,nginx,postgresql,sonarqube`** - It runs before all four. SSH host keys are regenerated per VM. `/run/sshd`, `/run/nginx`, and `/run/postgresql` are all wiped on boot. The PostgreSQL cluster start happens inside `lab-init.sh` directly, not through the `postgresql.service` dependency, because `lab-init` must both start PG and provision the DB before `sonarqube.service` launches.
+
+**`BUILD_DATE` and `VCS_REF` not passed as `build-args` in CI** - Same known gap as Jenkins and Nexus. The workflow does not pass these as explicit `build-args`, so the Dockerfile `LABEL` block will produce empty OCI labels for `created` and `revision`.
+
+---
+
+## Source Layout
 
 ```text
 sonarqube/
 ├── Dockerfile
+├── README.md
 ├── welcome
 ├── configs/
-│   ├── nginx.conf                  # Upstream: 127.0.0.1:__SONARQUBE_PORT__
-│   ├── sonarqube.service
-│   ├── sonar.properties            # DB + web + ES + CE JVM options
+│   ├── nginx.conf                      # client_max_body_size 64M; upstream __SONARQUBE_PORT__
+│   ├── sonar.properties                # JDBC, web port, ES port=9001, JVM heap tuning
+│   ├── sonarqube.service               # Type=simple; Requires=postgresql + lab-init
 │   ├── sudoers.d/
-│   │   └── sonarqube-user
+│   │   └── sonarqube-user              # sonar daemon: service control + PG + journalctl
 │   └── systemd/
-│       └── lab-init.service
+│       └── lab-init.service            # oneshot: Before=ssh,nginx,postgresql,sonarqube
 └── scripts/
-    ├── install-postgresql.sh       # PG18 via PGDG apt repo
-    ├── install-sonarqube.sh        # SonarQube LTA + sonar user
-    ├── configure-nginx.sh          # Enables site, systemd override
-    ├── lab-init.sh                 # SSH keys + DB init + sysctl
-    ├── healthcheck.sh              # Build-time validation
-    ├── customize-bashrc.sh         # Aliases → ~/.bashrc
-    └── install-cloudflared.sh
+    ├── install-postgresql.sh           # PG18 via PGDG apt repo; systemctl enable postgresql
+    ├── install-sonarqube.sh            # Java 21 + SonarQube 26.2.0.119303; sysctl values
+    ├── configure-nginx.sh              # Installs nginx, enables site, systemd override
+    ├── lab-init.sh                     # SSH keys + /run dirs + PG start + DB provisioning + sysctl
+    ├── healthcheck.sh                  # Build-time validation (10 sections)
+    ├── customize-bashrc.sh             # sonar/pg/nginx aliases → ~/.bashrc
+    └── install-cloudflared.sh          # Cloudflare Tunnel CLI
 ```
 
-Key paths:
+---
 
-- Dockerfile - [`iximiuz/rootfs/sonarqube/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/Dockerfile)
-- Scripts - [`iximiuz/rootfs/sonarqube/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/scripts)
-- Configs - [`iximiuz/rootfs/sonarqube/configs/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/configs)
-- Welcome - [`iximiuz/rootfs/sonarqube/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/welcome)
+## Build Arguments
+
+| ARG | CI Default | Description |
+|---|---|---|
+| `USER` | `ibtisam` | Interactive non-root user (inherited from base) |
+| `SONARQUBE_PORT` | `9000` | SonarQube web port - substituted in sonar.properties, nginx, welcome |
+| `BUILD_DATE` | From CI metadata-action | OCI label: image creation timestamp |
+| `VCS_REF` | `github.sha` | OCI label: git commit SHA |
 
 ---
 
 ## Prerequisites
 
-To build SonarQube Rootfs:
-
-- Base image `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest` must be built and available.
-- Local clone of `github.com/ibtisam-iq/silver-stack` with the `iximiuz/rootfs/sonarqube` tree.
-- Docker with Buildx (for multi‑arch builds).
-- Network access to fetch PostgreSQL packages from PGDG and SonarQube binaries.
+- `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest` built and published.
+- Local checkout of [`github.com/ibtisam-iq/silver-stack`](https://github.com/ibtisam-iq/silver-stack) with `iximiuz/rootfs/sonarqube/` available.
+- Docker Buildx available locally, or a GitHub Actions runner with `docker/setup-buildx-action`.
+- Network access to: PGDG apt repository (PostgreSQL), `binaries.sonarsource.com` (SonarQube zip), Cloudflare apt repo (`cloudflared`).
+- For CI: `packages: write` permission to push to GHCR via `secrets.GITHUB_TOKEN`.
 
 ---
 
-## Installation / Build Steps
+## Build Steps
 
-### 1. Local SonarQube Rootfs build
+### 1. Local Build
 
-From `iximiuz/rootfs/sonarqube`:
+From `iximiuz/rootfs/sonarqube/`:
 
 ```bash
-IMAGE_NAME="ghcr.io/ibtisam-iq/sonarqube-rootfs:latest"
-
 docker build \
   --build-arg USER="ibtisam" \
-  --build-arg SONARQUBE_PORT="9000" \
-  -t "${IMAGE_NAME}" \
+  --build-arg SONARQUBE_PORT=9000 \
+  -t ghcr.io/ibtisam-iq/sonarqube-rootfs:latest \
   .
 ```
 
-The Dockerfile
-[`iximiuz/rootfs/sonarqube/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/Dockerfile)
-performs these major steps:
+> `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
 
-1. **Base and environment**
+The Dockerfile performs the following sequence in order:
 
-    - `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`.
-    - `USER root`.
-    - Build args: `USER`, `SONARQUBE_PORT`, `BUILD_DATE`, `VCS_REF`.
-    - Labels: `created` and `revision`.
-    - Environment variables:
-        - `SONARQUBE_HOME=/opt/sonarqube`
-        - `SONARQUBE_PORT=${SONARQUBE_PORT:-9000}`
-        - `JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64`
-        - `PATH` updated for Java bin
-        - `TZ=UTC`.
+**Step 1 - Inherit the base**
 
-2. **Scripts and systemd units**
+- `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
+- `USER root` for all installation steps
+- ARGs: `USER`, `SONARQUBE_PORT`, `BUILD_DATE`, `VCS_REF`
+- `ENV`: `SONARQUBE_HOME=/opt/sonarqube`, `SONARQUBE_PORT=${SONARQUBE_PORT:-9000}`, `JAVA_HOME`, `PATH` (Java bin prepended), `TZ=UTC`
 
-    - Copies all scripts to `/opt/sonarqube-scripts/` and marks them executable.
-    - Copies `configs/sonarqube.service` to `/etc/systemd/system/sonarqube.service`.
-    - Copies `configs/sudoers.d/sonarqube-user` to `/etc/sudoers.d/sonarqube-user`.
-    - Copies `configs/systemd/lab-init.service` to `/etc/systemd/system/lab-init.service`.
+> Note: `SONARQUBE_PORT` in ENV uses `${SONARQUBE_PORT:-9000}` - a default fallback in case the ARG is not passed. This is different from Jenkins and Nexus which do not use a default in the ENV assignment.
 
-3. **Install PostgreSQL**
+**Step 2 - Copy build-time scripts first**
 
-    - Runs `/opt/sonarqube-scripts/install-postgresql.sh` to configure PGDG repo and install PostgreSQL 18.
+- `COPY scripts/ /opt/sonarqube-scripts/` + `chmod +x *.sh`
 
-4. **Install SonarQube**
+> This is structurally different from Jenkins and Nexus: scripts are copied **before** config files because the install scripts are needed before `sonar.properties` and `nginx.conf` exist. The Dockerfile does not need nginx config for the first two RUN steps.
 
-    - Executes `/opt/sonarqube-scripts/install-sonarqube.sh ${SONARQUBE_PORT}` to install SonarQube 26.2 CE, create `sonar` user, and prepare directories.
+**Step 3 - Copy systemd units and sudoers**
 
-5. **Apply SonarQube configuration**
+- `COPY configs/sonarqube.service /etc/systemd/system/sonarqube.service`
+- `COPY configs/sudoers.d/sonarqube-user /etc/sudoers.d/sonarqube-user`
+- `COPY configs/systemd/lab-init.service /etc/systemd/system/lab-init.service`
 
-    - Copies `configs/sonar.properties` into `/opt/sonarqube/conf/sonar.properties`.
-    - Replaces `__SONARQUBE_PORT__` with `SONARQUBE_PORT` and sets owner to `sonar:sonar`.
+> `sonar.properties` and `nginx.conf` are **NOT copied here**. They are copied in later steps after their target directories exist.
 
-6. **Configure Nginx**
+**Step 4 - Install PostgreSQL** (`install-postgresql.sh`)
 
-    - Copies `configs/nginx.conf` to `/etc/nginx/sites-available/sonarqube` and replaces `__SONARQUBE_PORT__` with `SONARQUBE_PORT`.
-    - Runs `/opt/sonarqube-scripts/configure-nginx.sh` to enable the SonarQube site and integrate it with systemd.
+- Installs `postgresql-common` (provides the PGDG repo setup script).
+- Runs `/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh` non-interactively to add the PGDG repository.
+- Installs `postgresql-18` and `postgresql-contrib-18`.
+- Runs `systemctl enable postgresql`.
 
-7. **Enable services on boot**
+**Step 5 - Install Java 21 + SonarQube CE** (`install-sonarqube.sh ${SONARQUBE_PORT}`)
 
-    - Enables `lab-init`, `postgresql`, `nginx`, and `sonarqube` using `systemctl enable`.
+- Validates port argument.
+- Installs `openjdk-21-jdk` via apt.
+- Downloads `sonarqube-26.2.0.119303.zip` from Sonatype CDN.
+- Extracts to `/opt/sonarqube`, removes zip.
+- Creates `sonar` system user (`--system --no-create-home --shell /bin/bash`).
+- Sets ownership `sonar:sonar`, permissions `755` on `/opt/sonarqube`.
+- Creates subdirectories: `/opt/sonarqube/{data,temp,logs}`.
+- Writes to `/etc/sysctl.conf`: `vm.max_map_count=524288` and `fs.file-max=131072`.
+- Writes to `/etc/security/limits.conf`: `sonar soft/hard nofile 131072`, `sonar soft/hard nproc 8192`.
 
-8. **Healthcheck and cloudflared**
+**Step 6 - Copy and configure `sonar.properties`**
 
-    - Runs `/opt/sonarqube-scripts/healthcheck.sh ${USER}` to validate PostgreSQL, SonarQube, Nginx, and sysctl configuration.
-    - Executes `/opt/sonarqube-scripts/install-cloudflared.sh` to install `cloudflared`.
+```dockerfile
+COPY configs/sonar.properties /opt/sonarqube/conf/sonar.properties
+RUN sed -i "s/__SONARQUBE_PORT__/${SONARQUBE_PORT}/g" /opt/sonarqube/conf/sonar.properties && \
+    chown sonar:sonar /opt/sonarqube/conf/sonar.properties
+```
+This must happen **after** `install-sonarqube.sh` because `/opt/sonarqube/conf/` is created by the install script. The `chown` ensures the `sonar` user can read it at runtime.
 
-9. **User home and shell customization**
+**Step 7 - Copy and configure `nginx.conf`**
 
-    - `chown -R ${USER}:${USER} /home/${USER}` to repair home ownership.
-    - Switches to `USER $USER`, `HOME=/home/$USER`.
-    - Copies `welcome` to `$HOME/.welcome` and substitutes `__SONARQUBE_PORT__` with `SONARQUBE_PORT`.
-    - Binds `scripts/` as `/tmp/scripts` and runs `customize-bashrc.sh` to add aliases and shortcuts.
+```dockerfile
+COPY configs/nginx.conf /etc/nginx/sites-available/sonarqube
+RUN sed -i "s/__SONARQUBE_PORT__/${SONARQUBE_PORT}/g" /etc/nginx/sites-available/sonarqube
+```
+`/etc/nginx/sites-available/` exists from the base image's Nginx installation.
 
-10. **Return to root and finalize**
+**Step 8 - Configure Nginx** (`configure-nginx.sh`)
 
-    - Switches back to `USER root` so systemd can run as PID 1.
-    - Exposes ports `22`, `80`, and `SONARQUBE_PORT`.
-    - `CMD ["/lib/systemd/systemd"]`.
+- Installs `nginx` via apt (idempotent if already present).
+- Validates `/etc/nginx/sites-available/sonarqube` exists (COPY'd in Step 7).
+- Removes default site, enables sonarqube site symlink.
+- Creates systemd override: `Type=simple`, `ExecStart=/usr/sbin/nginx -g 'daemon off;'`.
+- Runs `nginx -t` to validate config.
 
-> **Why this matters:** SonarQube’s embedded Elasticsearch requires specific sysctl and service ordering; this build flow guarantees those preconditions via `lab-init` + healthcheck.
+**Step 9 - Enable systemd units**
+
+```bash
+systemctl enable lab-init
+systemctl enable postgresql
+systemctl enable nginx
+systemctl enable sonarqube
+```
+
+**Step 10 - Build-time healthcheck** (`healthcheck.sh ${USER}`)
+
+Validates 10 sections without starting services (systemd not running during build):
+
+| Section | What is checked |
+|---|---|
+| 1. System tools | `curl`, `wget`, `git`, `vim`, `unzip`, `nginx` present |
+| 2. Java | `java`, `javac` commands; `JAVA_HOME` set |
+| 3. PostgreSQL | `postgresql-18` package; `psql` command; `postgres` user; `/var/lib/postgresql` dir |
+| 4. SonarQube installation | `/opt/sonarqube/{bin,conf,data,logs}` dirs; `sonar.sh` present; `sonar` user; `/opt/sonarqube` owned by `sonar` |
+| 5. Nginx config | Site file present; symlink enabled; default removed; `nginx -t` passes |
+| 6. Systemd units | `lab-init`, `ssh`, `postgresql`, `nginx`, `sonarqube` symlinks in `multi-user.target.wants/` |
+| 7. SSH config | `sshd_config` and `sshd` binary; host keys absent (expected - generated at boot) |
+| 8. Users | Interactive `$USER` account; `sudoers.d/sonarqube-user` present |
+| 9. File permissions | `/opt/sonarqube` owned by `sonar` |
+| 10. Port config | `sonar.properties` has `sonar.web.port=SONARQUBE_PORT`; nginx config has `127.0.0.1:SONARQUBE_PORT` |
+
+**Step 11 - Install cloudflared** (`install-cloudflared.sh`)
+
+**Step 12 - Fix ownership**
+
+- `chown -R ${USER}:${USER} /home/${USER}`
+
+**Step 13 - User customizations**
+
+- `USER $USER` + `ENV HOME=/home/$USER`
+- `COPY welcome $HOME/.welcome` → `sed -i` replaces `__SONARQUBE_PORT__`
+- `customize-bashrc.sh` appends to `~/.bashrc`:
+    - `sonar-status`, `sonar-logs`, `sonar-restart`, `sonar-start`, `sonar-stop`
+    - `pg-status`, `pg-logs`, `pg-restart`
+    - `nginx-status`, `nginx-logs`, `nginx-reload`
+    - Standard `ll`, `la`, `l` aliases
+
+**Step 14 - Return to root + CMD**
+
+- `USER root`
+- `EXPOSE 22 80 ${SONARQUBE_PORT}`
+- `CMD ["/lib/systemd/systemd"]`
 
 ---
 
-### 2. Build and push via GitHub Actions
+### 2. Build and Push via GitHub Actions
 
-CI build is defined in
-[`.github/workflows/build-sonarqube-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-sonarqube-rootfs.yml).
+Canonical build: [`.github/workflows/build-sonarqube-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-sonarqube-rootfs.yml)
 
-Key behavior:
+**Triggers:**
 
-- **Triggers**
-    - `push` to `main` when files under `iximiuz/rootfs/sonarqube/**` (except `README.md`) or the workflow file change.
-    - `pull_request` on the same paths.
-    - `workflow_dispatch` for manual runs.
+- `push` to `main` when files under `iximiuz/rootfs/sonarqube/**` (excluding `README.md`) or the workflow file change.
+- Pull requests with the same path filters.
+- Manual `workflow_dispatch`.
 
-- **Environment**
-    - `IMAGE_NAME = ghcr.io/${{ github.repository_owner }}/sonarqube-rootfs`.
+**Key steps:**
 
-- **Build steps**
-    - Checkout repo.
-    - Set up QEMU and Buildx for `amd64` and `arm64`.
-    - Log in to GHCR.
-    - Use `docker/metadata-action` to generate tags and labels, including:
-        - `latest` on default branch.
-        - `26.2.0-community` tag.
-        - `community` tag.
-        - `sha-<short-sha>` and date tags.
-        - Base image label `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`.
-    - Use `docker/build-push-action` with:
-        - `context: ./iximiuz/rootfs/sonarqube`
-        - `file: ./iximiuz/rootfs/sonarqube/Dockerfile`
-        - `platforms: linux/amd64,linux/arm64`
-        - `build-args: USER=ibtisam, SONARQUBE_PORT=9000`
-        - Cache from/to `gha`.
-        - `push: true` on non‑PR events.
-    - Print the final image digest.
+1. Checkout repository.
+2. Set up Docker Buildx (no QEMU - amd64 only, intentional).
+3. Log in to GHCR via `secrets.GITHUB_TOKEN`.
+4. Extract metadata via `docker/metadata-action`:
+    - Tags: `latest`, `community`, `26.2.0-community` (on default branch), `sha-<short>`, `YYYY-MM-DD`
+    - Labels include `org.opencontainers.image.base.name=ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
+5. `docker/build-push-action` with:
+    - `context: ./iximiuz/rootfs/sonarqube`
+    - `platforms: linux/amd64`
+    - `push: true` (non-PR only)
+    - `build-args: USER=ibtisam`, `SONARQUBE_PORT=9000`
+    - GHA layer cache enabled.
+6. Print final image digest.
 
-> **Why this matters:** Keeping local build args consistent with the workflow avoids discrepancies between local testing and what iximiuz pulls from GHCR.
+> **Known gap:** `BUILD_DATE` and `VCS_REF` are not passed as explicit `build-args`. Same issue as Jenkins and Nexus - the Dockerfile `LABEL` block produces empty OCI labels for `created` and `revision`.
 
 ---
 
 ## Verification
 
-### Local container test
-
-From the README:
+### ✅ Correct: Inspect the Registry Image
 
 ```bash
-docker run -d \
-  --name sonarqube-test \
-  --privileged \
-  --cgroupns=host \
-  -v /sys/fs/cgroup:/sys/fs/cgroup \
-  --tmpfs /tmp \
-  --tmpfs /run \
-  --tmpfs /run/lock \
-  -p 9000:80 \
-  -p 8022:22 \
-  ghcr.io/ibtisam-iq/sonarqube-rootfs:latest
-
-# Wait ~30s for SonarQube to start
-docker exec sonarqube-test systemctl is-active lab-init postgresql nginx sonarqube
-
-# Verify PostgreSQL database
-docker exec sonarqube-test su - postgres -c "psql -c '\l'"
-
-# SonarQube health
-docker exec sonarqube-test \
-  curl -u admin:admin http://localhost:9000/api/system/health
-
-# Nginx health
-docker exec sonarqube-test curl -f http://localhost/health
-
-# UI in browser
-open http://localhost:9000
+skopeo inspect docker://ghcr.io/ibtisam-iq/sonarqube-rootfs:latest \
+  | jq '{
+      name: .Name,
+      base: .Labels["org.opencontainers.image.base.name"],
+      created: .Labels["org.opencontainers.image.created"],
+      documentation: .Labels["org.opencontainers.image.documentation"],
+      authors: .Labels["org.opencontainers.image.authors"]
+    }'
 ```
 
-You should see:
+---
 
-- All four services active.
-- PostgreSQL listing includes `sonarqube` database.
-- `/api/system/health` returning `GREEN` once fully initialized.
-- `/health` returning `"healthy"`.
+### ✅ Correct: Binary and Config Presence Check (`docker run` - limited scope)
 
-### GHCR image check
+Confirms binaries, files, configs, and symlinks. Does **not** validate runtime behavior (no systemd, no PostgreSQL, no SonarQube):
 
 ```bash
-skopeo inspect docker://ghcr.io/ibtisam-iq/sonarqube-rootfs:community \
-  | jq '.Name,.Labels."org.opencontainers.image.base.name"'
+docker run --rm ghcr.io/ibtisam-iq/sonarqube-rootfs:latest bash -c "
+  java -version 2>&1 | head -1
+  psql --version
+  nginx -v 2>&1
+  cloudflared --version
+
+  echo '--- SonarQube binary ---'
+  ls -lh /opt/sonarqube/bin/linux-x86-64/sonar.sh
+
+  echo '--- sonar.properties (port + jdbc) ---'
+  grep -E 'sonar.web.port|sonar.jdbc' /opt/sonarqube/conf/sonar.properties
+
+  echo '--- sonar.properties (ES + JVM heap) ---'
+  grep -E 'sonar.search|sonar.ce.java|sonar.web.java' /opt/sonarqube/conf/sonar.properties
+
+  echo '--- Nginx upstream port ---'
+  grep server /etc/nginx/sites-available/sonarqube | head -3
+
+  echo '--- Systemd unit symlinks ---'
+  ls /etc/systemd/system/multi-user.target.wants/ | grep -E 'lab-init|postgresql|nginx|sonarqube'
+
+  echo '--- sysctl.conf Elasticsearch limits ---'
+  grep -E 'max_map_count|file-max' /etc/sysctl.conf
+
+  echo '--- sudoers ---'
+  cat /etc/sudoers.d/sonarqube-user
+
+  echo '--- Welcome banner ---'
+  cat /home/ibtisam/.welcome
+"
 ```
 
-Base label should be `ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`.
+---
+
+### ✅ Correct: Full Runtime Verification (iximiuz microVM)
+
+The only valid way to verify the full stack:
+
+```bash
+# Step 1 - ensure labctl is authenticated
+labctl auth whoami
+
+# Step 2 - download the manifest
+curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/iximiuz/manifests/sonarqube-server.yml \
+  -o sonarqube-server.yml
+
+# Step 3 - create the playground
+labctl playground create --base flexbox sonarqube-server -f sonarqube-server.yml
+```
+
+Once the VM is running, connect via the terminal tab:
+
+```bash
+# --- System health ---
+systemctl is-system-running              # Expected: running
+systemctl status lab-init                # Expected: active (exited) - oneshot complete
+systemctl status postgresql              # Expected: active (running)
+systemctl status nginx                   # Expected: active (running)
+systemctl status sonarqube               # Expected: active (running) - may be activating for 2-3 min
+
+# --- PostgreSQL database provisioned ---
+sudo -u postgres psql -c '\l'           # sonarqube database should appear
+sudo -u postgres psql -c '\du'          # sonar role should appear
+
+# --- Nginx health endpoint ---
+curl -s http://localhost:80/health       # Expected: healthy
+
+# --- SonarQube API health (wait 2-3 min for full startup) ---
+curl -s -u admin:admin http://localhost:9000/api/system/health
+# Expected: {"health":"GREEN","causes":[]}
+
+# --- Elasticsearch sysctl values ---
+sysctl vm.max_map_count                  # Expected: 524288
+sysctl fs.file-max                       # Expected: 131072
+
+# --- Aliases available ---
+alias | grep sonar-
+alias | grep pg-
+alias | grep nginx-
+```
+
+---
+
+### ❌ Not Valid: `docker run` for systemd or service checks
+
+`docker run` cannot start systemd, PostgreSQL, or SonarQube. Any attempt produces:
+
+```
+System has not been booted with systemd as init system (PID 1). Can't operate.
+```
+
+This is **expected and correct** - not a bug.
+
+> **SonarQube startup time:** SonarQube 26.2 with embedded Elasticsearch typically takes **2–3 minutes** to fully start on first boot. `systemctl status sonarqube` will show `activating` during this period. Monitor with `sonar-logs` and wait for the log line `SonarQube is operational` before testing the UI or API.
 
 ---
 
@@ -366,7 +534,7 @@ To start immediately, click **Start**.
 
 To review or adjust settings before starting, click ⋮ → **Configure**. This opens the Playground Settings page where machine drives, resources, network, and UI tabs can be inspected before launch.
 
-![](../../../assets/screenshots/sonarqube-server-drive-config.png)
+![](../../../assets/screenshots/silverstack-sonarqube-server-playground.png)
 
 ---
 
@@ -394,10 +562,13 @@ If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the foll
 
 ## Related
 
-- SonarQube Rootfs README - [`iximiuz/rootfs/sonarqube/README.md`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/README.md)
-- SonarQube Dockerfile - [`iximiuz/rootfs/sonarqube/Dockerfile`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/Dockerfile)
-- SonarQube scripts - [`iximiuz/rootfs/sonarqube/scripts/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/scripts)
-- SonarQube configs - [`iximiuz/rootfs/sonarqube/configs/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/configs)
-- SonarQube welcome - [`iximiuz/rootfs/sonarqube/welcome`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/welcome)
-- Build workflow - [`.github/workflows/build-sonarqube-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-sonarqube-rootfs.yml)
-- SonarQube iximiuz manifest - [`iximiuz/manifests/sonarqube-server.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/sonarqube-server.yml)
+- [SonarQube README](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/README.md)
+- [SonarQube Dockerfile](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/sonarqube/Dockerfile)
+- [SonarQube scripts](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/scripts)
+- [SonarQube configs](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/sonarqube/configs)
+- [Ubuntu base rootfs README](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/README.md)
+- [SonarQube workflow](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-sonarqube-rootfs.yml)
+- [SonarQube manifest](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/sonarqube-server.yml)
+- [Nexus Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-nexus-rootfs-image/)
+- [Jenkins Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-jenkins-rootfs-image/)
+- [Dev Machine runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-machine-rootfs-image/)
