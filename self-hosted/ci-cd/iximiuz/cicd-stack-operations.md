@@ -5,6 +5,7 @@ This runbook captures the **post‑provisioning operational steps** that turn th
 It assumes the infra is already up via the [**Setup - CI/CD Stack Orchestration**](setup-cicd-stack-orchestration.md) runbook and focuses on Jenkins, SonarQube, and Nexus configuration.
 
 ![](../../../assets/screenshots/cicd-stack-dev-machine-welcome.png)
+
 ---
 
 ## Prerequisites and Assumptions

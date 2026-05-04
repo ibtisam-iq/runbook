@@ -149,7 +149,6 @@ These aliases make it trivial to jump from the Dev Machine to each service node.
 [`.github/workflows/build-dev-cicd-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-dev-cicd-rootfs.yml).
 
 - Triggers on changes under `iximiuz/rootfs/dev/ci-cd/**` (excluding `README.md`) and on edits to the workflow itself.
-- Uses QEMU + Buildx to build `amd64` and `arm64` images.
 - Logs into GHCR and tags the image as `latest`, a `sha-<short-sha>` tag, and a date tag.
 - Sets `USER=ibtisam` as a build argument so the Dev Machine user matches your primary account.
 
