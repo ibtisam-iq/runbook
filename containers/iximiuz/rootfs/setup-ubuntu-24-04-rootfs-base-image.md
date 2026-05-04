@@ -228,7 +228,6 @@ After a CI push or manual `docker push`, verify image metadata:
 skopeo inspect docker://ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest \
   | jq '{
       name: .Name,
-      title: .Labels["org.opencontainers.image.title"],
       base: .Labels["org.opencontainers.image.base.name"],
       created: .Labels["org.opencontainers.image.created"]
     }'
@@ -239,7 +238,6 @@ Expected:
 ```json
 {
   "name": "ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs",
-  "title": "Ubuntu 24.04 Rootfs",
   "base": "ubuntu:24.04",
   "created": "<build-date>"
 }
