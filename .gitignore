@@ -11,3 +11,5 @@ Thumbs.db
 # Byte-compiled / cached Python files
 __pycache__/
 *.pyc
+
+*.bak
