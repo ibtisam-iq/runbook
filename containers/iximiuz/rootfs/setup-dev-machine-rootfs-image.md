@@ -63,6 +63,25 @@ All installation work is split into focused scripts:
 
 - **`BUILD_DATE` and `VCS_REF` injected by CI** - the workflow passes these as build-args from `docker/metadata-action` output and `github.sha`, respectively. Local builds may omit them; the OCI labels will be empty strings, which is acceptable for local testing only.
 
+- **`USER $USER` at the end is intentional - do not change it to `USER root`**
+
+The Dockerfile ends with `USER $USER`, not `USER root`. This is a deliberate decision, not an oversight. Understanding why requires distinguishing the two completely independent execution contexts this image is used in:
+
+| Context | Who controls the starting user | Effect of `USER` directive |
+|---|---|---|
+| `docker run` binary check | Docker daemon, reads `USER` from OCI image config | **Matters** - process starts as `ibtisam` |
+| iximiuz microVM boot | Platform kernel + systemd as PID 1 | **Irrelevant** - `USER` field is never read |
+
+When iximiuz boots this image, it mounts the filesystem as a block device, boots it with its own kernel, and systemd becomes PID 1 entirely independent of anything in the OCI image config. The `USER` directive is an OCI image config field - it only tells `docker run` which user to start the process as. It has zero effect on the microVM boot.
+
+Ending at `USER $USER` is correct for both reasons:
+
+  - **For `docker run` binary checks:** the process starts as `ibtisam`. This correctly validates that all tools are accessible to the non-root interactive user - the user who will actually use them inside the VM. If the Dockerfile ended with `USER root`, the binary check would pass even if a tool were installed in a location only root can reach, masking real permission issues.
+  - **For microVM boot:** completely irrelevant. systemd boots as root via the platform kernel regardless of this directive.
+
+Adding `USER root` before `EXPOSE 22` would be a regression: it makes `docker run` checks run as root, silently hides permission problems, and provides zero benefit for the actual iximiuz runtime.
+
+
 ---
 
 ## Source Layout
@@ -185,6 +204,8 @@ The Dockerfile performs the following sequence:
 - `COPY welcome $HOME/.welcome` - placed at this stage so the banner is not consumed by any non-interactive build step.
 - `customize-bashrc.sh` (bind mount) - appends kubectl, docker, terraform, git, and utility aliases and helpers to `~/.bashrc`.
 - **`EXPOSE 22`** - documents the SSH port for iximiuz port-forwarding. SSH itself is managed by systemd inherited from the base image.
+
+> **Note:** The Dockerfile intentionally ends at `USER $USER` - not `USER root`. See [Key Decisions → `USER $USER` at the end is intentional](#key-decisions) for the full explanation.
 
 ---
 
