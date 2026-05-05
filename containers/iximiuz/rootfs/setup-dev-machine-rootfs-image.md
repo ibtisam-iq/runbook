@@ -8,7 +8,7 @@ It turns the generic Ubuntu base into a fully provisioned environment with Docke
 
 > **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process, not through Docker. Running the image with `docker run` will not produce a working systemd, Docker daemon, or network services - see [Verification](#verification) for the correct approach.
 
-![](../../../assets/screenshots/silverstack-dev-machine-playground.png)
+![](../../../assets/screenshots/dev-machine-drive-config.png)
 
 All source artifacts live under:
 
