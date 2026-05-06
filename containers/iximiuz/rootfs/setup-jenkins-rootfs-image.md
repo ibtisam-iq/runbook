@@ -1,4 +1,4 @@
-# Jenkins LTS Rootfs: CI Server Image Build and Integration
+# Jenkins LTS Rootfs: CI Server Image Build and Integration for the Iximiuz Labs
 
 ## Context
 
@@ -8,7 +8,7 @@ Jenkins LTS Rootfs is a production-grade Jenkins CI server image for iximiuz pla
 
 ![](../../../assets/screenshots/jenkins-server-drive-config.png)
 
-**Pipeline tools and plugins are intentionally NOT baked in.** Two post-setup scripts are placed on `PATH` and run by you after the VM is live - keeping the image lean and your toolchain choices explicit.
+**Pipeline tools and plugins are intentionally NOT baked in.** Two post-setup scripts are placed on `PATH` and run after the VM is live - keeping the image lean.
 
 All source artifacts:
 
@@ -403,9 +403,13 @@ This is **expected and correct** - not a bug. Even with `--privileged`, a plain 
 
 ## Integration with iximiuz Labs
 
+> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
+> https://labs.iximiuz.com/playgrounds/SilverStack-jenkins-server-63fe430c
+> - no local tools required. The `labctl` steps below are for launching via manifest.
+
 ### Prerequisites
 
-Before proceeding, ensure the following are in place on the machine from which you will run `labctl` commands:
+Before proceeding, ensure the following are in place on the machine from which `labctl` commands will run:
 
 1. **`labctl` is installed**
    ```bash
@@ -450,15 +454,15 @@ The manifest can be edited before running - for example, to adjust `cpuCount`, `
 Run `labctl playground create` pointing at the local manifest:
 
 ```bash
-labctl playground create --base flexbox jenkins-server -f jenkins-server.yml
+labctl playground create --base flexbox SilverStack-jenkins-server -f jenkins-server.yml
 ```
 
 When the command succeeds, `labctl` prints the playground URL and its unique ID:
 
 ```
-Creating playground from /path/to/<MANIFEST_FILENAME>
-Playground URL: https://labs.iximiuz.com/playgrounds/jenkins-server-<unique-id>
-jenkins-server-<unique-id>
+Creating playground from /Users/ibtisam-iq/gitHub/silver-stack/iximiuz/manifests/jenkins-server.yml
+Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-jenkins-server-63fe430c
+SilverStack-jenkins-server-63fe430c
 ```
 
 > **Note:** The playground does **not** appear under **Playgrounds → Running**.

@@ -2,9 +2,9 @@
 
 This runbook covers the post-provisioning steps that turn the SilverStack CI/CD stack into a fully functional DevSecOps platform. It assumes the infra is already running (see [Setup - CI/CD Stack Orchestration](setup-cicd-stack-orchestration.md)) and Cloudflare Tunnels are live with valid SSL on:
 
-- `https://jenkins.ibtisam-iq.com`
-- `https://sonar.ibtisam-iq.com`
-- `https://nexus.ibtisam-iq.com`
+- [https://jenkins.ibtisam-iq.com](https://jenkins.ibtisam-iq.com)
+- [https://sonar.ibtisam-iq.com](https://sonar.ibtisam-iq.com)
+- [https://nexus.ibtisam-iq.com](https://nexus.ibtisam-iq.com)
 
 ![](../../../assets/screenshots/cicd-stack-dev-machine-welcome.png)
 
@@ -82,7 +82,7 @@ The script:
 3. Installs all plugins via `jenkins-cli.jar` over WebSocket (`-webSocket` flag, which bypasses reverse-proxy origin checks).
 4. Triggers a safe restart so all plugins become active without interrupting running builds.
 
-> **This step must run after the setup wizard is completed.** The initial admin password (`initialAdminPassword`) is deleted by Jenkins as soon as the wizard finishes - the script uses your new admin credentials, not the initial password.
+> **This step must run after the setup wizard is completed.** The initial admin password (`initialAdminPassword`) is deleted by Jenkins as soon as the wizard finishes - the script uses new admin credentials, not the initial password.
 
 To skip a plugin, comment out its line in `/usr/local/bin/install-plugins`. To add one, append its official plugin ID.
 
@@ -129,7 +129,7 @@ ID:       github-creds
 
 ### Credential 3 - Docker Hub
 
-Create a Docker Hub access token (not your account password): **Account Settings → Security → New Access Token**
+Create a Docker Hub access token (not account password): **Account Settings → Security → New Access Token**
 
 - Name: `jenkins-ci`
 - Scopes: Read, Write

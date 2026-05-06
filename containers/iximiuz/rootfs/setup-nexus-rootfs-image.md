@@ -1,4 +1,4 @@
-# Nexus Repository Manager Rootfs: Artifact Server Image Build and Integration
+# Nexus Repository Manager Rootfs: Artifact Server Image Build and Integration for the Iximiuz Labs
 
 ## Context
 
@@ -405,9 +405,13 @@ This is **expected and correct** - not a bug. The image is purpose-built for mic
 
 ## Integration with iximiuz Labs
 
+> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
+> https://labs.iximiuz.com/playgrounds/SilverStack-nexus-server-9a3f87e9
+> - no local tools required. The `labctl` steps below are for launching via manifest.
+
 ### Prerequisites
 
-Before proceeding, ensure the following are in place on the machine from which you will run `labctl` commands:
+Before proceeding, ensure the following are in place on the machine from which `labctl` commands will run:
 
 1. **`labctl` is installed**
    ```bash
@@ -452,15 +456,15 @@ The manifest can be edited before running - for example, to adjust `cpuCount`, `
 Run `labctl playground create` pointing at the local manifest:
 
 ```bash
-labctl playground create --base flexbox nexus-server -f nexus-server.yml
+labctl playground create --base flexbox SilverStack-nexus-server -f nexus-server.yml
 ```
 
 When the command succeeds, `labctl` prints the playground URL and its unique ID:
 
 ```
-Creating playground from /path/to/<MANIFEST_FILENAME>
-Playground URL: https://labs.iximiuz.com/playgrounds/nexus-server-<unique-id>
-nexus-server-<unique-id>
+Creating playground from /Users/ibtisam-iq/gitHub/silver-stack/iximiuz/manifests/nexus-server.yml
+Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-nexus-server-9a3f87e9
+SilverStack-nexus-server-9a3f87e9
 ```
 
 > **Note:** The playground does **not** appear under **Playgrounds → Running**.

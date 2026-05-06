@@ -1,4 +1,4 @@
-# Dev Machine Rootfs: DevOps Workstation Image Build and Integration
+# Dev Machine Rootfs: DevOps Workstation Image Build and Integration for the Iximiuz Labs
 
 ## Context
 
@@ -348,6 +348,10 @@ These are **not bugs** - they are expected and correct.
 ---
 
 ## Integration with iximiuz Labs
+
+> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
+> https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7
+> - no local tools required. The `labctl` steps below are for launching via manifest.
 
 ### Prerequisites
 

@@ -1,4 +1,4 @@
-# Ubuntu 24.04 Rootfs: Base Image Build and Integration
+# Ubuntu 24.04 Rootfs: Base Image Build and Integration for the Iximiuz Labs
 
 ## Context
 
@@ -299,7 +299,7 @@ Guidelines for child Dockerfiles:
 
 ### Optional: Direct Use as a Playground Rootfs
 
-The base image can be booted directly by pointing a manifest's drive at it (as shown in Verification above). Typically you would use Dev Machine or another child image instead.
+The base image can be booted directly by pointing a manifest's drive at it (as shown in Verification above). Typically use Dev Machine or another child image instead.
 
 ---
 

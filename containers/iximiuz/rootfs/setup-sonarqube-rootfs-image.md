@@ -1,4 +1,4 @@
-# SonarQube Community Edition Rootfs: Code Quality Server Image Build and Integration
+# SonarQube Community Edition Rootfs: Code Quality Server Image Build and Integration for the Iximiuz Labs
 
 ## Context
 
@@ -453,11 +453,13 @@ This is **expected and correct** - not a bug.
 
 ## Integration with iximiuz Labs
 
-Once the image is verified locally and pushed to GHCR, it can be launched as a custom iximiuz playground using the `labctl` CLI and a manifest file. Unlike iximiuz's built-in catalog labs, custom rootfs images cannot be started directly from the iximiuz UI - they require a manifest file to declare the machine drive source, resources, and tabs.
+> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
+> https://labs.iximiuz.com/playgrounds/SilverStack-sonarqube-server-7761f36f
+> - no local tools required. The `labctl` steps below are for launching via manifest.
 
 ### Prerequisites
 
-Before proceeding, ensure the following are in place on the machine from which you will run `labctl` commands:
+Before proceeding, ensure the following are in place on the machine from which `labctl` commands will run:
 
 1. **`labctl` is installed**
    ```bash
@@ -502,15 +504,15 @@ The manifest can be edited before running - for example, to adjust `cpuCount`, `
 Run `labctl playground create` pointing at the local manifest:
 
 ```bash
-labctl playground create --base flexbox sonarqube-server -f sonarqube-server.yml
+labctl playground create --base flexbox SilverStack-sonarqube-server -f sonarqube-server.yml
 ```
 
 When the command succeeds, `labctl` prints the playground URL and its unique ID:
 
 ```
-Creating playground from /path/to/<MANIFEST_FILENAME>
-Playground URL: https://labs.iximiuz.com/playgrounds/sonarqube-server-<unique-id>
-sonarqube-server-<unique-id>
+Creating playground from /Users/ibtisam-iq/gitHub/silver-stack/iximiuz/manifests/sonarqube-server.yml
+Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-sonarqube-server-7761f36f
+SilverStack-sonarqube-server-7761f36f
 ```
 
 > **Note:** The playground does **not** appear under **Playgrounds → Running**.

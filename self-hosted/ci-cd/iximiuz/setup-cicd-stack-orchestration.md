@@ -154,12 +154,16 @@ alias stack-nexus='ssh -o StrictHostKeyChecking=no ibtisam@nexus-server'
 
 ## Provisioning the Playground
 
+> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
+> https://labs.iximiuz.com/playgrounds/SilverStack-CICD-Stack-1766a8a1
+> - no local tools required. The `labctl` steps below are for launching via manifest.
+
 ### Step 1 - Create the Stack
 
 From a machine where `labctl` is authenticated and the [silver-stack](https://github.com/ibtisam-iq/silver-stack) repo is cloned:
 
 ```bash
-labctl playground create --base flexbox cicd-stack \
+labctl playground create --base flexbox SilverStack-CICD-Stack \
   -f iximiuz/manifests/cicd-stack.yml
 ```
 
@@ -171,9 +175,9 @@ This command:
 
 Output:
 ```
-Creating playground from iximiuz/manifests/cicd-stack.yml
-Playground URL: https://labs.iximiuz.com/playgrounds/cicd-stack-<unique-id>
-cicd-stack-<unique-id>
+Creating playground from /Users/ibtisam-iq/gitHub/silver-stack/iximiuz/manifests/cicd-stack.yml
+Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-CICD-Stack-1766a8a1
+SilverStack-CICD-Stack-1766a8a1
 ```
 
 > Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom** in the iximiuz dashboard, **not** under "Running".
