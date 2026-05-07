@@ -28,7 +28,7 @@ exclude_docs: |
 
 draft_docs: |
   incident-response/*
-  
+
   docs/_meta/*
   docs/_drafts/*
 
@@ -87,7 +87,7 @@ theme:
     - content.tooltips
     - content.action.edit
     - content.action.view
-    - navigation.expand
+    # - navigation.expand
     - navigation.indexes
   palette:
     - media: "(prefers-color-scheme: light)"
