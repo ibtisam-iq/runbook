@@ -72,18 +72,7 @@ jobs:
         run: mkdocs build # --strict
 
       - name: QA — HTML validation
-        run: |
-          html5validator --root site --blacklist robots.txt --ignore \
-            "autocomplete" \
-            "autocorrect" \
-            "autocapitalize" \
-            "No \"p\" element in scope" \
-            "Unclosed element" \
-            "not allowed as child" \
-            "End tag" \
-            "were open elements" \
-            "tabindex" \
-            "aria-labelledby"
+        run: html5validator --config .html5validator.cfg
 
       - name: QA — Check for broken links
         uses: lycheeverse/lychee-action@v2.8.0
