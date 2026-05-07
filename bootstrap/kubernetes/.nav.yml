@@ -1,0 +1,6 @@
+title: Kubernetes
+nav:
+
+  - install-kubernetes-cluster
+  - install-storage-class.md
+

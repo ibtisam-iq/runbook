@@ -1,0 +1,11 @@
+title: Install Kubernetes Cluster
+nav:
+  - index.md
+  - Overview:            kubernetes-overview.md
+  - Node Preparation:    node-preparation.md
+  - Container Runtime:   container-runtime.md
+  - Kubernetes Packages: kubernetes-packages.md
+  - Cluster Bootstrap:   cluster-bootstrap.md
+  - Kubeconfig & CNI:    kubeconfig-and-cni.md
+  - Maintenance & Reset: maintenance-and-reset.md
+  - KinD Local Cluster:  kind-local-cluster.md
