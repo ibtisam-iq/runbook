@@ -1,5 +1,5 @@
 lychee
-html5validator
+# html5validator
 mdformat
 mdformat-gfm
 mdformat-tables
