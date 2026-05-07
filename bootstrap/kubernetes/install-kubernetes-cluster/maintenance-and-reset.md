@@ -1,5 +1,13 @@
 # Maintenance and Reset
 
+
+!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
+    **Post-install reference — Teardown & reset** — Covers full cluster teardown, Calico removal, and Flannel removal. Use when rebuilding a lab, replacing a CNI, or recovering a broken node.
+
+    **Prerequisite:** Applies to clusters bootstrapped with [Install a Kubernetes Cluster with kubeadm](index.md).
+
+---
+
 Three reset scripts handle different scopes of cleanup: full cluster teardown,
 Calico CNI removal, and Flannel CNI removal. All are destructive and
 irreversible. They are designed for lab rebuilds, re-provisioning, or CNI

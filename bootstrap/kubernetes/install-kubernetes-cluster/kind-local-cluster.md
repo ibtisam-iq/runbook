@@ -1,5 +1,13 @@
 # KinD Local Cluster
 
+
+!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
+    **Alternative path — Local development cluster** — Creates a Kubernetes cluster inside Docker on your laptop using KinD. Use this instead of the kubeadm flow when you do not have a remote server.
+
+    **Prerequisite:** Docker Desktop or Docker Engine must be running locally. `kind` and `kubectl` must be installed.
+
+---
+
 The KinD (Kubernetes-in-Docker) path provides a local development cluster
 without the full kubeadm bare-metal setup. It uses two declarative YAML
 manifests to configure the cluster topology.

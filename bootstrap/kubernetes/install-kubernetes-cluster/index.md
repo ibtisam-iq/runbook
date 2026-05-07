@@ -15,17 +15,7 @@ runc, install crictl, add the Kubernetes APT repo, pin versions, run kubeadm
 init, configure kubectl, install a CNI — and if you miss one step or run them
 in the wrong order, the cluster silently breaks or never comes up at all.
 
-Existing resources fall into two camps:
-
-| What exists | What it does wrong |
-|---|---|
-| Official Kubernetes docs | Step-by-step manual instructions, no automation |
-| Shell gists on GitHub | Hardcoded IPs/versions, no error handling, not idempotent, usually outdated |
-| `k3s` / `k3d` | Lightweight distributions — not kubeadm, not upstream Kubernetes |
-| Docker Desktop + KinD | Only works on your laptop where Docker Desktop is installed |
-| `eksctl` (EKS) | AWS-only managed clusters — you don't own the control plane |
-
-**silver-stack fills the gap:** a fully automated, idempotent, version-aware
+**SilverStack fills the gap:** a fully automated, idempotent, version-aware
 bash automation layer that bootstraps a real upstream Kubernetes cluster via
 kubeadm on any server you own or rent.
 

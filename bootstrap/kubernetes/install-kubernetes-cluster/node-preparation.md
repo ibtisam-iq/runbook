@@ -1,10 +1,11 @@
 # Node Preparation
 
-!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
-    **Phase 2 of 9** — Prepares every Linux node (control plane **and** workers) before any Kubernetes component is installed.
 
-    **Prerequisite:** Phase 1 — cluster parameters must have been collected. This is done automatically by the entrypoint scripts.  
-    **Next step:** [Container Runtime](container-runtime.md) — install containerd, runc, and crictl.
+!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
+    **Phase 2 of 9** — Prepares the Linux OS on every node before any Kubernetes component is installed.
+
+    **Prerequisite:** Phase 1 (cluster parameters) must have been collected by the entrypoint script.
+    **Next:** [Container Runtime](container-runtime.md) — install containerd, runc, and crictl.
 
 ---
 
@@ -133,5 +134,6 @@ sysctl net.ipv4.ip_forward
 ## Order Dependency
 
 These three scripts have no dependency on each other and can run in any order.
-The entrypoints run them in the order shown above for clarity, but the order
-does not matter for correctness.
+The entrypoints run them in the sequence: disable-swap → load-kernel-modules
+→ apply-sysctl, which is the recommended order as it moves from the most
+disruptive (swap) to the least.

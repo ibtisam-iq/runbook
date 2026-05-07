@@ -2,5 +2,5 @@ title: Kubernetes
 nav:
 
   - install-kubernetes-cluster
-  - install-storage-class.md
+  # - install-storage-class.md
 

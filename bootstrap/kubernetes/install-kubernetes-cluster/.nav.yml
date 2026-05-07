@@ -1,7 +1,7 @@
 title: Install Kubernetes Cluster
 nav:
   - index.md
-  - Overview:            kubernetes-overview.md
+  - Architecture & Internals: kubernetes-overview.md
   - Node Preparation:    node-preparation.md
   - Container Runtime:   container-runtime.md
   - Kubernetes Packages: kubernetes-packages.md

@@ -1,5 +1,14 @@
 # Kubeconfig and CNI Setup
 
+
+!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
+    **Post-init — Final two manual steps** — Configures kubectl access for your user and installs a CNI plugin so nodes reach `Ready` state. The cluster is fully operational after this.
+
+    **Prerequisite:** [Cluster Bootstrap](cluster-bootstrap.md) must be complete — `kubeadm init` must have succeeded.
+    **Next:** Cluster is ready. See [Maintenance & Reset](maintenance-and-reset.md) for teardown procedures.
+
+---
+
 After `kubeadm init` completes, the cluster is running but two manual steps
 remain before it is usable: configuring `kubectl` access and installing a CNI
 plugin. Neither is performed automatically by the entrypoint scripts.

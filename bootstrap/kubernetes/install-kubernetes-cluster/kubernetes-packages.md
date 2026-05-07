@@ -1,10 +1,11 @@
 # Kubernetes Packages
 
-!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
-    **Phases 5 & 6 of 9** — Installs Kubernetes binaries with exact version pinning. All nodes get kubelet and kubeadm; the control plane additionally gets kubectl, helm, and k9s.
 
-    **Prerequisite:** [Container Runtime](container-runtime.md) — containerd must be installed and running.  
-    **Next step:** [Cluster Bootstrap](cluster-bootstrap.md) — detect existing state, verify services, and run `kubeadm init`.
+!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
+    **Phases 5 & 6 of 9** — Installs kubelet and kubeadm on all nodes; kubectl, helm, and k9s on the control plane only.
+
+    **Prerequisite:** [Container Runtime](container-runtime.md) must be complete.
+    **Next:** [Cluster Bootstrap](cluster-bootstrap.md) — run kubeadm init and join workers.
 
 ---
 
@@ -36,80 +37,110 @@ patch release via the official Kubernetes release API.
 export K8S_VERSION="1.36"   # Set during cluster-params wizard (Phase 1)
 ```
 
-**What `k8s-version-resolver.sh` does:**
-
-1. Queries `https://dl.k8s.io/release/stable-1.36.txt` → gets `v1.36.0`
-2. Strips the `v` prefix → `1.36.0`
-3. Converts to Debian package revision → `1.36.0-1.1`
-4. Exports `K8S_FULL_VERSION=1.36.0` and `K8S_PKG_VERSION=1.36.0-1.1`
-
-**Why this matters:** APT package names require the full revision string
-(`kubelet=1.36.0-1.1`). Floating version installs (`apt install kubelet`) would
-install whatever is latest in the repo — potentially a different version than
-you intended or tested.
-
----
-
-## Phase 5 — kubelet and kubeadm (All Nodes)
-
-**`install-kubeadm-kubelet.sh`**
-
-1. Adds the Kubernetes APT repo for the resolved minor version:
-   `https://pkgs.k8s.io/core:/stable:/v1.36/deb/`
-2. Installs:
-   - `kubelet=$K8S_PKG_VERSION`
-   - `kubeadm=$K8S_PKG_VERSION`
-3. Runs `apt-mark hold kubelet kubeadm` — prevents accidental upgrades via
-   `apt upgrade`
+**Resolution logic:**
 
 ```bash
-kubelet --version   # e.g. Kubernetes v1.36.0
-kubeadm version     # e.g. kubeadm version: v1.36.0
-apt-mark showhold   # Should list: kubelet, kubeadm
+curl -fsSL https://dl.k8s.io/release/stable-1.36.txt
+# Returns: v1.36.0
 ```
+
+**Exported variables:**
+
+| Variable | Example value | Used by |
+|---|---|---|
+| `K8S_MAJOR_MINOR` | `1.36` | APT repo URL |
+| `K8S_PATCH_VERSION` | `1.36.0` | Validation output |
+| `K8S_IMAGE_TAG` | `v1.36.0` | `kubeadm config images pull`, `kubeadm init` |
+| `KUBE_PKG_VERSION` | `1.36.0-1.1` | `apt-get install kubelet=...` |
+
+The `-1.1` suffix is the Debian package revision appended by the Kubernetes
+packaging team. Without it, `apt-get` cannot find the exact package version.
+
+The resolver performs no installation and makes no system changes. It is safe
+to source multiple times.
 
 ---
 
-## Phase 6 — Control Plane CLI Tools (Control Plane Only)
+## Phase 5 — kubelet + kubeadm (`install-kubeadm-kubelet.sh`)
 
-**`install-controlplane-cli.sh`** is called only by `init-controlplane.sh`.
-Worker nodes skip this phase entirely.
+**What the script does:**
+
+1. Logs the resolved version context (`K8S_MAJOR_MINOR`, `K8S_PATCH_VERSION`,
+   `KUBE_PKG_VERSION`)
+2. Installs `ca-certificates`, `curl`, `gpg`
+3. Removes any legacy `kubernetes.list` source file
+4. Downloads the Kubernetes signing key from `pkgs.k8s.io` and stores it at
+   `/etc/apt/keyrings/kubernetes-apt-keyring.gpg` (skips if already present)
+5. Writes a Deb822-format APT source pointing to
+   `https://pkgs.k8s.io/core:/stable:/v<MAJOR.MINOR>/deb/`
+6. Installs exact versions:
+
+    ```bash
+    apt-get install kubelet=1.36.0-1.1 kubeadm=1.36.0-1.1
+    ```
+
+7. Pins both packages with `apt-mark hold` to prevent accidental upgrade
+8. Enables `kubelet` via systemd (it will crashloop until `kubeadm init`
+   or `kubeadm join` completes — this is expected and handled by
+   `ensure-k8s-services.sh`)
+
+**Verify:**
+
+```bash
+kubelet --version
+kubeadm version
+apt-mark showhold   # Should list kubelet and kubeadm
+```
+
+!!! note "Worker nodes stop here"
+    `init-worker-node.sh` ends after Phase 5. `kubectl` and the remaining
+    CLI tools are not installed on workers. The `kubeadm join` command
+    (printed by `init-controlplane.sh`) is run manually after the control
+    plane is ready.
+
+---
+
+## Phase 6 — Control Plane CLI Tools (`install-controlplane-cli.sh`)
+
+Installs three tools that are only useful from the control plane:
 
 ### kubectl
 
-Installed from the same APT repo as kubelet:
+Installed from the same `pkgs.k8s.io` APT repository using the same
+`KUBE_PKG_VERSION`. The script checks if `kubectl` is already present and
+skips if so.
 
 ```bash
-kubectl=$K8S_PKG_VERSION
-apt-mark hold kubectl
+kubectl version --client
 ```
 
-Version-matched to the cluster to avoid skew warnings.
+### Helm 4
 
-### helm
-
-Installed via the official Helm installer script:
+Downloaded via the official Helm install script:
 
 ```bash
-curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
 ```
 
-This always installs the latest stable Helm 4 release. Helm does not need
-to match the Kubernetes version exactly.
+Skipped if `helm` is already installed.
 
 ```bash
-helm version   # e.g. v4.x.x
+helm version --short
 ```
 
 ### k9s
 
-Installed as a binary from GitHub releases (`v0.50.16`):
+Downloaded as a tarball from `derailed/k9s` GitHub releases (pinned to
+`v0.50.16`). Architecture is auto-detected (`amd64` / `arm64`).
 
-1. Downloads the architecture-appropriate tarball
-2. Extracts the `k9s` binary to `/usr/local/bin/k9s`
+1. Downloads `k9s_Linux_<arch>.tar.gz`
+2. Extracts the `k9s` binary
+3. Installs to `/usr/local/bin/k9s` with `install -m 0755`
+
+Skipped if `k9s` is already installed.
 
 ```bash
-k9s version
+k9s version --short
 ```
 
 ---
@@ -121,3 +152,39 @@ start successfully yet — it has no cluster configuration. It will restart
 repeatedly (this is normal) until `kubeadm init` writes its configuration in
 Phase 9. Phase 8 (`ensure-k8s-services.sh`) waits for this condition before
 proceeding.
+
+---
+
+## APT Repository Structure
+
+The Kubernetes APT repository at `pkgs.k8s.io` uses a **per-minor-version**
+repo structure. Installing `v1.36.x` requires pointing the source at
+`/core:/stable:/v1.36/deb/`. Switching versions means updating the source
+file and re-running `apt-get update`.
+
+The source is written in **Deb822 format** (`.sources` extension), which is
+the current standard that replaces the legacy single-line `.list` format.
+Any existing `kubernetes.list` file is deleted before writing the new source
+to prevent repository conflicts.
+
+---
+
+## Version Pinning Strategy
+
+`apt-mark hold` is applied to `kubelet` and `kubeadm` immediately after
+installation. This prevents `apt-get upgrade` from accidentally upgrading
+Kubernetes components, which would create a version skew between the control
+plane and worker nodes.
+
+To upgrade intentionally:
+
+```bash
+apt-mark unhold kubelet kubeadm kubectl
+apt-get install kubelet=<new-version> kubeadm=<new-version> kubectl=<new-version>
+apt-mark hold kubelet kubeadm kubectl
+```
+
+`cluster-params-2.sh` (the advanced wizard variant) enforces an additional
+safety rule: it detects the currently installed `kubelet` version and refuses
+to install a version more than one minor version away, preventing unsupported
+upgrade or downgrade jumps.

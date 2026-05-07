@@ -1,10 +1,11 @@
 # Container Runtime
 
-!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
-    **Phases 3 & 4 of 9** — Installs and configures the complete container runtime stack on every node: CNI binaries, crictl, containerd, and runc.
 
-    **Prerequisite:** [Node Preparation](node-preparation.md) — swap disabled, kernel modules loaded, sysctl applied.  
-    **Next step:** [Kubernetes Packages](kubernetes-packages.md) — install kubelet, kubeadm, kubectl, helm, and k9s.
+!!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
+    **Phases 3 & 4 of 9** — Installs containerd, runc, crictl, and CNI plugin binaries on every node.
+
+    **Prerequisite:** [Node Preparation](node-preparation.md) must be complete.
+    **Next:** [Kubernetes Packages](kubernetes-packages.md) — install kubelet, kubeadm, and kubectl.
 
 ---
 
@@ -36,111 +37,160 @@ This layer runs in Phases 3 and 4 of both entrypoint scripts.
 ## Phase 3 — Runtime Prerequisites
 
 Phase 3 installs two components that are needed *before* containerd itself:
+CNI plugin binaries and crictl.
 
-### CNI Plugin Binaries
+### CNI Plugin Binaries (`install-cni-binaries.sh`)
 
-**What they are:** Low-level networking executables (`bridge`, `host-local`,
-`loopback`, etc.) that CNI plugins like Calico and Flannel call into.
-Without them, CNI plugins fail to configure pod network interfaces.
-
-**What the script does:**
-
-1. Detects architecture (`amd64` or `arm64`)
-2. Downloads the CNI plugins archive (`v1.9.0`) from GitHub releases
-3. Extracts to `/opt/cni/bin/`
-
-```bash
-ls /opt/cni/bin/   # Should show: bridge, host-local, loopback, portmap, etc.
-```
-
-### crictl
-
-**What it is:** The CRI (Container Runtime Interface) CLI — a low-level
-debugging tool that talks directly to containerd's CRI socket, bypassing
-Kubernetes entirely. Useful for inspecting containers, pods, and images when
-`kubectl` is unavailable or when debugging container startup failures.
+!!! note "CNI binaries ≠ CNI plugin"
+    The binaries installed here (`/opt/cni/bin/bridge`, `host-local`, `loopback`,
+    etc.) are the **low-level primitives** that CNI plugins like Calico and
+    Flannel call internally. They are not the CNI plugin itself. The CNI plugin
+    (Calico or Flannel) is installed separately after `kubeadm init` — see
+    [`kubeconfig-and-cni.md`](kubeconfig-and-cni.md).
 
 **What the script does:**
 
-1. Downloads the `crictl` binary (`v1.30.0`) for the detected architecture
-2. Extracts to `/usr/local/bin/crictl`
-3. Makes it executable
+1. Resolves architecture (`x86_64` → `amd64`, `aarch64` → `arm64`)
+2. Downloads `cni-plugins-linux-<arch>-<version>.tgz` from
+   `containernetworking/plugins` GitHub releases (default: `v1.9.0`)
+3. Verifies SHA256 checksum
+4. Extracts all binaries to `/opt/cni/bin/`
+5. Skips if `/opt/cni/bin/bridge` already exists (idempotent)
+
+**Verify:**
 
 ```bash
-crictl version   # Verify install
+ls /opt/cni/bin/
+# Should list: bridge, host-local, loopback, portmap, etc.
 ```
 
-After Phase 4, `crictl` is configured with the correct socket path by
-`config-crictl.sh`.
+### crictl (`install-crictl.sh`)
+
+crictl is the low-level CRI debugging tool (`kubectl` equivalent for the
+container runtime layer). It is installed before containerd because Phase 4
+uses it to validate containerd configuration.
+
+**What the script does:**
+
+1. Downloads `crictl-<version>-linux-<arch>.tar.gz` from
+   `kubernetes-sigs/cri-tools` (default: `v1.30.0`)
+2. Verifies SHA256 checksum
+3. Extracts `crictl` binary to `/usr/local/bin/`
+4. Skips if already installed (idempotent)
 
 ---
 
-## Phase 4 — containerd Install and Configuration
+## Phase 4 — Containerd Installation
 
-Phase 4 installs the container runtime itself. Two install methods are
-supported. You choose during Phase 1 (the cluster parameters wizard).
+`install-containerd.sh` is a **dispatcher**: it reads the
+`CONTAINERD_INSTALL_METHOD` environment variable (set during Phase 1 by the
+cluster parameters wizard) and routes to one of two installation paths.
 
-### Method Selection
+```
+CONTAINERD_INSTALL_METHOD=package  →  install-containerd-package.sh
+                                       config-containerd-package.sh
 
-| Method | How it installs | Best for |
-|---|---|---|
-| **Package** (default) | `apt install containerd.io` from Docker's APT repo | All standard deployments |
-| **Binary** | Downloads and extracts official containerd binary releases | Air-gapped or locked-down environments |
+CONTAINERD_INSTALL_METHOD=binary   →  install-runc.sh
+                                       install-containerd-binary.sh
+                                       config-containerd-binary.sh
+```
 
-The dispatcher script `install-containerd.sh` reads `CONTAINERD_METHOD` (set
-during Phase 1) and calls the correct install + config script pair.
+After either path completes, the dispatcher enables `containerd` via systemd
+and validates that the service is active.
 
-### Package Method
+### Package Method (Recommended)
 
-**`install-containerd-package.sh`**
+Uses the **Docker official APT repository** to install `containerd.io`. This
+package bundles runc and is maintained by Docker, making it the
+industry-standard approach for Ubuntu-based nodes.
 
-1. Installs Docker's APT repo GPG key
-2. Adds `https://download.docker.com/linux/ubuntu` to APT sources
-3. Runs `apt install -y containerd.io`
-4. Enables and starts the `containerd` systemd service
+**install-containerd-package.sh:**
 
-**`config-containerd-package.sh`**
+1. Installs `ca-certificates`, `curl`, `gnupg`, `lsb-release`
+2. Adds the Docker GPG key to `/etc/apt/keyrings/docker.asc`
+3. Writes a Deb822-format source to `/etc/apt/sources.list.d/docker.sources`
+4. Installs `containerd.io` via `apt-get`
 
-1. Generates the default containerd config: `containerd config default > /etc/containerd/config.toml`
-2. Patches `SystemdCgroup = false` → `SystemdCgroup = true` — **critical:**
-   without this, kubelet and containerd use different cgroup drivers and the
-   cluster fails to start
+**config-containerd-package.sh:**
+
+1. Runs `containerd config default > /etc/containerd/config.toml` to
+   generate a clean baseline
+2. Sets `SystemdCgroup = true` — **this is the critical change**; without it,
+   kubelet and containerd use different cgroup drivers and the node becomes
+   unstable
 3. Restarts containerd
 
-### Binary Method
+### Binary Method (Advanced)
 
-**`install-runc.sh`** — downloads the `runc` binary from GitHub releases and
-installs to `/usr/local/sbin/runc`. (The package method gets runc bundled with
-`containerd.io`.)
+Downloads containerd directly from the upstream GitHub releases at
+`containerd/containerd`. runc must be installed first because the binary
+method does not bundle it.
 
-**`install-containerd-binary.sh`** — downloads the containerd tarball from
-GitHub releases, extracts binaries to `/usr/local/bin/`, writes and enables a
-systemd service unit.
+**install-runc.sh:**
 
-**`config-containerd-binary.sh`** — identical to the package config: generates
-`config.toml` and patches `SystemdCgroup = true`.
+1. Downloads `runc.<arch>` from `opencontainers/runc` releases (default: `v1.4.0`)
+2. Verifies SHA256 from the official checksum file (parses the correct line
+   for the architecture)
+3. Installs to `/usr/local/sbin/runc` with `install -m 0755`
+
+**install-containerd-binary.sh:**
+
+1. Requires `runc` to be present (exits if not found)
+2. Downloads `containerd-<version>-linux-<arch>.tar.gz` (default: `v2.2.0`)
+3. Verifies SHA256 checksum
+4. Extracts to `/usr/local`
+5. Creates a complete systemd unit at `/etc/systemd/system/containerd.service`
+6. Enables and starts the service
+
+**config-containerd-binary.sh (extended):**
+
+Applies more configuration than the package variant:
+
+1. Generates default config
+2. Sets `SystemdCgroup = true`
+3. Sets `sandbox_image` to `registry.k8s.io/pause:3.9`
+4. Sets `bin_dir` to `/opt/cni/bin` and `conf_dir` to `/etc/cni/net.d`
+5. Waits up to 10 seconds for the containerd socket
+6. Runs `crictl info` to validate CRI plugin is functional
 
 ---
 
-## Phase 4 (post) — Configure crictl
+## Phase 4 (Post) — Configure crictl
 
-**`config-crictl.sh`** writes `/etc/crictl.yaml`:
+After containerd is running, `config-crictl.sh` configures crictl to
+communicate with it.
+
+**What the script does:**
+
+1. Confirms `crictl` is installed and the containerd socket exists at
+   `/run/containerd/containerd.sock`
+2. Writes `/etc/crictl.yaml`:
 
 ```yaml
 runtime-endpoint: unix:///run/containerd/containerd.sock
-image-endpoint: unix:///run/containerd/containerd.sock
-timeout: 2
-debug: false
+image-endpoint:   unix:///run/containerd/containerd.sock
+timeout:          10
+debug:            false
+pull-image-on-create: false
 ```
 
-This tells `crictl` which socket to use. Without this, every `crictl` invocation
-requires a `--runtime-endpoint` flag.
+3. Validates the configuration with `crictl info`
 
-**Verify full Phase 3+4 result:**
+**Verify:**
 
 ```bash
-systemctl is-active containerd          # Should: active
-crictl info                             # Should: print containerd info
-ls /opt/cni/bin/                        # Should: list CNI binaries
-ls /usr/local/bin/crictl                # Should: exist
+crictl info
+crictl ps       # List running containers
+crictl images   # List pulled images
 ```
+
+---
+
+## Key Design Notes
+
+| Topic | Detail |
+|---|---|
+| `SystemdCgroup = true` | Must be set in both package and binary config scripts. kubelet uses systemd cgroup driver by default since Kubernetes 1.22; containerd must match. |
+| CNI binaries vs CNI plugin | Binaries in `/opt/cni/bin/` are always installed. The CNI plugin (Calico/Flannel) is not installed until after `kubeadm init`. |
+| Package method preference | The package method is preferred because Docker maintains `containerd.io` with stable release cadence and bundled runc. The binary method gives explicit version control at the cost of manual runc management. |
+| Idempotency | `install-runc.sh`, `install-containerd-binary.sh`, `install-crictl.sh`, and `install-cni-binaries.sh` all check if the binary already exists and skip if it does. |
