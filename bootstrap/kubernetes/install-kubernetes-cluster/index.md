@@ -257,7 +257,7 @@ These are things the scripts do that manual guides do not:
 | Limitation | Detail |
 |---|---|
 | Ubuntu/Debian only | Scripts use `apt-get` and Debian package format. CentOS, RHEL, and Fedora are not supported. |
-| `reset-calico.sh` and `reset-flannel.sh` are incomplete | Both scripts currently exit early without running their cleanup logic. Manual cleanup commands are documented in the [Maintenance & Reset runbook](../bootstrap/kubernetes/maintenance-and-reset.md). |
+| `reset-calico.sh` and `reset-flannel.sh` are incomplete | Both scripts currently exit early without running their cleanup logic. Manual cleanup commands are documented in the [Maintenance & Reset runbook](./maintenance-and-reset.md). |
 | No HA control plane setup | The `--upload-certs` flag is passed to `kubeadm init` (enabling future HA joins), but the scripts do not automate joining a second control plane node. |
 | No offline/air-gapped mode | All scripts download from the internet at runtime. Air-gapped environments are not supported. |
 | Single-OS tested | Tested on Ubuntu 22.04 and 24.04. Behaviour on other Debian-based distributions is not guaranteed. |

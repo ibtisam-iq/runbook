@@ -1,4 +1,4 @@
 title: IAM
 nav:
   - index.md
-  - "*"
+  - glob: "*"

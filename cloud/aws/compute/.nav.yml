@@ -1,4 +1,4 @@
 title: Compute
 nav:
   - index.md
-  - "*"
+  - glob: "*"

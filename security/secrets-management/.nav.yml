@@ -1,4 +1,4 @@
 title: Secrets Management
 nav:
   - index.md
-  - "*"
+  - glob: "*"

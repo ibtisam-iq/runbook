@@ -1,4 +1,4 @@
 title: GitOps
 nav:
   - index.md
-  - "*"
+  - glob: "*"

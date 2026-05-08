@@ -13,11 +13,15 @@ edit_uri: edit/main/
 docs_dir: .
 site_dir: site/
 use_directory_urls: true      # Use pretty URLs (e.g., /page/ instead of /page.html), default: true
-# strict: true                  # Treat warnings as errors
+# strict: true                # Treat warnings as errors
+
+# exclude_docs does NOT prevent plugins from scanning excluded paths.
+# It only removes files from the final build output and navigation.
+# So plugins can still access these files during the build process.
 exclude_docs: |
   README.md
   .venv/*
-  .stratchpad/*
+  .scratchpad/*
   scripts/*
   .github/*
   requirements*.txt
@@ -188,6 +192,11 @@ plugins:
       locale: en
       exclude:
         - index.md
+        - .venv/*
+        - .scratchpad/*
+        - .github/*
+        - scripts/*
+        - assests/*
 
 # Extra
 extra:

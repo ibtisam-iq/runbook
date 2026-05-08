@@ -1,4 +1,4 @@
 title: System Setup
 nav:
   - index.md
-  - "*"
+  - glob: "*"

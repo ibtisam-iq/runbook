@@ -1,4 +1,4 @@
 title: Backup Restore
 nav:
   - index.md
-  - "*"
+  - glob: "*"

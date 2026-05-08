@@ -1,4 +1,4 @@
 title: Registries
 nav:
   - index.md
-  - "*"
+  - glob: "*"

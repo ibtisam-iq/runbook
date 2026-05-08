@@ -1,4 +1,4 @@
 title: Scanning
 nav:
   - index.md
-  - "*"
+  - glob: "*"

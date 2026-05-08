@@ -1,4 +1,4 @@
 title: CD Deployments
 nav:
   - index.md
-  - "*"
+  - glob: "*"

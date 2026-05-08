@@ -1,4 +1,4 @@
 title: GCP
 nav:
   - index.md
-  - "*"
+  - glob: "*"

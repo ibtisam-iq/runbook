@@ -1,4 +1,4 @@
 title: Ingress Gateway
 nav:
   - index.md
-  - "*"
+  - glob: "*"

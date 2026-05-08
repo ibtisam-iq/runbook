@@ -1,4 +1,4 @@
 title: Certificates
 nav:
   - index.md
-  - "*"
+  - glob: "*"

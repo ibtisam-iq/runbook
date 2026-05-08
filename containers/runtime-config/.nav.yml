@@ -1,4 +1,4 @@
 title: Runtime Config
 nav:
   - index.md
-  - "*"
+  - glob: "*"

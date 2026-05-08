@@ -1,4 +1,4 @@
 title: Load Balancing
 nav:
   - index.md
-  - "*"
+  - glob: "*"

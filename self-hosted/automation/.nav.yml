@@ -1,4 +1,4 @@
 title: Automation
 nav:
   - index.md
-  - "*"
+  - glob: "*"

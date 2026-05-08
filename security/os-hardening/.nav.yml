@@ -1,4 +1,4 @@
 title: OS Hardening
 nav:
   - index.md
-  - "*"
+  - glob: "*"

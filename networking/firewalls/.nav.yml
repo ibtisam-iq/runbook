@@ -1,4 +1,4 @@
 title: Firewalls
 nav:
   - index.md
-  - "*"
+  - glob: "*"

@@ -1,3 +1,5 @@
 title: Infrastructure as Code
 nav:
-  - index.md
+  # - index.md
+  - install-terraform.md
+  - install-ansible.md

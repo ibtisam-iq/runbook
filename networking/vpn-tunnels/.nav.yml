@@ -1,4 +1,4 @@
 title: VPN Tunnels
 nav:
   - index.md
-  - "*"
+  - glob: "*"

@@ -1,4 +1,4 @@
 title: CI Pipelines
 nav:
   - index.md
-  - "*"
+  - glob: "*"

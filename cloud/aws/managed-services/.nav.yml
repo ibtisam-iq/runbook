@@ -1,4 +1,4 @@
 title: Managed Services
 nav:
   - index.md
-  - "*"
+  - glob: "*"

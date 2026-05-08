@@ -1,4 +1,4 @@
 title: RBAC
 nav:
   - index.md
-  - "*"
+  - glob: "*"

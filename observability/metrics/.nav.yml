@@ -1,4 +1,4 @@
 title: Metrics
 nav:
   - index.md
-  - "*"
+  - glob: "*"

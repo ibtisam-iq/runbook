@@ -14,4 +14,5 @@ nav:
   - bootstrap
   # - incident-response
   - workstation
-  # - "*"
+  # - glob: "*"
+ignore_no_matches: true

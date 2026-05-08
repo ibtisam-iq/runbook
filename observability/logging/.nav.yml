@@ -1,4 +1,4 @@
 title: Logging
 nav:
   - index.md
-  - "*"
+  - glob: "*"

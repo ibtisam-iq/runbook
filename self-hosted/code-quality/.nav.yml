@@ -1,4 +1,4 @@
 title: Code Quality
 nav:
   - index.md
-  - "*"
+  - glob: "*"
