@@ -42,7 +42,7 @@ kubectl version --client
 ## Running the Entrypoint
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/create-kind-cluster.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/create-kind-cluster.sh | bash
 ```
 
 The script prompts for a manifest choice and creates the cluster using

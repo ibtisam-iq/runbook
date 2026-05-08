@@ -115,7 +115,7 @@ If you are on your laptop and Docker is already running, use the KinD path
 instead — no server required:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/create-kind-cluster.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/create-kind-cluster.sh | bash
 ```
 
 Two cluster configurations are available:
@@ -137,7 +137,7 @@ checks, resolves versions, and prints what it would do — but makes no system
 changes.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash -s -- --dry-run
+# curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/init-controlplane.sh | sudo bash -s -- --dry-run
 ```
 
 Use this to validate that your server meets all requirements before committing
@@ -220,7 +220,7 @@ kubectl get nodes                   # Should show Ready
 To wipe the cluster and start fresh (useful in disposable labs):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/maintenance/reset-cluster.sh | sudo bash
+# curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/maintenance/reset-cluster.sh | sudo bash
 ```
 
 The script:
@@ -296,6 +296,6 @@ For a deep dive into what each script does, see the internal runbooks:
 
 All scripts are open source and available at:
 
-**[github.com/ibtisam-iq/silver-stack](https://github.com/ibtisam-iq/silver-stack)**
+**[github.com/ibtisam-iq/silver-stack](https://github.com/ibtisam-iq/silver-stack/tree/main/scripts/kubernetes)**
 
 `scripts/kubernetes/` is the root of everything described on this page.
