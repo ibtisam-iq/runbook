@@ -1,6 +1,11 @@
 title: Kubernetes
 nav:
-
   - install-kubernetes-cluster
-  # - install-storage-class.md
+  - install-cni
+  - install-kubernetes-tools
+  - deploy-local-path-provisioner.md
+  - deploy-ingress-nginx-controller.md
+  - deploy-metallb-load-balancer.md
+  - deploy-gateway-api
+  # - deploy-cert-manager.md
 

@@ -1,0 +1,5 @@
+title: Install CNI
+nav:
+  - index.md
+  - install-calico.md
+  - install-flannel.md
