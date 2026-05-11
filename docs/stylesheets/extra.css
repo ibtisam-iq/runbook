@@ -284,7 +284,7 @@
 }
 
 .md-typeset p {
-  max-width: 72ch;
+  max-width: 100%;
   margin-bottom: 1.25rem;
   line-height: 1.8;
 }
@@ -295,7 +295,7 @@
   line-height: 1.7;
   opacity: 0.8;
   font-weight: 400;
-  max-width: 64ch;
+  max-width: 100%;
 }
 
 .md-typeset strong {
