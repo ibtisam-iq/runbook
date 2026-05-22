@@ -9,3 +9,4 @@ nav:
   - Kubeconfig & CNI:    kubeconfig-and-cni.md
   - Maintenance & Reset: maintenance-and-reset.md
   - KinD Local Cluster:  kind-local-cluster.md
+  - K3s Cluster:         k3s-cluster.md
