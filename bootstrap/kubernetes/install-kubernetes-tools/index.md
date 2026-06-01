@@ -28,6 +28,20 @@ sudo mv kubectl /usr/local/bin/kubectl
 kubectl version --client
 ```
 
+Run these commands to enable shell autocompletion and the `k` alias:
+
+```bash
+# Enable kubectl autocompletion in the current bash session
+source <(kubectl completion bash)
+
+# Persist autocompletion across all future bash sessions
+echo "source <(kubectl completion bash)" >> ~/.bashrc
+
+# Create a short alias and wire autocompletion to it
+alias k=kubectl
+complete -o default -F __start_kubectl k
+```
+
 !!! note "kustomize is bundled with kubectl"
     Installing `kubectl` also ships a bundled `kustomize` binary. Check before running the standalone kustomize install:
     ```bash
@@ -44,7 +58,7 @@ The Kubernetes package manager. Uses the official installer script which handles
 
 ```bash
 # Download and run the official Helm install script
-curl -sSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+curl -sSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4 | bash
 
 # Verify
 helm version --short
