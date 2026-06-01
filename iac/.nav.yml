@@ -1,4 +1,3 @@
 title: IaC
 nav:
-  - index.md
-  # - glob: "*"
+  - terraform

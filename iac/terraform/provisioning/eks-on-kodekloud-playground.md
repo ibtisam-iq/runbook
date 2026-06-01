@@ -1,9 +1,12 @@
 # Deploying EKS Cluster on KodeKloud AWS Playground via Terraform
 
-**Repo:** `ibtisam-iq/retail-store-sample-app`  
-**Terraform entry point:** `terraform/eks/minimal/`  
-**Cluster name:** `retail-store`  
-**Region:** `us-east-1`
+- **Repo:** [retail-store-sample-app](https://github.com/ibtisam-iq/retail-store-sample-app)
+- **Terraform entry point:** [terraform/eks/minimal](https://github.com/ibtisam-iq/retail-store-sample-app/tree/main/terraform/eks/minimal)
+- **Cluster name:** `retail-store`
+- **Region:** `us-east-1`
+
+!!! note ""
+    This runbook covers the deployment of an Amazon Elastic Kubernetes Service (EKS) cluster using Terraform on the [KodeKloud AWS Playground](https://learn.kodekloud.com/user/playgrounds/playground-aws). It specifically addresses the constraints and permission limitations inherent in the Playground environment, ensuring a successful deployment without errors.
 
 ---
 
@@ -88,7 +91,8 @@ resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
 }
 ```
 
-> **Critical:** The role name MUST be `eksClusterRole`. KodeKloud's permission boundary only grants `iam:PassRole` on a hardcoded whitelist of role names. Any other name causes `AccessDeniedException` on `eks:CreateCluster`.
+!!! note "Important"
+    The role name MUST be `eksClusterRole`. KodeKloud's permission boundary only grants `iam:PassRole` on a hardcoded whitelist of role names. Any other name causes `AccessDeniedException` on `eks:CreateCluster`.
 
 ---
 
@@ -154,7 +158,8 @@ chmod 400 ~/.ssh/eks-nodes-key.pem
 
 Fetch the cluster control plane security group ID.
 
-> Use the SG named `retail-store-cluster`. Do NOT use `eks-cluster-sg-retail-store-*` (that is the primary/shared SG auto-created by EKS) and do NOT use `retail-store-node`.
+!!! note "Important"
+    Use the SG named `retail-store-cluster`. Do NOT use `eks-cluster-sg-retail-store-*` (that is the primary/shared SG auto-created by EKS) and do NOT use `retail-store-node`.
 
 ```bash
 aws ec2 describe-security-groups \
@@ -166,17 +171,17 @@ aws ec2 describe-security-groups \
 Fetch VPC ID:
 
 ```bash
-aws ec2 describe-vpcs \
+VPC_ID=$(aws ec2 describe-vpcs \
   --filters "Name=tag:Name,Values=retail-store" \
   --query "Vpcs[0].VpcId" \
-  --output text
+  --output text)
 ```
 
 Fetch private subnet IDs (tagged by the Terraform VPC module with `kubernetes.io/role/internal-elb`):
 
 ```bash
 aws ec2 describe-subnets \
-  --filters "Name=vpc-id,Values=<VPC_ID>" \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
             "Name=tag:kubernetes.io/role/internal-elb,Values=1" \
   --query "Subnets[*].SubnetId" \
   --output text
@@ -195,7 +200,7 @@ cat > /tmp/cf-params.json << 'EOF'
   {"ParameterKey": "NodeInstanceType",                    "ParameterValue": "t3.medium"},
   {"ParameterKey": "NodeVolumeSize",                      "ParameterValue": "20"},
   {"ParameterKey": "VpcId",                               "ParameterValue": "<VPC_ID>"},
-  {"ParameterKey": "Subnets",                             "ParameterValue": "<SUBNET1>,<SUBNET2>,<SUBNET3>"},
+  {"ParameterKey": "Subnets",                             "ParameterValue": "subnet-xxx,subnet-yyy,subnet-zzz"},
   {"ParameterKey": "KeyName",                             "ParameterValue": "eks-nodes-key"},
   {"ParameterKey": "NodeAutoScalingGroupMinSize",         "ParameterValue": "1"},
   {"ParameterKey": "NodeAutoScalingGroupMaxSize",         "ParameterValue": "3"},
@@ -203,6 +208,9 @@ cat > /tmp/cf-params.json << 'EOF'
 ]
 EOF
 ```
+
+!!! note "Important"
+    Replace the placeholder values with the values obtained in the previous steps.
 
 ### Step 5 — Launch CloudFormation Stack
 
