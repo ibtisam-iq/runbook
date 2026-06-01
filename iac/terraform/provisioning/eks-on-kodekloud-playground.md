@@ -44,7 +44,6 @@ Add these two arguments inside `module "eks_cluster"`:
 
 ```hcl
 create_cloudwatch_log_group = false
-cluster_enabled_log_types   = []
 ```
 
 ---
