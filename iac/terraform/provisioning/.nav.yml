@@ -1,3 +1,4 @@
 title: Provisioning
 nav:
+  - eks-on-kodekloud-aws-playground.md
   - eks-on-kodekloud-playground.md
