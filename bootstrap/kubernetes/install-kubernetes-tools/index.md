@@ -1,169 +1,148 @@
-# Install Kubernetes CLI Tools
+# Install Kubernetes Tools
 
-Installs the four essential Kubernetes command-line tools on any Linux server
-in a single script run: **kubectl**, **helm**, **kustomize**, and **k9s**.
+This runbook covers the manual installation of the most commonly used Kubernetes-related CLI tools. Each section contains a single, self-contained bash block with inline comments — copy the entire block and paste it into your terminal to install that tool. Architecture-sensitive tools auto-detect `amd64` vs `arm64` at runtime.
 
 ---
 
-## Quick Start
+## 1. kubectl
+
+The official Kubernetes command-line tool for interacting with clusters.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/installers/install-kubernetes-cli.sh | bash
-```
+# Fetch the latest stable version string
+KUBECTL_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 
-No `sudo` required for the script itself. Individual install steps that write
-to `/usr/local/bin` use `sudo mv` internally.
+# Detect architecture
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH="amd64"
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
 
----
+# Download the binary
+curl -sSLO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl"
 
-## Script
-
-| Script | Path |
-|---|---|
-| `install-kubernetes-cli.sh` | `scripts/installers/install-kubernetes-cli.sh` |
-
-This is a **standalone script** — it does not depend on a running Kubernetes
-cluster and can be run on any fresh Linux server.
-
----
-
-## Tools Installed
-
-| Tool | Version strategy | Binary location |
-|---|---|---|
-| `kubectl` | Latest stable from `dl.k8s.io/release/stable.txt` | `/usr/local/bin/kubectl` |
-| `helm` | Latest release from `helm/helm` GitHub API | `/usr/local/bin/helm` |
-| `kustomize` | Latest release from `kubernetes-sigs/kustomize` GitHub API | `/usr/local/bin/kustomize` |
-| `k9s` | Latest release from `derailed/k9s` GitHub API | `/usr/local/bin/k9s` |
-
-All four tools are installed to `/usr/local/bin/` and made executable.
-Architecture is auto-detected (`x86_64` → `amd64`).
-
----
-
-## Idempotency
-
-Each tool is checked with `command -v` before installation. If already present,
-the install step is skipped and the existing version is logged:
-
-```
-[ OK ]    kubectl already installed
-[ OK ]    helm already installed
-```
-
-Re-running the script on an already-configured machine is safe.
-
----
-
-## Installation Steps
-
-### Step 1 — Preflight
-
-Runs the silver-stack preflight check (OS, architecture, connectivity) before
-any installation begins:
-
-```bash
-bash <(curl -fsSL .../preflight.sh)
-```
-
-Exits immediately if preflight fails.
-
----
-
-### Step 2 — kubectl
-
-Fetches the latest stable version string from the official Kubernetes release
-endpoint, then downloads the binary directly:
-
-```bash
-curl -sLO "https://dl.k8s.io/release/v${KUBECTL_V}/bin/linux/amd64/kubectl"
+# Make it executable and move to PATH
 chmod +x kubectl
 sudo mv kubectl /usr/local/bin/kubectl
+
+# Verify
+kubectl version --client
 ```
 
 ---
 
-### Step 3 — helm
+## 2. Helm
 
-Fetches the latest tag from `helm/helm` releases, then downloads the official
-tarball from `get.helm.sh`:
+The Kubernetes package manager. Uses the official installer script which handles arch detection internally.
 
 ```bash
-curl -sLO "https://get.helm.sh/helm-v${HELM_TAG}-linux-amd64.tar.gz"
-tar -xzf *.tar.gz
-sudo mv linux-amd64/helm /usr/local/bin/helm
+# Download and run the official Helm install script
+curl -sSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Verify
+helm version --short
 ```
 
 ---
 
-### Step 4 — kustomize
+## 3. K9s
 
-Fetches the latest release from `kubernetes-sigs/kustomize`, downloads the
-`linux_amd64` tarball via the GitHub releases API, extracts it, and moves the
-binary:
+A terminal-based UI for managing Kubernetes clusters in real time.
 
 ```bash
-# asset URL resolved from GitHub API
-download_and_install "$ASSET_URL" "/usr/local/bin/kustomize"
-```
+# Detect architecture
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH="amd64"
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
 
-The internal `download_and_install` helper handles `.tar.gz`, `.tgz`, and
-`.zip` archives — finds the first executable binary in the archive and moves
-it to the target path.
+# Fetch the latest release tag
+K9S_VERSION=$(curl -sSL https://api.github.com/repos/derailed/k9s/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
 
----
+# Download the correct tarball for the detected arch
+curl -sSLO "https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_${ARCH}.tar.gz"
 
-### Step 5 — k9s
-
-Detects whether an existing `k9s` binary matches the current architecture
-(`file $(command -v k9s) | grep x86-64`). If missing or wrong architecture,
-downloads the correct `k9s_Linux_amd64.tar.gz` asset from `derailed/k9s`
-releases:
-
-```bash
-curl -sLO "$ASSET_URL"
-tar -xzf k9s*Linux*
+# Extract and install
+tar -xzf "k9s_Linux_${ARCH}.tar.gz" k9s
 sudo mv k9s /usr/local/bin/k9s
 sudo chmod +x /usr/local/bin/k9s
+
+# Clean up
+rm -f "k9s_Linux_${ARCH}.tar.gz"
+
+# Verify
+k9s version --short
 ```
 
 ---
 
-### Step 6 — Summary
+## 4. kustomize
 
-Prints a version summary table on completion:
+A tool for customizing Kubernetes YAML manifests without templating.
 
+```bash
+# Detect architecture
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH="amd64"
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
+
+# Fetch the latest kustomize release tag (tags follow kustomize/vX.Y.Z format)
+KUSTOMIZE_TAG=$(curl -sSL https://api.github.com/repos/kubernetes-sigs/kustomize/releases/latest | grep '"tag_name"' | grep 'kustomize/' | cut -d'"' -f4)
+KUSTOMIZE_VERSION=${KUSTOMIZE_TAG#kustomize/}
+
+# Download the tarball
+curl -sSLO "https://github.com/kubernetes-sigs/kustomize/releases/download/${KUSTOMIZE_TAG}/kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz"
+
+# Extract and install
+tar -xzf "kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz"
+sudo mv kustomize /usr/local/bin/kustomize
+sudo chmod +x /usr/local/bin/kustomize
+
+# Clean up
+rm -f "kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz"
+
+# Verify
+kustomize version
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- • kubectl:          1.33.0
- • helm:             3.17.3
- • kustomize:        5.6.0
- • k9s:              0.32.7
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[ OK ]    Kubernetes CLI toolchain ready
+
+---
+
+## 5. Helmfile
+
+A declarative spec for deploying Helm charts. Used to manage multiple releases in a single `helmfile.yaml`.
+
+```bash
+# Detect architecture
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH="amd64"
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
+
+# Fetch the latest release tag
+HELMFILE_VERSION=$(curl -sSL https://api.github.com/repos/helmfile/helmfile/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+
+# Download the tarball
+curl -sSLO "https://github.com/helmfile/helmfile/releases/download/${HELMFILE_VERSION}/helmfile_${HELMFILE_VERSION#v}_linux_${ARCH}.tar.gz"
+
+# Extract and install
+tar -xzf "helmfile_${HELMFILE_VERSION#v}_linux_${ARCH}.tar.gz" helmfile
+sudo mv helmfile /usr/local/bin/helmfile
+sudo chmod +x /usr/local/bin/helmfile
+
+# Clean up
+rm -f "helmfile_${HELMFILE_VERSION#v}_linux_${ARCH}.tar.gz"
+
+# Verify
+helmfile --version
 ```
 
 ---
 
 ## Post-Install Verification
 
+Run all version checks together to confirm the full toolchain is in place:
+
 ```bash
 kubectl version --client
 helm version --short
-kustomize version
 k9s version --short
+kustomize version
+helmfile --version
 ```
-
----
-
-## Notes
-
-!!! note "No cluster required"
-    This script does not need a running Kubernetes cluster. It installs
-    client-side tools only. Use it on the laptop, a jump host, a CI runner,
-    or any server that needs to talk to a remote cluster.
-
-!!! note "kustomize release tag format"
-    The `kubernetes-sigs/kustomize` repository tags releases as
-    `kustomize/vX.Y.Z` rather than plain `vX.Y.Z`. The script strips the
-    prefix automatically before using the version string.
