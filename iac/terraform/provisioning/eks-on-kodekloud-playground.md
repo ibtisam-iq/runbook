@@ -12,49 +12,62 @@
 
 ## Context
 
-KodeKloud AWS Playground uses an IAM user (`kk_labs_user_*`) with a restrictive permission boundary. The following actions are **blocked**:
+KodeKloud AWS Playground uses an IAM user (`kk_labs_user_*`) with a restrictive permission boundary. Several IAM and EKS actions that the upstream Terraform module expects are **blocked**:
 
-- `logs:PutRetentionPolicy`
-- `iam:PutRolePolicy` (inline policies)
-- `iam:PassRole` on custom role names
-- `eks:CreateNodegroup` (managed node groups entirely blocked)
+| Blocked Action | Impact |
+|---|---|
+| `logs:PutRetentionPolicy` | Cannot set CloudWatch log retention |
+| `logs:DeleteLogGroup` | Cannot destroy existing log groups |
+| `iam:PutRolePolicy` | Cannot attach inline policies to IAM roles |
+| `iam:PassRole` on custom names | Only whitelisted role names (`eksClusterRole`) are allowed |
+| `eks:CreateNodegroup` | Managed node groups entirely blocked |
 
-The Terraform module at `terraform/lib/eks/eks.tf` wraps `terraform-aws-modules/eks/aws ~> 19.9` and must be patched to work around all four restrictions.
-
----
-
-## KodeKloud Playground IAM Restrictions — Quick Reference
-
-| Blocked Action | Root Cause | Fix Applied |
-|---|---|---|
-| `logs:PutRetentionPolicy` | No CloudWatch perms | `create_cloudwatch_log_group = false` |
-| `iam:PutRolePolicy` | Inline policies blocked | `create_iam_role = false` + custom role |
-| `iam:PassRole` on custom names | Whitelist enforced | Rename role to `eksClusterRole` |
-| `eks:CreateNodegroup` | Managed node groups blocked | CloudFormation self-managed nodes |
+The Terraform module at `terraform/lib/eks/eks.tf` wraps `terraform-aws-modules/eks/aws ~> 19.9` and must be patched before applying.
 
 ---
 
-## Fix 1 — Disable CloudWatch Log Group Creation
+## Deployment Overview
+
+Because of the restrictions above, deployment happens in **two phases**:
+
+1. **Pre-apply patches** — modify Terraform source to avoid blocked actions, then run `terraform apply` (first apply)
+2. **Node bootstrap** — manually provision self-managed worker nodes via CloudFormation, join them to the cluster, then run `terraform apply` again (second apply)
+
+!!! warning "Do not skip straight to `terraform apply`"
+    Running `terraform apply` without the patches in Phase 1 will fail immediately. Running the second `terraform apply` without worker nodes will fail on Helm addon webhooks.
+
+---
+
+## Phase 1 — Patch Terraform & First Apply
+
+### Fix 1 — Disable CloudWatch Log Group
 
 **File:** `terraform/lib/eks/eks.tf`
 
-**Problem:** The module tries to create `/aws/eks/retail-store/cluster` log group and set a retention policy. Both `logs:CreateLogGroup` (on re-run, due to leftover resource) and `logs:PutRetentionPolicy` fail.
+**Error without this fix:**
+```
+AccessDeniedException: not authorized to perform: logs:PutRetentionPolicy
+```
 
-Add these two arguments inside `module "eks_cluster"`:
+Add inside `module "eks_cluster"`:
 
 ```hcl
 create_cloudwatch_log_group = false
+cluster_enabled_log_types   = []
 ```
 
 ---
 
-## Fix 2 — Bypass Inline Policy with Custom IAM Role
+### Fix 2 — Replace Inline IAM Role with Custom Role
 
 **File:** `terraform/lib/eks/eks.tf`
 
-**Problem:** The module creates the cluster IAM role with an inline policy using `iam:PutRolePolicy`, which is blocked. The `iam_role_additional_policies = {}` argument does not suppress the inline policy in v19.
+**Error without this fix:**
+```
+AccessDenied: not authorized to perform: iam:PutRolePolicy
+```
 
-Disable the module's role creation and provide a custom one.
+The module creates an inline policy on the cluster role by default. Disable it and supply a custom role.
 
 Inside `module "eks_cluster"` add:
 
@@ -63,7 +76,7 @@ create_iam_role = false
 iam_role_arn    = aws_iam_role.eks_cluster_role.arn
 ```
 
-Add these new resources to the same `eks.tf`:
+Add these new resources to the same file:
 
 ```hcl
 resource "aws_iam_role" "eks_cluster_role" {
@@ -90,16 +103,19 @@ resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
 }
 ```
 
-!!! note "Important"
-    The role name MUST be `eksClusterRole`. KodeKloud's permission boundary only grants `iam:PassRole` on a hardcoded whitelist of role names. Any other name causes `AccessDeniedException` on `eks:CreateCluster`.
+!!! warning "Role name is mandatory"
+    The role name MUST be `eksClusterRole`. KodeKloud's permission boundary only grants `iam:PassRole` on a hardcoded whitelist. Any other name causes `AccessDeniedException` on `eks:CreateCluster`.
 
 ---
 
-## Fix 3 — Disable Managed Node Groups
+### Fix 3 — Disable Managed Node Groups
 
 **File:** `terraform/lib/eks/eks.tf`
 
-**Problem:** `eks:CreateNodegroup` is entirely blocked on KodeKloud playground. All managed node groups fail with `AccessDeniedException`.
+**Error without this fix:**
+```
+AccessDeniedException: not authorized to perform: eks:CreateNodegroup
+```
 
 Replace the `eks_managed_node_groups` block with an empty map:
 
@@ -107,20 +123,48 @@ Replace the `eks_managed_node_groups` block with an empty map:
 eks_managed_node_groups = {}
 ```
 
-Run Terraform apply after all three fixes above:
+---
+
+### First `terraform apply`
+
+With all three fixes in place, run the first apply:
 
 ```bash
 cd ~/retail-store-sample-app/terraform/eks/minimal
 terraform apply
 ```
 
-The EKS control plane takes ~9 minutes to provision. This is expected.
+!!! note ""
+    The EKS control plane takes ~9 minutes to provision. This is expected. The apply will **partially fail** — specifically on the `cert-manager` Helm release and the CloudWatch log group destroy. Both are expected at this stage and are resolved in the steps below.
+
+**Expected partial failures on first apply:**
+
+| Resource | Error | Resolution |
+|---|---|---|
+| `helm_release.cert_manager` | `no endpoints available for service "aws-load-balancer-webhook-service"` | No worker nodes yet — resolved after Phase 2 |
+| `aws_cloudwatch_log_group.this[0]` | `logs:DeleteLogGroup` AccessDenied | Remove from state — see Fix 4 below |
 
 ---
 
-## Fix 4 — Add Worker Nodes via Self-Managed CloudFormation Stack
+### Fix 4 — Remove Log Group from Terraform State
 
-**Problem:** With managed node groups disabled, the cluster has no worker nodes. Self-managed nodes must be provisioned via the AWS-provided CloudFormation template.
+**Error:**
+```
+AccessDeniedException: not authorized to perform: logs:DeleteLogGroup
+```
+
+Terraform is trying to destroy a log group created by EKS itself. The lab user cannot call `DeleteLogGroup`. Remove the resource from state — this does not delete anything in AWS:
+
+```bash
+terraform state rm \
+  'module.retail_app_eks.module.eks_cluster.aws_cloudwatch_log_group.this[0]'
+```
+
+---
+
+## Phase 2 — Self-Managed Worker Nodes
+
+With the control plane running but no worker nodes, the `cert-manager` Helm webhook fails because the `aws-load-balancer-controller` has nowhere to schedule. Worker nodes must be provisioned manually via the AWS-provided CloudFormation template.
 
 ### Step 1 — Create Node IAM Role
 
@@ -155,18 +199,6 @@ chmod 400 ~/.ssh/eks-nodes-key.pem
 
 ### Step 3 — Fetch Required IDs
 
-Fetch the cluster control plane security group ID.
-
-!!! note "Important"
-    Use the SG named `retail-store-cluster`. Do NOT use `eks-cluster-sg-retail-store-*` (that is the primary/shared SG auto-created by EKS) and do NOT use `retail-store-node`.
-
-```bash
-aws ec2 describe-security-groups \
-  --filters "Name=tag:Name,Values=retail-store-cluster" \
-  --query "SecurityGroups[0].GroupId" \
-  --output text
-```
-
 Fetch VPC ID:
 
 ```bash
@@ -176,7 +208,19 @@ VPC_ID=$(aws ec2 describe-vpcs \
   --output text)
 ```
 
-Fetch private subnet IDs (tagged by the Terraform VPC module with `kubernetes.io/role/internal-elb`):
+Fetch the cluster control plane security group ID:
+
+!!! warning ""
+    Use the SG named `retail-store-cluster`. Do **not** use `eks-cluster-sg-retail-store-*` (auto-created by EKS) and do **not** use `retail-store-node`.
+
+```bash
+CLUSTER_SG=$(aws ec2 describe-security-groups \
+  --filters "Name=tag:Name,Values=retail-store-cluster" \
+  --query "SecurityGroups[0].GroupId" \
+  --output text)
+```
+
+Fetch private subnet IDs (tagged `kubernetes.io/role/internal-elb=1` by the Terraform VPC module):
 
 ```bash
 aws ec2 describe-subnets \
@@ -188,7 +232,8 @@ aws ec2 describe-subnets \
 
 ### Step 4 — Create Parameters File
 
-Pass parameters via a JSON file to avoid AWS CLI shell-parsing issues with comma-delimited subnet lists. Passing subnets inline (even with `\,` escaping) causes the CLI to incorrectly interpret the value as a Python list.
+!!! note ""
+    Pass parameters via a JSON file. Passing the subnet list inline (even with `\,` escaping) causes the AWS CLI to misparse the value as a Python list.
 
 ```bash
 cat > /tmp/cf-params.json << 'EOF'
@@ -208,8 +253,7 @@ cat > /tmp/cf-params.json << 'EOF'
 EOF
 ```
 
-!!! note "Important"
-    Replace the placeholder values with the values obtained in the previous steps.
+Replace all `<PLACEHOLDER>` values with the IDs collected in Step 3.
 
 ### Step 5 — Launch CloudFormation Stack
 
@@ -254,3 +298,67 @@ kubectl get nodes
 ```
 
 All 3 nodes transition from `NotReady` to `Ready` within ~2 minutes.
+
+---
+
+## Second `terraform apply`
+
+With worker nodes running and the log group removed from state, re-run apply. Terraform retries only the previously failed resources:
+
+```bash
+terraform apply
+```
+
+Expected outcome: `cert-manager` Helm release succeeds (~1m19s), ADOT addon installs, and the plan ends with:
+
+```
+Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
+```
+
+---
+
+## Post-Deployment Verification
+
+### Configure kubectl
+
+```bash
+aws eks --region us-east-1 update-kubeconfig --name retail-store
+```
+
+### Verify Nodes
+
+```bash
+kubectl get nodes
+```
+
+### Verify System Deployments
+
+```bash
+kubectl get deployments -n kube-system
+```
+
+Expected deployments:
+
+| Deployment | Replicas | Description |
+|---|---|---|
+| `aws-load-balancer-controller` | 2/2 | ALB Ingress controller |
+| `cert-manager` | 1/1 | Certificate manager |
+| `cert-manager-cainjector` | 1/1 | CA injector |
+| `cert-manager-webhook` | 1/1 | Cert-manager webhook |
+| `coredns` | 2/2 | Cluster DNS |
+
+### Verify StorageClass
+
+```bash
+kubectl get storageclass
+```
+
+`gp2` should be listed and marked as default.
+
+### Verify IngressClass
+
+```bash
+kubectl get ingressclass
+```
+
+`alb` should be listed.
