@@ -1,6 +1,6 @@
 # Install Kubernetes Tools
 
-This runbook covers the manual installation of the most commonly used Kubernetes-related CLI tools. Each section contains a single, self-contained bash block with inline comments — copy the entire block and paste it into your terminal to install that tool. Architecture-sensitive tools auto-detect `amd64` vs `arm64` at runtime.
+Manual installation of the most commonly used Kubernetes CLI tools. Each section is a self-contained bash block — all commands with inline comments, ready to copy and run.
 
 ---
 
@@ -27,6 +27,14 @@ sudo mv kubectl /usr/local/bin/kubectl
 # Verify
 kubectl version --client
 ```
+
+!!! note "kustomize is bundled with kubectl"
+    Installing `kubectl` also ships a bundled `kustomize` binary. Check before running the standalone kustomize install:
+    ```bash
+    kubectl version --client
+    # Output includes: Kustomize Version: vX.Y.Z
+    ```
+    If kustomize is already present, skip [Section 4](#4-kustomize).
 
 ---
 
@@ -102,6 +110,9 @@ rm -f "kustomize_${KUSTOMIZE_VERSION}_linux_${ARCH}.tar.gz"
 # Verify
 kustomize version
 ```
+
+!!! note "Already installed via kubectl?"
+    `kubectl` bundles kustomize internally. If `kubectl version --client` already shows a `Kustomize Version`, a standalone install is unnecessary unless a specific newer version is required.
 
 ---
 
