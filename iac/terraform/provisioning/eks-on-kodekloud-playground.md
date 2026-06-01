@@ -17,7 +17,6 @@ KodeKloud AWS Playground uses an IAM user (`kk_labs_user_*`) with a restrictive 
 | Blocked Action | Impact |
 |---|---|
 | `logs:PutRetentionPolicy` | Cannot set CloudWatch log retention |
-| `logs:DeleteLogGroup` | Cannot destroy existing log groups |
 | `iam:PutRolePolicy` | Cannot attach inline policies to IAM roles |
 | `iam:PassRole` on custom names | Only whitelisted role names (`eksClusterRole`) are allowed |
 | `eks:CreateNodegroup` | Managed node groups entirely blocked |
@@ -53,7 +52,6 @@ Add inside `module "eks_cluster"`:
 
 ```hcl
 create_cloudwatch_log_group = false
-cluster_enabled_log_types   = []
 ```
 
 ---
@@ -134,31 +132,11 @@ cd ~/retail-store-sample-app/terraform/eks/minimal
 terraform apply
 ```
 
-!!! note ""
-    The EKS control plane takes ~9 minutes to provision. This is expected. The apply will **partially fail** — specifically on the `cert-manager` Helm release and the CloudWatch log group destroy. Both are expected at this stage and are resolved in the steps below.
-
 **Expected partial failures on first apply:**
 
 | Resource | Error | Resolution |
 |---|---|---|
 | `helm_release.cert_manager` | `no endpoints available for service "aws-load-balancer-webhook-service"` | No worker nodes yet — resolved after Phase 2 |
-| `aws_cloudwatch_log_group.this[0]` | `logs:DeleteLogGroup` AccessDenied | Remove from state — see Fix 4 below |
-
----
-
-### Fix 4 — Remove Log Group from Terraform State
-
-**Error:**
-```
-AccessDeniedException: not authorized to perform: logs:DeleteLogGroup
-```
-
-Terraform is trying to destroy a log group created by EKS itself. The lab user cannot call `DeleteLogGroup`. Remove the resource from state — this does not delete anything in AWS:
-
-```bash
-terraform state rm \
-  'module.retail_app_eks.module.eks_cluster.aws_cloudwatch_log_group.this[0]'
-```
 
 ---
 
@@ -303,7 +281,7 @@ All 3 nodes transition from `NotReady` to `Ready` within ~2 minutes.
 
 ## Second `terraform apply`
 
-With worker nodes running and the log group removed from state, re-run apply. Terraform retries only the previously failed resources:
+With worker nodes running, re-run apply. Terraform retries only the previously failed resources:
 
 ```bash
 terraform apply
@@ -318,18 +296,6 @@ Apply complete! Resources: 0 added, 0 changed, 0 destroyed.
 ---
 
 ## Post-Deployment Verification
-
-### Configure kubectl
-
-```bash
-aws eks --region us-east-1 update-kubeconfig --name retail-store
-```
-
-### Verify Nodes
-
-```bash
-kubectl get nodes
-```
 
 ### Verify System Deployments
 
