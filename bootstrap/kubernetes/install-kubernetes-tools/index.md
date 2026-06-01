@@ -135,6 +135,36 @@ helmfile --version
 
 ---
 
+## 6. eksctl
+
+The official CLI for creating and managing Amazon EKS clusters.
+
+```bash
+# Detect architecture
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH="amd64"
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
+
+# Fetch the latest release tag
+EKSCTL_VERSION=$(curl -sSL https://api.github.com/repos/eksctl-io/eksctl/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+
+# Download the tarball
+curl -sSLO "https://github.com/eksctl-io/eksctl/releases/download/${EKSCTL_VERSION}/eksctl_Linux_${ARCH}.tar.gz"
+
+# Extract and install
+tar -xzf "eksctl_Linux_${ARCH}.tar.gz" eksctl
+sudo mv eksctl /usr/local/bin/eksctl
+sudo chmod +x /usr/local/bin/eksctl
+
+# Clean up
+rm -f "eksctl_Linux_${ARCH}.tar.gz"
+
+# Verify
+eksctl version
+```
+
+---
+
 ## Post-Install Verification
 
 Run all version checks together to confirm the full toolchain is in place:
@@ -145,4 +175,5 @@ helm version --short
 k9s version --short
 kustomize version
 helmfile --version
+eksctl version
 ```
