@@ -7,5 +7,5 @@ nav:
   - deploy-ingress-nginx-controller.md
   - deploy-metallb-load-balancer.md
   - deploy-gateway-api
-  # - deploy-cert-manager.md
+  - install-eks-ebs-csi-driver.md
 

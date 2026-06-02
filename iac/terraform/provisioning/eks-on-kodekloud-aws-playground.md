@@ -1,4 +1,4 @@
-# EKS Cluster Setup on KodeKloud AWS Labs
+# EKS Cluster Setup on KodeKloud AWS Playground
 
 ## Problem
 
