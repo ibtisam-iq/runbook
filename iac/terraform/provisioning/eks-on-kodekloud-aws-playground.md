@@ -234,7 +234,7 @@ chmod 400 ~/.ssh/eks-nodes-key.pem
 
 ### Step 2 — Fetch Required IDs
 
-Fetch VPC ID (replace `<cluster-name>` with the actual cluster name):
+Fetch VPC ID directly from the cluster:
 
 ```bash
 VPC_ID=$(aws eks describe-cluster \
@@ -245,7 +245,17 @@ VPC_ID=$(aws eks describe-cluster \
 echo $VPC_ID
 ```
 
-Fetch the cluster control plane security group ID:
+Fetch the cluster security group ID directly from the cluster:
+
+!!! note "Which security group to use"
+    When a cluster is created via the AWS Console or eksctl, EKS automatically creates one security group named `eks-cluster-sg-<cluster-name>-<uniqueID>`. This is the **cluster security group** and it already contains the required rules:
+
+    - **Inbound:** All traffic from itself (self-referencing rule) — allows node-to-node and node-to-control-plane communication
+    - **Outbound:** All traffic to `0.0.0.0/0`
+
+    No additional ports need to be opened manually. Do **not** use the `default` VPC security group.
+
+    When the cluster was created by a Terraform module (e.g., the retail-store repo), multiple named SGs exist (e.g., `retail-store-cluster`, `retail-store-node`). In that case the module-specific SG name was used. For Console/eksctl-created clusters, always fetch via `aws eks describe-cluster` as shown below.
 
 ```bash
 CLUSTER_SG=$(aws eks describe-cluster \
@@ -256,14 +266,32 @@ CLUSTER_SG=$(aws eks describe-cluster \
 echo $CLUSTER_SG
 ```
 
-Fetch private subnet IDs:
+Fetch subnet IDs from the VPC:
+
+!!! note "Why not filter by tag?"
+    The previous command filtered subnets using the tag `kubernetes.io/role/internal-elb=1`. This tag is automatically applied by Terraform-managed VPCs (e.g., the retail-store module). However, if the cluster was created via the Console using the **default VPC**, its subnets have no EKS-specific tags and the filter returns nothing.
+
+    Use the command below to fetch all subnets in the cluster's VPC regardless of tags. Pick subnets from **at least 2 different Availability Zones** for the CloudFormation stack.
 
 ```bash
-aws ec2 describe-subnets \
+SUBNETS=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=$VPC_ID" \
-            "Name=tag:kubernetes.io/role/internal-elb,Values=1" \
+  --query "Subnets[*].[SubnetId,AvailabilityZone]" \
+  --output table)
+
+echo "$SUBNETS"
+```
+
+Then build a comma-separated list from the output:
+
+```bash
+# Store as comma-separated variable for use in cf-params.json
+SUBNET_IDS=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
   --query "Subnets[*].SubnetId" \
-  --output text
+  --output text | tr '\t' ',')
+
+echo $SUBNET_IDS
 ```
 
 ### Step 3 — Create CloudFormation Parameters File
