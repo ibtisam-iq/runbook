@@ -586,6 +586,72 @@ kubectl get nodes
 
 Once the role is mapped correctly, kubelet retries on its own and nodes register within ~30 seconds, then transition to `Ready` shortly after.
 
+---
+
+## Install EKS EBS CSI Driver
+
+### Create IAM Role (IRSA)
+
+```bash
+eksctl create iamserviceaccount \
+  --name ebs-csi-controller-sa \
+  --namespace kube-system \
+  --cluster $CLUSTER_NAME \
+  --role-name AmazonEKS_EBS_CSI_DriverRole \
+  --role-only \
+  --attach-policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy \
+  --approve
+```
+
+### Get Role ARN
+
+```bash
+ROLE_ARN=$(aws iam get-role \
+  --role-name AmazonEKS_EBS_CSI_DriverRole \
+  --query "Role.Arn" --output text)
+echo $ROLE_ARN
+```
+
+### Install Addon
+
+!!! note **KodeKloud SCP Restriction:** `iam:PassRole` is blocked, so `--service-account-role-arn` cannot be passed directly to `aws eks create-addon`. Use the workaround below.
+
+**This will fail:**
+```bash
+aws eks create-addon \
+  --cluster-name $CLUSTER_NAME \
+  --addon-name aws-ebs-csi-driver \
+  --service-account-role-arn $ROLE_ARN \
+  --configuration-values '{"defaultStorageClass":{"enabled":true}}'
+```
+
+**Workaround — install without role, annotate manually:**
+```bash
+# Step 1: Install addon without passing role (bypasses iam:PassRole SCP)
+aws eks create-addon \
+  --cluster-name $CLUSTER_NAME \
+  --addon-name aws-ebs-csi-driver \
+  --resolve-conflicts OVERWRITE
+
+# Step 2: Annotate the service account directly
+kubectl annotate serviceaccount ebs-csi-controller-sa \
+  -n kube-system \
+  eks.amazonaws.com/role-arn=$ROLE_ARN \
+  --overwrite
+
+# Step 3: Restart controller to pick up the annotation
+kubectl rollout restart deployment ebs-csi-controller -n kube-system
+```
+
+### Verify
+
+```bash
+kubectl get deploy ebs-csi-controller -n kube-system
+kubectl get daemonset ebs-csi-node -n kube-system
+```
+
+---
+
 ## Troubleshooting
 
 If `kubectl get nodes` returns `No resources found`:
