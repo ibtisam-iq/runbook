@@ -198,6 +198,7 @@ metadata:
 
 iam:
   serviceRoleARN: arn:aws:iam::<account-id>:role/eksClusterRole
+  withOIDC: true  # required for IRSA (IAM Roles for Service Accounts)
 
 # Make both join paths available (access entries + aws-auth ConfigMap).
 # Omit or set to "API" and you must use access entries to join nodes.
@@ -265,7 +266,9 @@ Fetch VPC ID directly from the cluster:
 ```bash
 # Set once and reuse for every lookup below (and in Track B).
 CLUSTER_NAME=<cluster-name>
+```
 
+```bash
 VPC_ID=$(aws eks describe-cluster \
   --name "$CLUSTER_NAME" \
   --query "cluster.resourcesVpcConfig.vpcId" \
@@ -583,33 +586,35 @@ kubectl get nodes
 
 Once the role is mapped correctly, kubelet retries on its own and nodes register within ~30 seconds, then transition to `Ready` shortly after.
 
-!!! note "Troubleshooting: `kubectl get nodes` returns `No resources found`"
+## Troubleshooting
 
-    This is **not** a timing issue and waiting longer will not help — it means the nodes are being rejected by the API server, almost always an authentication-mode/identity-mapping problem from Step 5.
+If `kubectl get nodes` returns `No resources found`:
 
-    1. Re-check the mode: `aws eks describe-cluster --name <cluster-name> --query "cluster.accessConfig.authenticationMode" --output text`. If it is `API`, the aws-auth ConfigMap is being ignored — switch to Path 1.
-    2. SSH (or SSM) onto a node and inspect kubelet:
+This is **not** a timing issue and waiting longer will not help — it means the nodes are being rejected by the API server, almost always an authentication-mode/identity-mapping problem from Step 5.
 
-        ```bash
-        sudo journalctl -u kubelet --no-pager | tail -30
-        ```
+1. Re-check the mode: `aws eks describe-cluster --name <cluster-name> --query "cluster.accessConfig.authenticationMode" --output text`. If it is `API`, the aws-auth ConfigMap is being ignored — switch to Path 1.
 
-        Repeated `"Unable to register node with API server" err="Unauthorized"` confirms the role mapping is the problem, not bootstrap.
+2. SSH (or SSM) onto a node and inspect kubelet:
 
-    3. Confirm the node is assuming the role you mapped:
+```bash
+sudo journalctl -u kubelet --no-pager | tail -30
+```
 
-        ```bash
-        curl -s http://169.254.169.254/latest/meta-data/iam/info
-        ```
+Repeated `"Unable to register node with API server" err="Unauthorized"` confirms the role mapping is the problem, not bootstrap.
 
-        The `InstanceProfileArn` must trace back to the node role from the CloudFormation stack output. A mismatch (e.g., a stale launch template) produces identical `Unauthorized` symptoms even with a perfect mapping.
+3. Confirm the node is assuming the role you mapped:
 
-    4. **Track B (AL2023) only:** nodes initialize via `nodeadm`, not `bootstrap.sh`, so the cloud-init log looks different. If nodes never appear *and* kubelet logs do **not** show `Unauthorized`, the likely cause is missing or wrong `nodeadm` metadata — verify `ApiServerEndpoint`, `CertificateAuthorityData`, and `ServiceCidr` in your params file matched the cluster. Inspect the node's bootstrap with:
+```bash
+curl -s http://169.254.169.254/latest/meta-data/iam/info
+```
 
-        ```bash
-        sudo journalctl -u nodeadm-config -u nodeadm-run --no-pager | tail -40
-        ```
+The `InstanceProfileArn` must trace back to the node role from the CloudFormation stack output. A mismatch (e.g., a stale launch template) produces identical `Unauthorized` symptoms even with a perfect mapping.
 
+4. **Track B (AL2023) only:** nodes initialize via `nodeadm`, not `bootstrap.sh`, so the cloud-init log looks different. If nodes never appear *and* kubelet logs do **not** show `Unauthorized`, the likely cause is missing or wrong `nodeadm` metadata — verify `ApiServerEndpoint`, `CertificateAuthorityData`, and `ServiceCidr` in your params file matched the cluster. Inspect the node's bootstrap with:
+
+```bash
+sudo journalctl -u nodeadm-config -u nodeadm-run --no-pager | tail -40
+```
 
 ---
 
