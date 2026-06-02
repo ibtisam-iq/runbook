@@ -234,13 +234,15 @@ chmod 400 ~/.ssh/eks-nodes-key.pem
 
 ### Step 2 — Fetch Required IDs
 
-Fetch VPC ID (replace `<cluster-name>` with your actual cluster name):
+Fetch VPC ID (replace `<cluster-name>` with the actual cluster name):
 
 ```bash
-VPC_ID=$(aws ec2 describe-vpcs \
-  --filters "Name=tag:Name,Values=<cluster-name>" \
-  --query "Vpcs[0].VpcId" \
+VPC_ID=$(aws eks describe-cluster \
+  --name <cluster-name> \
+  --query "cluster.resourcesVpcConfig.vpcId" \
   --output text)
+
+echo $VPC_ID
 ```
 
 Fetch the cluster control plane security group ID:
