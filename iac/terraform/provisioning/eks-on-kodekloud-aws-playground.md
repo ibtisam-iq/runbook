@@ -247,14 +247,13 @@ echo $VPC_ID
 
 Fetch the cluster control plane security group ID:
 
-!!! note ""
-    Use the SG named `<cluster-name>-cluster`. Do **not** use `eks-cluster-sg-<cluster-name>-*` (auto-created by EKS).
-
 ```bash
-CLUSTER_SG=$(aws ec2 describe-security-groups \
-  --filters "Name=tag:Name,Values=<cluster-name>-cluster" \
-  --query "SecurityGroups[0].GroupId" \
+CLUSTER_SG=$(aws eks describe-cluster \
+  --name <cluster-name> \
+  --query "cluster.resourcesVpcConfig.clusterSecurityGroupId" \
   --output text)
+
+echo $CLUSTER_SG
 ```
 
 Fetch private subnet IDs:
