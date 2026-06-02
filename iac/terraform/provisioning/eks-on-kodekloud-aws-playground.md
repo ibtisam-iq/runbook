@@ -268,24 +268,58 @@ echo $CLUSTER_SG
 
 Fetch subnet IDs from the VPC:
 
-!!! note "Why not filter by tag?"
-    The previous command filtered subnets using the tag `kubernetes.io/role/internal-elb=1`. This tag is automatically applied by Terraform-managed VPCs (e.g., the retail-store module). However, if the cluster was created via the Console using the **default VPC**, its subnets have no EKS-specific tags and the filter returns nothing.
+!!! note "Why subnet tags matter for Load Balancers"
+    The AWS Load Balancer Controller discovers subnets by looking for specific tags:
 
-    Use the command below to fetch all subnets in the cluster's VPC regardless of tags. Pick subnets from **at least 2 different Availability Zones** for the CloudFormation stack.
+    - `kubernetes.io/role/internal-elb=1` — for **internal** load balancers (ALB/NLB in private subnets)
+    - `kubernetes.io/role/elb=1` — for **internet-facing** load balancers (ALB/NLB in public subnets)
+
+    When Terraform creates the VPC (e.g., the retail-store module), these tags are applied automatically. When using the **default VPC via Console**, subnets have no EKS tags — the Load Balancer Controller will fail to provision load balancers unless you tag them manually.
+
+    Choose the option that fits your situation:
+
+**Option A — Tag subnets first, then fetch (recommended for full LB support)**
+
+First list all subnets in the VPC to identify their IDs and Availability Zones:
 
 ```bash
-SUBNETS=$(aws ec2 describe-subnets \
+aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=$VPC_ID" \
-  --query "Subnets[*].[SubnetId,AvailabilityZone]" \
-  --output table)
-
-echo "$SUBNETS"
+  --query "Subnets[*].[SubnetId,AvailabilityZone,MapPublicIpOnLaunch]" \
+  --output table
 ```
 
-Then build a comma-separated list from the output:
+Tag private subnets for internal load balancers:
 
 ```bash
-# Store as comma-separated variable for use in cf-params.json
+aws ec2 create-tags \
+  --resources subnet-aaa subnet-bbb subnet-ccc \
+  --tags Key=kubernetes.io/role/internal-elb,Value=1
+```
+
+Tag public subnets for internet-facing load balancers:
+
+```bash
+aws ec2 create-tags \
+  --resources subnet-xxx subnet-yyy subnet-zzz \
+  --tags Key=kubernetes.io/role/elb,Value=1
+```
+
+Then fetch by tag:
+
+```bash
+SUBNET_IDS=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
+            "Name=tag:kubernetes.io/role/internal-elb,Values=1" \
+  --query "Subnets[*].SubnetId" \
+  --output text | tr '\t' ',')
+
+echo $SUBNET_IDS
+```
+
+**Option B — Fetch all subnets directly (simpler, tag later)**
+
+```bash
 SUBNET_IDS=$(aws ec2 describe-subnets \
   --filters "Name=vpc-id,Values=$VPC_ID" \
   --query "Subnets[*].SubnetId" \
@@ -293,6 +327,9 @@ SUBNET_IDS=$(aws ec2 describe-subnets \
 
 echo $SUBNET_IDS
 ```
+
+!!! warning ""
+    Without the `kubernetes.io/role/internal-elb` and `kubernetes.io/role/elb` tags, the AWS Load Balancer Controller cannot discover subnets and will fail to provision ALB/NLB for your applications. If you use Option B now, apply the tags from Option A before deploying any Ingress or Service of type LoadBalancer.
 
 ### Step 3 — Create CloudFormation Parameters File
 
