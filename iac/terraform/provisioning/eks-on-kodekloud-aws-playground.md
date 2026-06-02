@@ -253,9 +253,7 @@ Fetch the cluster security group ID directly from the cluster:
     - **Inbound:** All traffic from itself (self-referencing rule) — allows node-to-node and node-to-control-plane communication
     - **Outbound:** All traffic to `0.0.0.0/0`
 
-    No additional ports need to be opened manually. Do **not** use the `default` VPC security group.
-
-    When the cluster was created by a Terraform module (e.g., the retail-store repo), multiple named SGs exist (e.g., `retail-store-cluster`, `retail-store-node`). In that case the module-specific SG name was used. For Console/eksctl-created clusters, always fetch via `aws eks describe-cluster` as shown below.
+    No additional ports need to be opened manually.
 
 ```bash
 CLUSTER_SG=$(aws eks describe-cluster \
@@ -274,9 +272,7 @@ Fetch subnet IDs from the VPC:
     - `kubernetes.io/role/internal-elb=1` — for **internal** load balancers (ALB/NLB in private subnets)
     - `kubernetes.io/role/elb=1` — for **internet-facing** load balancers (ALB/NLB in public subnets)
 
-    When Terraform creates the VPC (e.g., the retail-store module), these tags are applied automatically. When using the **default VPC via Console**, subnets have no EKS tags — the Load Balancer Controller will fail to provision load balancers unless you tag them manually.
-
-    Choose the option that fits your situation:
+    Choose the option that fits the situation:
 
 **Option A — Tag subnets first, then fetch (recommended for full LB support)**
 
