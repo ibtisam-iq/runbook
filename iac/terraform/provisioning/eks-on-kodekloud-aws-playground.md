@@ -28,10 +28,15 @@ KodeKloud lab accounts operate under an **AWS Organizations Service Control Poli
 This is confirmed by running the IAM policy simulator:
 
 ```bash
+export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo $ACCOUNT_ID
+```
+
+```bash
 aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::<account-id>:user/<lab-username> \
+  --policy-source-arn arn:aws:iam::$ACCOUNT_ID:user/<lab-username> \
   --action-names iam:PassRole \
-  --resource-arns arn:aws:iam::<account-id>:role/AmazonEKSClusterRole
+  --resource-arns arn:aws:iam::$ACCOUNT_ID:role/AmazonEKSClusterRole
 ```
 
 If `EvalDecision` returns `implicitDeny` and `AllowedByOrganizations` returns `False`, the SCP is the blocker. No workaround exists at the account level — the restriction is enforced at the AWS Organization level above the account.
@@ -205,6 +210,16 @@ iam:
 accessConfig:
   authenticationMode: API_AND_CONFIG_MAP
 
+# Explicitly declare addons — omit attachPolicyARNs/serviceAccountRoleARN
+# so eksctl never calls UpdateAddon with iam:PassRole
+addons:
+  - name: vpc-cni
+    version: latest
+  - name: kube-proxy
+    version: latest
+  - name: coredns
+    version: latest
+
 managedNodeGroups: []
 ```
 
@@ -218,7 +233,7 @@ eksctl create cluster -f cluster.yaml
 
     - Replace `<account-id>` with the AWS account ID visible in the Console top-right corner.
     - **Do not add `managedNodeGroups` entries.** eksctl creates node groups via `eks:CreateNodegroup` — blocked by the SCP. Keep the list empty and use the self-managed node provisioning steps below to attach worker nodes.
-
+    - **Do NOT use `withOIDC: true` without explicitly declaring addons**, otherwise `eksctl` will auto-attach an IAM role to `vpc-cni` via `UpdateAddon`, which triggers `iam:PassRole` and fails the entire cluster creation.
 
 ---
 
@@ -235,9 +250,9 @@ eksctl create cluster -f cluster.yaml
 ```bash
 # Verification command
 aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::<account-id>:user/<lab-username> \
+  --policy-source-arn arn:aws:iam::$ACCOUNT_ID:user/<lab-username> \
   --action-names eks:CreateNodegroup \
-  --resource-arns arn:aws:eks:us-east-1:<account-id>:cluster/<cluster-name>
+  --resource-arns arn:aws:eks:us-east-1::$ACCOUNT_ID:cluster/<cluster-name>
 ```
 
 **There is no workaround for managed node groups.** Use self-managed worker nodes instead (see next section).
@@ -560,9 +575,9 @@ The `EC2_LINUX` type automatically confers the `system:bootstrappers` and `syste
 
     ```bash
     aws iam simulate-principal-policy \
-      --policy-source-arn arn:aws:iam::<account-id>:user/<lab-username> \
+      --policy-source-arn arn:aws:iam::$ACCOUNT_ID:user/<lab-username> \
       --action-names eks:CreateAccessEntry \
-      --resource-arns arn:aws:eks:us-east-1:<account-id>:cluster/<cluster-name>
+      --resource-arns arn:aws:eks:us-east-1::$ACCOUNT_ID:cluster/<cluster-name>
     ```
 
 

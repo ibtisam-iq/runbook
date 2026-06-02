@@ -21,7 +21,7 @@ Ensure the following before starting:
 - Helm is installed.
 - Access exists to create IAM policies and roles in the AWS account.
 
-Set the cluster name:
+Set the following variables:
 
 ```bash
 export CLUSTER_NAME=<eks-cluster-name>
