@@ -217,32 +217,6 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --version 1.14.0
 ```
 
-**Alternative fix (IMDS hop limit):** If you need IMDS access for other workloads, increase the hop limit on every node instance to 2:
-
-```bash
-aws ec2 modify-instance-metadata-options \
-  --instance-id <node-instance-id> \
-  --http-tokens required \
-  --http-put-response-hop-limit 2 \
-  --region $REGION
-```
-
----
-
-### Webhook service has no endpoints
-
-**Symptom:** Other add-ons or Kubernetes objects fail with:
-
-```
-failed calling webhook "mservice.elbv2.k8s.aws": failed to call webhook:
-Post "https://aws-load-balancer-webhook-service.kube-system.svc:443/...":
-no endpoints available for service "aws-load-balancer-webhook-service"
-```
-
-**Cause:** The AWS Load Balancer Controller pods are not `Ready`, so the webhook service has no healthy endpoints. This is a downstream effect of the VPC discovery failure above.
-
-**Fix:** Resolve the controller `CrashLoopBackOff` first. Once the deployment reaches `2/2 Ready`, the webhook service will have endpoints and the failing add-on installations can be retried.
-
 ---
 
 ## Quick sequence
