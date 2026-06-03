@@ -198,20 +198,19 @@ apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
 metadata:
-  name: my-cluster
+  name: ibtisam-iq-eks-cluster
   region: us-east-1
 
 iam:
   serviceRoleARN: arn:aws:iam::<account-id>:role/eksClusterRole
-  withOIDC: true  # required for IRSA (IAM Roles for Service Accounts)
+  withOIDC: false  # ← MUST be false; enable OIDC separately after cluster is up
 
 # Make both join paths available (access entries + aws-auth ConfigMap).
 # Omit or set to "API" and you must use access entries to join nodes.
 accessConfig:
   authenticationMode: API_AND_CONFIG_MAP
 
-# Explicitly declare addons — omit attachPolicyARNs/serviceAccountRoleARN
-# so eksctl never calls UpdateAddon with iam:PassRole
+# Explicitly declare addons
 addons:
   - name: vpc-cni
     version: latest
@@ -221,19 +220,33 @@ addons:
     version: latest
 
 managedNodeGroups: []
+
+autoModeConfig:
+  enabled: false
 ```
 
 Run:
 
 ```bash
+# Step 1: Create cluster (no OIDC, no role auto-attachment)
 eksctl create cluster -f cluster.yaml
 ```
 
-!!! note ""
+```bash
+# Step 2: Associate OIDC provider manually (no iam:PassRole triggered here)
+eksctl utils associate-iam-oidc-provider \
+  --cluster <cluster-name> \
+  --region <region> \
+  --approve
+```
 
-    - Replace `<account-id>` with the AWS account ID visible in the Console top-right corner.
-    - **Do not add `managedNodeGroups` entries.** eksctl creates node groups via `eks:CreateNodegroup` — blocked by the SCP. Keep the list empty and use the self-managed node provisioning steps below to attach worker nodes.
-    - **Do NOT use `withOIDC: true` without explicitly declaring addons**, otherwise `eksctl` will auto-attach an IAM role to `vpc-cni` via `UpdateAddon`, which triggers `iam:PassRole` and fails the entire cluster creation.
+!!! warning "Important warnings"
+
+    - Use `aws sts get-caller-identity --query Account --output text` for AWS account-id and `aws configure get region` for AWS region.
+    - **KodeKloud SCP Rule:** `withOIDC: true` during eksctl create cluster triggers `UpdateAddon` on `vpc-cni` with `iam:PassRole`. This fails the whole operation. Always set `withOIDC: false` and run `associate-iam-oidc-provider` as a separate step after cluster creation.
+    - **Do NOT add `managedNodeGroups` entries.** eksctl creates node groups via `eks:CreateNodegroup` — blocked by the SCP. Keep the list empty and use the self-managed node provisioning steps below to attach worker nodes.
+    - **Do NOT enable `autoModeConfig`**. It triggers `CreateNodegroup` which fails the whole operation.
+    
 
 ---
 
@@ -445,6 +458,18 @@ Now skip to [monitoring the stack](#monitor-the-stack).
 
 AL2023 nodes use `nodeadm` instead of `bootstrap.sh` and no longer auto-discover cluster metadata, so the template requires several values that Track A did not. Collect them first.
 
+##### Step 3B.0 — Confirm the Template's Parameter Set
+
+The accepted parameters differ between template versions, and CloudFormation rejects the whole stack if it passes even one key it doesn't define (`ValidationError: Parameters: [X] do not exist in the template`). Print the authoritative list straight from the template before building the params file:
+
+```bash
+aws cloudformation get-template-summary \
+  --template-url https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2025-11-26/amazon-eks-nodegroup.yaml \
+  --query "Parameters[].ParameterKey" --output text | tr '\t' '\n' | sort
+```
+
+Build the `cf-params.json` using only keys that appear in this output. The set below is correct for the `2025-11-26` template at time of writing, but AWS revises these templates — if a key was added or removed in a newer dated template, the command is the source of truth.
+
 ##### Step 3B.1 — Fetch the Extra Cluster Metadata
 
 ```bash
@@ -461,13 +486,25 @@ SERVICE_CIDR=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region us-east-
 AUTH_MODE=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region us-east-1 \
   --query "cluster.accessConfig.authenticationMode" --output text)
 
+# The node template's AuthenticationMode parameter uses human-readable display
+# strings, NOT the API enum that describe-cluster returns. Translate it:
+#   API               -> "EKS API"
+#   API_AND_CONFIG_MAP -> "EKS API and ConfigMap"
+#   CONFIG_MAP        -> "ConfigMap"
+case "$AUTH_MODE" in
+  API)                AUTH_MODE_PARAM="EKS API" ;;
+  API_AND_CONFIG_MAP) AUTH_MODE_PARAM="EKS API and ConfigMap" ;;
+  CONFIG_MAP)         AUTH_MODE_PARAM="ConfigMap" ;;
+  *) echo "Unexpected auth mode: $AUTH_MODE" >&2 ;;
+esac
+
 K8S_VERSION=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region us-east-1 \
   --query "cluster.version" --output text)
 
 echo "cluster=$CLUSTER_NAME"
 echo "endpoint=$API_SERVER"
 echo "service_cidr=$SERVICE_CIDR"
-echo "auth_mode=$AUTH_MODE"
+echo "auth_mode=$AUTH_MODE -> param=$AUTH_MODE_PARAM"
 echo "k8s_version=$K8S_VERSION"
 ```
 
@@ -485,12 +522,11 @@ cat > /tmp/cf-params.json << EOF
   {"ParameterKey": "ApiServerEndpoint",                   "ParameterValue": "$API_SERVER"},
   {"ParameterKey": "CertificateAuthorityData",            "ParameterValue": "$CA_DATA"},
   {"ParameterKey": "ServiceCidr",                         "ParameterValue": "$SERVICE_CIDR"},
-  {"ParameterKey": "AuthenticationMode",                  "ParameterValue": "$AUTH_MODE"},
+  {"ParameterKey": "AuthenticationMode",                  "ParameterValue": "$AUTH_MODE_PARAM"},
   {"ParameterKey": "NodeGroupName",                       "ParameterValue": "${CLUSTER_NAME}-nodes"},
   {"ParameterKey": "NodeInstanceType",                    "ParameterValue": "t3.medium"},
   {"ParameterKey": "NodeImageIdSSMParam",                 "ParameterValue": "/aws/service/eks/optimized-ami/$K8S_VERSION/amazon-linux-2023/x86_64/standard/recommended/image_id"},
   {"ParameterKey": "NodeVolumeSize",                      "ParameterValue": "20"},
-  {"ParameterKey": "NodeVolumeType",                      "ParameterValue": "gp3"},
   {"ParameterKey": "VpcId",                               "ParameterValue": "$VPC_ID"},
   {"ParameterKey": "Subnets",                             "ParameterValue": "$SUBNET_IDS"},
   {"ParameterKey": "KeyName",                             "ParameterValue": "eks-nodes-key"},
@@ -500,6 +536,10 @@ cat > /tmp/cf-params.json << EOF
 ]
 EOF
 ```
+
+!!! warning "The template's `AuthenticationMode` uses display strings, not the API enum"
+
+    `describe-cluster` returns `API`, `API_AND_CONFIG_MAP`, or `CONFIG_MAP`, but the node template's `AuthenticationMode` parameter only accepts `EKS API`, `EKS API and ConfigMap`, or `ConfigMap`. Passing the raw enum fails with `Parameter 'AuthenticationMode' must be one of AllowedValues`. The `case` block in Step 3B.1 does this translation into `$AUTH_MODE_PARAM` — use that variable, not `$AUTH_MODE`, in the params file. Per the template, choosing `EKS API` or `EKS API and ConfigMap` makes it auto-create the node-role access entry, so Step 5's manual mapping becomes unnecessary.
 
 !!! note ""
 
@@ -549,6 +589,7 @@ AUTH_MODE=$(aws eks describe-cluster \
   --query "cluster.accessConfig.authenticationMode" \
   --output text)
 
+echo "Node role ARN: $NODE_ROLE_ARN"
 echo "Authentication mode: $AUTH_MODE"
 ```
 
@@ -603,6 +644,44 @@ Once the role is mapped correctly, kubelet retries on its own and nodes register
 
 ---
 
+## Install VPC CNI (Optional)
+
+If OIDC is enabled on the cluster, the VPC CNI addon should be installed automatically. But, due to the restriction
+of `iam:PassRole` the addon may fail to install. 
+
+Use the following command to check the status of the addon:
+
+```bash
+aws eks describe-addon --cluster-name $CLUSTER_NAME --addon-name vpc-cni --query "addon.status" --output text
+```
+
+If the addon is not installed:
+
+**Option A — Console:**
+
+1. Under **Add-on access** — select **"IAM roles for service accounts (IRSA)"**
+2. Under **Select IAM role** — **leave it blank / don't choose any role**
+3. Click **Next** → **Add**
+
+**Option B — CLI (recommended, faster):**
+
+```bash
+# Just install vpc-cni with no role — nodes will become Ready
+aws eks create-addon \
+  --cluster-name $CLUSTER_NAME \
+  --addon-name vpc-cni \
+  --resolve-conflicts OVERWRITE
+
+# Confirm addon is active
+aws eks describe-addon --cluster-name $CLUSTER_NAME --addon-name vpc-cni \
+  --query "addon.status"
+
+# Nodes should now be Ready 
+kubectl get nodes
+```
+
+---
+
 ## Install EKS EBS CSI Driver
 
 ### Create IAM Role (IRSA)
@@ -629,7 +708,8 @@ echo $ROLE_ARN
 
 ### Install Addon
 
-!!! note **KodeKloud SCP Restriction:** `iam:PassRole` is blocked, so `--service-account-role-arn` cannot be passed directly to `aws eks create-addon`. Use the workaround below.
+!!! note 
+    **KodeKloud SCP Restriction:** `iam:PassRole` is blocked, so `--service-account-role-arn` cannot be passed directly to `aws eks create-addon`. Use the workaround below.
 
 **This will fail:**
 ```bash
@@ -696,6 +776,9 @@ The `InstanceProfileArn` must trace back to the node role from the CloudFormatio
 ```bash
 sudo journalctl -u nodeadm-config -u nodeadm-run --no-pager | tail -40
 ```
+
+5. If `kubectl describe node <node-name>` returns `NotReady` and `container runtime network not ready: NetworkReady=false reason:NetworkPluginNotReady message:Network plugin returns error: cni plugin not initialized`, it means the VPC CNI addon is not installed or not working properly. In this case, install the VPC CNI addon using `Install VPC CNI (Optional)` section in this runbook.
+
 
 ---
 
