@@ -728,6 +728,8 @@ aws eks create-addon \
   --addon-name aws-ebs-csi-driver \
   --resolve-conflicts OVERWRITE
 
+sleep 30
+
 # Step 2: Annotate the service account directly
 kubectl annotate serviceaccount ebs-csi-controller-sa \
   -n kube-system \
