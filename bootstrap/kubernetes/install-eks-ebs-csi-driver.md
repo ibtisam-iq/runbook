@@ -236,8 +236,6 @@ kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml | grep role-arn
 
 ## Configure the Default StorageClass (gp2 → gp3)
 
-### Understand where `gp2` comes from
-
 After installing the EBS CSI driver, running `kubectl get sc` shows a `gp2` StorageClass that was never explicitly created:
 
 ```text
