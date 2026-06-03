@@ -27,8 +27,14 @@ Set the following variables:
 export CLUSTER_NAME=<eks-cluster-name>
 export REGION=<region>
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-
+export VPC_ID=$(aws eks describe-cluster \
+  --name "$CLUSTER_NAME" \
+  --query "cluster.resourcesVpcConfig.vpcId" \
+  --output text)
 ```
+
+!!! note
+    `VPC_ID` is required for the Helm install. The controller cannot reliably discover the VPC from EC2 instance metadata (IMDS) in all EKS node configurations. Passing it explicitly avoids a startup crash.
 
 ---
 
@@ -91,7 +97,7 @@ eksctl create iamserviceaccount \
 This command performs four things:
 
 - Creates an IAM role named `aws-load-balancer-controller`
-- Creates a trust policy on that role that allows the `aws-load-balancer-controller` ServiceAccount in `kube-system` to assume it via the cluster’s OIDC provider
+- Creates a trust policy on that role that allows the `aws-load-balancer-controller` ServiceAccount in `kube-system` to assume it via the cluster's OIDC provider
 - Attaches the `AWSLoadBalancerControllerIAMPolicy` policy to this IAM role
 - Creates (or updates) the `aws-load-balancer-controller` ServiceAccount in `kube-system` and adds the `eks.amazonaws.com/role-arn` annotation pointing to this IAM role
 
@@ -127,6 +133,8 @@ Deploy the AWS Load Balancer Controller chart and reuse the existing ServiceAcco
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --namespace kube-system \
   --set clusterName="$CLUSTER_NAME" \
+  --set region="$REGION" \
+  --set vpcId="$VPC_ID" \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller \
   --version 1.14.0
@@ -137,6 +145,8 @@ This Helm release is configured as follows:
 - `serviceAccount.create=false` prevents Helm from creating a new ServiceAccount; the release uses the ServiceAccount created by `eksctl`.
 - `serviceAccount.name=aws-load-balancer-controller` selects that ServiceAccount explicitly.
 - `clusterName="$CLUSTER_NAME"` passes the EKS cluster name so the controller can tag and manage AWS resources correctly.
+- `region="$REGION"` passes the AWS region explicitly so the controller does not rely on IMDS for region discovery.
+- `vpcId="$VPC_ID"` passes the VPC ID explicitly. Without this, the controller attempts to fetch the VPC from EC2 instance metadata, which can fail with a `context deadline exceeded` error in some EKS node configurations, causing a `CrashLoopBackOff`.
 
 ---
 
@@ -162,6 +172,77 @@ kubectl get sa -n kube-system aws-load-balancer-controller
 kubectl get sa -n kube-system aws-load-balancer-controller -o yaml | grep role-arn
 ```
 
+Check the webhook service has endpoints:
+
+```bash
+kubectl get endpoints -n kube-system aws-load-balancer-webhook-service
+```
+
+Check controller logs for errors:
+
+```bash
+kubectl logs -n kube-system deploy/aws-load-balancer-controller
+```
+
+---
+
+## Troubleshooting
+
+### CrashLoopBackOff — failed to get VPC ID from instance metadata
+
+**Symptom:**
+
+```
+{"level":"error","logger":"setup","msg":"unable to initialize AWS cloud",
+"error":"failed to get VPC ID: failed to fetch VPC ID from instance metadata:
+error in fetching vpc id through ec2 metadata: get mac metadata: operation error
+ec2imds: GetMetadata, canceled, context deadline exceeded"}
+```
+
+**Cause:** The controller tries to discover the VPC ID by calling the EC2 Instance Metadata Service (IMDS). This can time out when:
+
+- The node group has IMDS hop limit set to 1 (default for some launch templates), which blocks containerised processes from reaching the metadata endpoint.
+- The node security group or network ACLs block the metadata IP (`169.254.169.254`).
+
+**Fix:** Pass the VPC ID and region explicitly in the Helm install so the controller does not use IMDS for discovery:
+
+```bash
+helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName="$CLUSTER_NAME" \
+  --set region="$REGION" \
+  --set vpcId="$VPC_ID" \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --version 1.14.0
+```
+
+**Alternative fix (IMDS hop limit):** If you need IMDS access for other workloads, increase the hop limit on every node instance to 2:
+
+```bash
+aws ec2 modify-instance-metadata-options \
+  --instance-id <node-instance-id> \
+  --http-tokens required \
+  --http-put-response-hop-limit 2 \
+  --region $REGION
+```
+
+---
+
+### Webhook service has no endpoints
+
+**Symptom:** Other add-ons or Kubernetes objects fail with:
+
+```
+failed calling webhook "mservice.elbv2.k8s.aws": failed to call webhook:
+Post "https://aws-load-balancer-webhook-service.kube-system.svc:443/...":
+no endpoints available for service "aws-load-balancer-webhook-service"
+```
+
+**Cause:** The AWS Load Balancer Controller pods are not `Ready`, so the webhook service has no healthy endpoints. This is a downstream effect of the VPC discovery failure above.
+
+**Fix:** Resolve the controller `CrashLoopBackOff` first. Once the deployment reaches `2/2 Ready`, the webhook service will have endpoints and the failing add-on installations can be retried.
+
 ---
 
 ## Quick sequence
@@ -170,6 +251,10 @@ kubectl get sa -n kube-system aws-load-balancer-controller -o yaml | grep role-a
 export CLUSTER_NAME=<eks-cluster-name>
 export REGION=<eks-cluster-region>
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+export VPC_ID=$(aws eks describe-cluster \
+  --name "$CLUSTER_NAME" \
+  --query "cluster.resourcesVpcConfig.vpcId" \
+  --output text)
 ```
 
 ```bash
@@ -200,6 +285,8 @@ helm repo update eks
 helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --namespace kube-system \
   --set clusterName="$CLUSTER_NAME" \
+  --set region="$REGION" \
+  --set vpcId="$VPC_ID" \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller \
   --version 1.14.0
@@ -207,4 +294,5 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
 kubectl get deploy -n kube-system aws-load-balancer-controller
 kubectl get sa -n kube-system aws-load-balancer-controller
 kubectl get sa -n kube-system aws-load-balancer-controller -o yaml | grep role-arn
+kubectl get endpoints -n kube-system aws-load-balancer-webhook-service
 ```
