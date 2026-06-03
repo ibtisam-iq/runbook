@@ -234,6 +234,93 @@ kubectl get sa ebs-csi-controller-sa -n kube-system -o yaml | grep role-arn
 
 ---
 
+## Configure the Default StorageClass (gp2 → gp3)
+
+### Understand where `gp2` comes from
+
+After installing the EBS CSI driver, running `kubectl get sc` shows a `gp2` StorageClass that was never explicitly created:
+
+```text
+NAME   PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2    kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  68m
+```
+
+This StorageClass is created automatically by EKS during cluster bootstrapping. It uses the **in-tree** EBS provisioner (`kubernetes.io/aws-ebs`), which is built into the Kubernetes node itself and does not require any CSI driver. AWS shipped this as the cluster default up through EKS 1.29.
+
+This provisioner is deprecated. It does not support `gp3` volume types. To use `gp3`, create a new StorageClass backed by the modern CSI provisioner (`ebs.csi.aws.com`) and demote `gp2` from the default.
+
+### gp2 vs gp3
+
+| Feature | gp2 | gp3 |
+|---|---|---|
+| Provisioner | `kubernetes.io/aws-ebs` (in-tree, deprecated) | `ebs.csi.aws.com` (CSI, current standard) |
+| Price | $0.10/GiB-month | $0.08/GiB-month (20% cheaper) |
+| Baseline IOPS | 3 IOPS/GiB, minimum 100 (size-dependent) | 3,000 flat regardless of volume size |
+| Max IOPS | 16,000 | 16,000 |
+| Max throughput | 250 MiB/s | 1,000 MiB/s |
+| IOPS tuning | Tied to volume size | Independent of size |
+| `allowVolumeExpansion` | false (default) | true (configurable) |
+
+The critical gp2 trap: a 10 GiB gp2 volume gets only 30 IOPS. A 10 GiB gp3 volume gets 3,000 IOPS at no extra cost.
+
+### Create the gp3 StorageClass
+
+Apply the following manifest to create a gp3 StorageClass using the CSI provisioner:
+
+```bash
+cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+```
+
+| Field | Value | Reason |
+|---|---|---|
+| `provisioner` | `ebs.csi.aws.com` | Uses the modern CSI driver, not the deprecated in-tree driver. |
+| `parameters.type` | `gp3` | Selects the gp3 EBS volume type. |
+| `volumeBindingMode` | `WaitForFirstConsumer` | Delays volume creation until a pod is scheduled, ensuring the EBS volume is created in the same AZ as the pod. |
+| `allowVolumeExpansion` | `true` | Permits online volume resize without recreating the StorageClass later. |
+| `is-default-class` | `"true"` | Makes gp3 the default for any PVC that does not specify a StorageClass. |
+
+### Remove the default annotation from gp2
+
+```bash
+kubectl patch storageclass gp2 -p \
+  '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+```
+
+### Verify
+
+```bash
+kubectl get sc
+```
+
+Expect the following output:
+
+```text
+NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2             kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  80m
+gp3 (default)   ebs.csi.aws.com         Delete          WaitForFirstConsumer   true                   36s
+```
+
+!!! note
+    Leave `gp2` in place. Deleting it can break workloads that reference `storageClassName: gp2` explicitly. Only remove it after confirming no PVCs depend on it.
+
+Any new PVC that does not specify a `storageClassName` will now automatically provision a gp3 EBS volume with 3,000 IOPS baseline.
+
+---
+
 ## Troubleshoot common failures
 
 ### Fix `iam:PassRole` failures
@@ -279,6 +366,30 @@ aws eks describe-addon \
 kubectl get deploy -n kube-system | grep ebs-csi
 kubectl get sa -n kube-system | grep ebs-csi-controller-sa
 kubectl get storageclass
+```
+
+```bash
+# Migrate default StorageClass from gp2 to gp3
+cat <<EOF | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  fsType: ext4
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+EOF
+
+kubectl patch storageclass gp2 -p \
+  '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+
+kubectl get sc
 ```
 
 ### Fallback for `iam:PassRole` failures
