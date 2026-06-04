@@ -59,7 +59,7 @@ eksctl utils associate-iam-oidc-provider \
 Download the official IAM policy for the AWS Load Balancer Controller:
 
 ```bash
-curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.2/docs/install/iam_policy.json
+curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.14.1/docs/install/iam_policy.json
 ```
 
 Create a customer-managed IAM policy from this file:
@@ -237,7 +237,7 @@ eksctl utils associate-iam-oidc-provider \
   --cluster "$CLUSTER_NAME" \
   --approve
 
-curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.2/docs/install/iam_policy.json
+curl -O https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.14.1/docs/install/iam_policy.json
 
 aws iam create-policy \
   --policy-name AWSLoadBalancerControllerIAMPolicy \
