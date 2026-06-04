@@ -116,8 +116,7 @@ Install the addon with the role ARN:
 aws eks create-addon \
   --cluster-name $CLUSTER_NAME \
   --addon-name aws-ebs-csi-driver \
-  --service-account-role-arn $ROLE_ARN \
-  --configuration-values '{"defaultStorageClass":{"enabled":true}}'
+  --service-account-role-arn $ROLE_ARN
 ```
 
 This command installs the AWS-managed EBS CSI addon on the cluster and attach the previously created IAM role to the addon-managed ServiceAccount.
@@ -160,7 +159,6 @@ Run the addon installation without `--service-account-role-arn`:
 aws eks create-addon \
   --cluster-name $CLUSTER_NAME \
   --addon-name aws-ebs-csi-driver \
-  --configuration-values '{"defaultStorageClass":{"enabled":true}}' \
   --resolve-conflicts "OVERWRITE"
 ```
 
@@ -353,13 +351,14 @@ ROLE_ARN=$(aws iam get-role --role-name AmazonEKS_EBS_CSI_DriverRole --query "Ro
 aws eks create-addon \
   --cluster-name $CLUSTER_NAME \
   --addon-name aws-ebs-csi-driver \
-  --service-account-role-arn $ROLE_ARN \
-  --configuration-values '{"defaultStorageClass":{"enabled":true}}'
+  --service-account-role-arn $ROLE_ARN
 
 aws eks describe-addon \
   --cluster-name $CLUSTER_NAME \
   --addon-name aws-ebs-csi-driver \
   --query "addon.status"
+
+sleep 15
 
 kubectl get deploy -n kube-system | grep ebs-csi
 kubectl get sa -n kube-system | grep ebs-csi-controller-sa
@@ -396,7 +395,6 @@ kubectl get sc
 aws eks create-addon \
   --cluster-name $CLUSTER_NAME \
   --addon-name aws-ebs-csi-driver \
-  --configuration-values '{"defaultStorageClass":{"enabled":true}}' \
   --resolve-conflicts "OVERWRITE"
 
 kubectl annotate serviceaccount ebs-csi-controller-sa \
@@ -406,6 +404,8 @@ kubectl annotate serviceaccount ebs-csi-controller-sa \
 
 kubectl rollout restart deployment ebs-csi-controller -n kube-system
 kubectl rollout status deployment ebs-csi-controller -n kube-system
+
+sleep 15
 
 aws eks describe-addon \
   --cluster-name $CLUSTER_NAME \
