@@ -4,10 +4,6 @@
 
 This runbook documents a **verified, end-to-end workaround** for provisioning a fully functional EKS cluster with self-managed worker nodes on a **KodeKloud AWS playground lab account** — an environment where an AWS Organizations Service Control Policy (SCP) silently blocks several standard EKS operations.
 
-I wrote this after hitting every one of these restrictions in production lab sessions and working through each failure systematically. Nothing here is theoretical — every command, error message, and workaround has been confirmed on a live KodeKloud playground.
-
-**Target environment:** KodeKloud AWS playground labs only. Personal AWS accounts are not subject to these restrictions.
-
 **End state after following this runbook:**
 
 - Two SCP-compliant IAM roles (`eksClusterRole`, `eksNodeRole`) provisioned via Terraform
@@ -43,7 +39,7 @@ The full workflow has three phases. Understand the map before starting — the T
 | Phase | What it does | Sections below |
 | --- | --- | --- |
 | **Phase 1 — IAM Roles** | Create the two SCP-whitelisted IAM roles via Terraform | [Phase 1](#phase-1--create-scp-compliant-iam-roles-terraform-required) |
-| **Phase 2 — EKS Cluster** | Create the control plane (Console or eksctl) | [Create the EKS Cluster](#create-the-eks-cluster) |
+| **Phase 2 — EKS Cluster** | Create the control plane (Console or eksctl) | [Create the EKS Cluster](#phase-2--create-the-eks-cluster) |
 | **Phase 3 — Worker Nodes** | Provision self-managed AL2023 nodes via CloudFormation and join them | [Phase 3](#phase-3--self-managed-worker-nodes) Steps 1–6 |
 
 **Post-cluster add-ons** (optional, after nodes are `Ready`): [VPC CNI](#install-vpc-cni) · [EBS CSI Driver](#install-eks-ebs-csi-driver)
