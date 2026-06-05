@@ -5,7 +5,7 @@
     **Post-init — Final two manual steps** — Configures kubectl access for your user and installs a CNI plugin so nodes reach `Ready` state. The cluster is fully operational after this.
 
     **Prerequisite:** [Cluster Bootstrap](cluster-bootstrap.md) must be complete — `kubeadm init` must have succeeded.
-    **Next:** Cluster is ready. See [Maintenance & Reset](maintenance-and-reset.md) for teardown procedures.
+    **Next:** Cluster is ready. See [Maintenance & Reset](ref-maintenance-and-reset.md) for teardown procedures.
 
 ---
 

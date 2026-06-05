@@ -1,6 +1,6 @@
-# Install Kubernetes Tools
+# Install Kubernetes Client Tools
 
-Manual installation of the most commonly used Kubernetes CLI tools. Each section is a self-contained bash block — all commands with inline comments, ready to copy and run.
+Manual installation of the most commonly used Kubernetes CLI tools. Each section is a self-contained bash block — all commands with inline comments, ready to copy and paste.
 
 ---
 

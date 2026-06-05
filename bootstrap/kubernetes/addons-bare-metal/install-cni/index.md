@@ -33,7 +33,7 @@ choose Calico or Flannel upfront — it asks at the end.
 ## Prerequisites
 
 - A running Kubernetes cluster (`kubeadm init` completed successfully)
-- kubeconfig configured and `kubectl` working — see [Kubeconfig & CNI](../install-kubernetes-cluster/kubeconfig-and-cni.md)
+- kubeconfig configured and `kubectl` working — see [Kubeconfig & CNI](../../cluster-kubeadm/ref-kubeconfig-and-cni.md)
 - No CNI plugin currently installed (or a supported one — Calico or Flannel — that the dispatcher can clean up safely)
 - Running as root or via `sudo`
 

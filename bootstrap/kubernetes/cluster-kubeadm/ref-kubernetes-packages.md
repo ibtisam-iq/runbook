@@ -4,7 +4,7 @@
 !!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
     **Phases 5 & 6 of 9** — Installs kubelet and kubeadm on all nodes; kubectl, helm, and k9s on the control plane only.
 
-    **Prerequisite:** [Container Runtime](container-runtime.md) must be complete.
+    **Prerequisite:** [Container Runtime](ref-container-runtime.md) must be complete.
     **Next:** [Cluster Bootstrap](cluster-bootstrap.md) — run kubeadm init and join workers.
 
 ---

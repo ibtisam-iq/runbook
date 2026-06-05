@@ -4,8 +4,8 @@
 !!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
     **Phases 7, 8 & 9 of 9** — Detects existing cluster state, verifies service readiness, and runs `kubeadm init` to bring up the control plane.
 
-    **Prerequisite:** [Kubernetes Packages](kubernetes-packages.md) must be complete on all nodes.
-    **Next:** [Kubeconfig & CNI](kubeconfig-and-cni.md) — configure kubectl access and install a CNI plugin.
+    **Prerequisite:** [Kubernetes Packages](ref-kubernetes-packages.md) must be complete on all nodes.
+    **Next:** [Kubeconfig & CNI](ref-kubeconfig-and-cni.md) — configure kubectl access and install a CNI plugin.
 
 ---
 

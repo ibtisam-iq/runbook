@@ -18,7 +18,6 @@ scripts/kubernetes/
 ├── packages/        ← kubelet, kubeadm, kubectl, helm, k9s — with version pinning
 ├── cni/             ← Calico and Flannel installers
 ├── maintenance/     ← Reset scripts
-├── manifests/       ← KinD cluster YAML configurations
 └── lib/             ← Shared library: logging, remote execution, kubeconfig helpers
 ```
 
@@ -42,7 +41,7 @@ the worker entrypoint on each worker node.
 curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/create-kind-cluster.sh | bash
 ```
 
-See [KinD Local Cluster](kind-local-cluster.md) for full details.
+See [KinD Local Cluster](../cluster-kind/index.md) for full details.
 
 ---
 

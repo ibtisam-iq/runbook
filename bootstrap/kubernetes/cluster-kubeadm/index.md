@@ -107,26 +107,7 @@ kubectl get pods -A        # All system pods should be Running
 kubectl cluster-info
 ```
 
----
-
-## Local Development — KinD Cluster
-
-If you are on your laptop and Docker is already running, use the KinD path
-instead — no server required:
-
-```bash
-# curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/scripts/kubernetes/entrypoints/create-kind-cluster.sh | bash
-```
-
-Two cluster configurations are available:
-
-| Manifest | Topology | CNI | Best for |
-|---|---|---|---|
-| `kind-default.yaml` | 1 control plane + 1 worker | Flannel (built-in) | Quick local testing |
-| `kind-calico.yaml` | 2 control planes + 2 workers | Calico (manual post-install) | NetworkPolicy, HA topology testing |
-
-> **Prerequisites:** Docker Desktop or Docker Engine running locally, `kind`
-> CLI installed, `kubectl` installed.
+> For local development without a server, see [KinD Local Cluster](../cluster-kind/index.md) or [K3s Cluster](../cluster-k3s/index.md)
 
 ---
 
@@ -282,13 +263,12 @@ lib/             ← Shared library: logging, remote execution, kubeconfig helpe
 
 For a deep dive into what each script does, see the internal runbooks:
 
-- [Node Preparation](node-preparation.md)
-- [Container Runtime](container-runtime.md)
-- [Kubernetes Packages](kubernetes-packages.md)
+- [Node Preparation](ref-node-preparation.md)
+- [Container Runtime](ref-container-runtime.md)
+- [Kubernetes Packages](ref-kubernetes-packages.md)
 - [Cluster Bootstrap](cluster-bootstrap.md)
-- [Kubeconfig & CNI](kubeconfig-and-cni.md)
-- [Maintenance & Reset](maintenance-and-reset.md)
-- [KinD Local Cluster](kind-local-cluster.md)
+- [Kubeconfig & CNI](ref-kubeconfig-and-cni.md)
+- [Maintenance & Reset](ref-maintenance-and-reset.md)
 
 ---
 

@@ -1,0 +1,5 @@
+title: Gateway API
+nav:
+  - index.md
+  - NGINX Gateway Fabric: deploy-nginx-gateway-fabric.md
+  - Envoy Gateway:        deploy-envoy-gateway.md

@@ -4,8 +4,8 @@
 !!! abstract "Part of: [Install a Kubernetes Cluster with kubeadm](index.md)"
     **Phases 3 & 4 of 9** — Installs containerd, runc, crictl, and CNI plugin binaries on every node.
 
-    **Prerequisite:** [Node Preparation](node-preparation.md) must be complete.
-    **Next:** [Kubernetes Packages](kubernetes-packages.md) — install kubelet, kubeadm, and kubectl.
+    **Prerequisite:** [Node Preparation](ref-node-preparation.md) must be complete.
+    **Next:** [Kubernetes Packages](ref-kubernetes-packages.md) — install kubelet, kubeadm, and kubectl.
 
 ---
 
@@ -46,7 +46,7 @@ CNI plugin binaries and crictl.
     etc.) are the **low-level primitives** that CNI plugins like Calico and
     Flannel call internally. They are not the CNI plugin itself. The CNI plugin
     (Calico or Flannel) is installed separately after `kubeadm init` — see
-    [`kubeconfig-and-cni.md`](kubeconfig-and-cni.md).
+    [`kubeconfig-and-cni.md`](ref-kubeconfig-and-cni.md).
 
 **What the script does:**
 

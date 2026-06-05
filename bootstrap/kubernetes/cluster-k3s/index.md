@@ -1,6 +1,6 @@
 # K3s Cluster
 
-!!! abstract "Part of: [Install a Kubernetes Cluster](index.md)"
+!!! abstract ""
     **Alternative path — Lightweight Kubernetes via K3s** — Installs a fully functional Kubernetes cluster using K3s, a single-binary distribution from Rancher. Use this instead of the kubeadm flow when a minimal footprint and fast bootstrap are needed.
 
     **Prerequisite:** A Linux server with `systemd`. No prior Kubernetes tooling required.

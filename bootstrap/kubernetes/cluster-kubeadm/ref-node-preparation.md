@@ -5,7 +5,7 @@
     **Phase 2 of 9** — Prepares the Linux OS on every node before any Kubernetes component is installed.
 
     **Prerequisite:** Phase 1 (cluster parameters) must have been collected by the entrypoint script.
-    **Next:** [Container Runtime](container-runtime.md) — install containerd, runc, and crictl.
+    **Next:** [Container Runtime](ref-container-runtime.md) — install containerd, runc, and crictl.
 
 ---
 
