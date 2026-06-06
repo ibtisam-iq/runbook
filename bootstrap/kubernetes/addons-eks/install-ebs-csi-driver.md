@@ -397,6 +397,8 @@ aws eks create-addon \
   --addon-name aws-ebs-csi-driver \
   --resolve-conflicts "OVERWRITE"
 
+sleep 15
+
 kubectl annotate serviceaccount ebs-csi-controller-sa \
   -n kube-system \
   eks.amazonaws.com/role-arn=$ROLE_ARN \
