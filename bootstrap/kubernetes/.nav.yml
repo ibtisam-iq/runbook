@@ -15,3 +15,4 @@ nav:
       - AWS Load Balancer Controller: addons-eks/deploy-aws-load-balancer-controller.md
       - EBS CSI Driver: addons-eks/install-ebs-csi-driver.md
       - Prometheus Stack: addons-eks/deploy-kube-prometheus-stack.md
+      - Fluent Bit CloudWatch: addons-eks/deploy-fluent-bit-cloudwatch.md
