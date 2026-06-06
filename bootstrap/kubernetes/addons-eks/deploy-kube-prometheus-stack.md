@@ -139,6 +139,8 @@ grafana:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/certificate-arn: "${CERT_ARN}"
       alb.ingress.kubernetes.io/group.name: "${ALB_GROUP_NAME}"
+      alb.ingress.kubernetes.io/healthcheck-path: /api/health
+      alb.ingress.kubernetes.io/success-codes: "200"
     hosts:
       - "${GRAFANA_HOST}"
 EOF
@@ -190,6 +192,8 @@ prometheus:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/certificate-arn: "${CERT_ARN}"
       alb.ingress.kubernetes.io/group.name: "${ALB_GROUP_NAME}"
+      alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
+      alb.ingress.kubernetes.io/success-codes: "200"
     hosts:
       - "${PROMETHEUS_HOST}"
     paths:
@@ -344,7 +348,7 @@ printed above.
 
     ```yaml
     grafana:
-      adminPassword: "<your-password>"
+      adminPassword: "<password>"
     ```
 
     This replaces the auto-generated Secret. Do not commit plaintext passwords
@@ -483,6 +487,8 @@ grafana:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/certificate-arn: "${CERT_ARN}"
       alb.ingress.kubernetes.io/group.name: "${ALB_GROUP_NAME}"
+      alb.ingress.kubernetes.io/healthcheck-path: /api/health
+      alb.ingress.kubernetes.io/success-codes: "200"
     hosts:
       - "${GRAFANA_HOST}"
 EOF
@@ -500,6 +506,8 @@ prometheus:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/certificate-arn: "${CERT_ARN}"
       alb.ingress.kubernetes.io/group.name: "${ALB_GROUP_NAME}"
+      alb.ingress.kubernetes.io/healthcheck-path: /-/healthy
+      alb.ingress.kubernetes.io/success-codes: "200"
     hosts:
       - "${PROMETHEUS_HOST}"
     paths:
