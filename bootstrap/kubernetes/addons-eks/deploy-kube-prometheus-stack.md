@@ -1,5 +1,21 @@
 # Deploy kube-prometheus-stack on EKS
 
+## Official sources
+
+| Resource | URL |
+|---|---|
+| ArtifactHub (chart) | https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack |
+| GitHub (helm-charts) | https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack |
+| GitHub (prometheus-operator) | https://github.com/prometheus-operator/prometheus-operator |
+| Prometheus docs | https://prometheus.io/docs/introduction/overview/ |
+| Grafana Helm chart | https://github.com/grafana/helm-charts/tree/main/charts/grafana |
+
+Always check ArtifactHub for the latest chart version before installing.
+The `--version` flag in every command below pins the chart to a specific
+release; replace it with the current version if a newer one is available.
+
+---
+
 The **kube-prometheus-stack** Helm chart is the standard way to deploy a
 full Kubernetes monitoring stack in one release. It bundles:
 
@@ -86,7 +102,7 @@ Dump the full default values to understand what is available to override:
 
 ```bash
 helm show values prometheus-community/kube-prometheus-stack \
-  --version 79.7.1 > /tmp/kube-prometheus-stack-defaults.yaml
+  --version 86.2.0 > /tmp/kube-prometheus-stack-defaults.yaml
 ```
 
 !!! note
@@ -225,7 +241,7 @@ Install the chart, passing both rendered override files:
 ```bash
 helm upgrade --install prometheus-stack \
   prometheus-community/kube-prometheus-stack \
-  --version 79.7.1 \
+  --version 86.2.0 \
   --namespace monitoring \
   --create-namespace \
   -f helm-values/monitoring/grafana-values-rendered.yaml \
@@ -510,7 +526,7 @@ envsubst < helm-values/monitoring/prometheus-values.yaml \
 
 helm upgrade --install prometheus-stack \
   prometheus-community/kube-prometheus-stack \
-  --version 79.7.1 \
+  --version 86.2.0 \
   --namespace monitoring \
   --create-namespace \
   -f helm-values/monitoring/grafana-values-rendered.yaml \
