@@ -151,7 +151,7 @@ envsubst < helm-values/monitoring/grafana-values.yaml \
 | `listen-ports` | 80 + 443 | ALB listens on both so the redirect rule can fire |
 | `ssl-redirect: '443'` | `443` | ALB redirects all HTTP:80 requests to HTTPS:443 (301) |
 | `certificate-arn` | ACM ARN | Associates the ACM certificate — enables TLS at the ALB listener |
-| `group.name` | shared group | Multiple Ingress objects share one ALB; one rule is added per host |
+| `group.name` | shared group | Multiple Ingress objects share one ALB; one listener rule is added per host |
 
 ---
 
@@ -336,22 +336,31 @@ printed above.
 
 ---
 
-## What the shared ALB looks like after this step
+## How the shared ALB accumulates rules
 
-Because all Ingress objects share `group.name`, the single ALB accumulates
-one listener rule per host. After deploying the UI, Grafana, and Prometheus:
+The `alb.ingress.kubernetes.io/group.name` annotation causes the AWS Load
+Balancer Controller to add one HTTPS listener rule per Ingress object to a
+single shared ALB, rather than provisioning a separate ALB for each service.
+After applying this runbook, two new rules are added:
 
 ```
-ALB: <group-name> (single shared ALB)
+ALB: ${ALB_GROUP_NAME} (single shared ALB)
   HTTPS :443 listener rules:
-    Rule 1 → Host: <ui-host>          → UI pods (default namespace)
-    Rule 2 → Host: ${GRAFANA_HOST}    → Grafana pods (monitoring)
-    Rule 3 → Host: ${PROMETHEUS_HOST} → Prometheus pods (monitoring)
-    Rule 4 → Default                  → 404 fixed response
+    ...                              ← any rules already present from previously
+    ...                                deployed Ingress objects in this group
+    Rule N   → Host: ${GRAFANA_HOST}    → Grafana pods (monitoring namespace)
+    Rule N+1 → Host: ${PROMETHEUS_HOST} → Prometheus pods (monitoring namespace)
+    Default  → fixed 404 response
 
   HTTP :80 listener:
     → Redirect ALL to HTTPS :443 (301)
 ```
+
+!!! note
+    The exact rule numbers depend on how many Ingress objects were already
+    sharing this ALB group before this runbook was applied. Each previously
+    deployed Ingress using the same `group.name` occupies earlier rule slots.
+    The ALB console shows the complete ordered rule list.
 
 ---
 
@@ -409,8 +418,9 @@ kubectl get storageclass
 kubectl get deploy -n kube-system | grep ebs-csi
 ```
 
-If `gp3` is missing, follow the
-[EBS CSI driver runbook](./install-ebs-csi-driver.md) to create it.
+If `gp3` is missing, install the EBS CSI driver and create the `gp3`
+StorageClass following the steps in `install-ebs-csi-driver.md` in this
+directory.
 
 ### Ingress shows no address
 
