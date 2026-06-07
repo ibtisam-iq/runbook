@@ -392,7 +392,7 @@ kubectl get nodes
 # ip-192-168-88-246.ec2.internal    Ready    <none>   82s   v1.34.8-eks-3385e9b
 ```
 
-![EKS Cluster Resources with Self-Managed Nodes](https://raw.githubusercontent.com/ibtisam-iq/retail-store-sample-app/main/assets/02-eks-cluster-resources-self-managed-nodes.jpg)
+![EKS Cluster Resources with Self-Managed Nodes](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/assets/02-eks-cluster-resources-self-managed-nodes.png)
 
 ---
 
@@ -1089,7 +1089,7 @@ kubectl get ds -n amazon-cloudwatch
 | `/aws/containerinsights/ibtisam-iq-eks-cluster/host` | Node-level OS and kernel logs |
 | `/aws/lambda/orders-sqs-to-sns` | Lambda invocation logs |
 
-![CloudWatch Container Insights Log Groups](https://raw.githubusercontent.com/ibtisam-iq/retail-store-sample-app/main/assets/05-cloudwatch-container-insights-log-groups.jpg)
+![CloudWatch Container Insights Log Groups](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/assets/05-cloudwatch-container-insights-log-groups.png)
 
 ---
 
@@ -1113,7 +1113,7 @@ aws elbv2 describe-target-groups \
 
 All three target groups report `healthy` in the ALB console resource map.
 
-![ALB Resource Map and Target Groups](https://raw.githubusercontent.com/ibtisam-iq/retail-store-sample-app/main/assets/03-alb-resource-map-and-target-groups.jpg)
+![ALB Resource Map and Target Groups](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/assets/03-alb-resource-map-and-target-groups.png)
 
 ### Application
 
@@ -1127,7 +1127,7 @@ curl https://retail-microservices.ibtisam-iq.com
 
 Browser: `https://retail-microservices.ibtisam-iq.com` → **"The most public Secret Shop"** ✅
 
-![Retail Store Live over HTTPS](https://raw.githubusercontent.com/ibtisam-iq/retail-store-sample-app/main/assets/04-retail-store-live-over-https.jpg)
+![Retail Store Live over HTTPS](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/assets/04-retail-store-live-over-https.png)
 
 ### DNS Resolution
 
@@ -1159,4 +1159,4 @@ curl -Lv https://retail-microservices.ibtisam-iq.com 2>&1 | grep -E "subject|iss
 | `eksctl-...-iamserviceaccount-orders-orders` | 2026-06-06 23:48 | ✅ CREATE_COMPLETE |
 | `eksctl-...-iamserviceaccount-amazon-cloudwatch-fluent-bit` | 2026-06-07 01:17 | ✅ CREATE_COMPLETE |
 
-![CloudFormation EKS Cluster Stack - CREATE_COMPLETE](https://raw.githubusercontent.com/ibtisam-iq/retail-store-sample-app/main/assets/01-cloudformation-eks-cluster-stack-create-complete.jpg)
+![CloudFormation EKS Cluster Stack - CREATE_COMPLETE](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/assets/01-cloudformation-eks-cluster-stack-create-complete.png)
