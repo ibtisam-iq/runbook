@@ -1,6 +1,6 @@
 # Runbook
 
-[![Docs](https://github.com/ibtisam-iq/runbook/actions/workflows/deploy.yml/badge.svg)](https://github.com/ibtisam-iq/runbook/actions/workflows/deploy.yml)
+[![Docs](https://github.com/ibtisam-iq/runbook/actions/workflows/pages.yml/badge.svg)](https://github.com/ibtisam-iq/runbook/actions/workflows/pages.yml)
 [![Site](https://img.shields.io/badge/Live-runbook.ibtisam--iq.com-01696f)](https://runbook.ibtisam-iq.com)
 
 My documented steps from real implementation work — bare-metal infrastructure, DevSecOps pipelines, Kubernetes, cloud environments, and platform tooling.
