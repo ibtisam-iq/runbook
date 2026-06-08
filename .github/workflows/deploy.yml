@@ -70,6 +70,8 @@ jobs:
 
       - name: Build MkDocs site
         run: mkdocs build # --strict
+        env:
+          DISABLE_MKDOCS_2_WARNING: "true"
 
       # NOTE: html5validator removed — this repo is Markdown-only; HTML is generated
       # by MkDocs + Material theme. Validation failures were caused by theme internals
