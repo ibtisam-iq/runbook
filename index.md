@@ -6,7 +6,7 @@ title: Home
 
 **Documented steps from real infrastructure work - bare-metal servers, Kubernetes clusters, self-hosted platforms, and DevSecOps pipelines.**
 
-[![Docs](https://github.com/ibtisam-iq/runbook/actions/workflows/deploy.yml/badge.svg)](https://github.com/ibtisam-iq/runbook/actions/workflows/deploy.yml)
+[![Docs](https://github.com/ibtisam-iq/runbook/actions/workflows/pages.yml/badge.svg)](https://github.com/ibtisam-iq/runbook/actions/workflows/pages.yml)
 
 Every runbook here documents something that was actually run - the exact commands, the decision points, and the failures encountered before things worked. This is not a course, not a reference manual. It is what was learned by doing, written down immediately after the work was finished.
 
