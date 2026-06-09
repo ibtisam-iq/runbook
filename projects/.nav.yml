@@ -1,4 +1,5 @@
 title: Projects
 nav:
-  - retail-microservices-on-eks
+  - microservices-demo
+  - retail-store-sample-app
   
