@@ -1,4 +1,3 @@
 title: Static Site
 nav:
-  - index.md
-  - glob: "*"
+  - mkdocs

@@ -1,4 +1,3 @@
 title: Delivery
 nav:
-  - index.md
-  # - glob: "*"
+  - static-site
