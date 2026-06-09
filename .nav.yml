@@ -1,19 +1,12 @@
-nav:
-  - Home: index.md
-  - projects
-  - kubernetes
-  - linux
-  - containers
-  - networking
-  - cloud
-  - delivery
-  - iac
-  - observability
-  - security
-  - self-hosted
-  - storage
-  - bootstrap
-  # - incident-response
-  - workstation
-
-ignore_no_matches: true
+# awesome-nav root config.
+# Note: under `docs_dir: .` + same-dir, the root nav: block is ignored
+# (mkdocs-awesome-nav#130). Tab order lives in hooks/same_dir_fix.py.
+# This file only sets fallback inclusion + sort for unplaced items.
+ 
+append_unmatched: true   # include everything; inherited by child dirs
+ 
+sort:
+  type: natural
+  direction: asc
+  by: filename
+  ignore_case: true
