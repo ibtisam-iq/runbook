@@ -307,8 +307,8 @@ eksctl create cluster -f cluster.yaml
 ```bash
 # Step 2: Associate OIDC provider manually (no iam:PassRole triggered here)
 eksctl utils associate-iam-oidc-provider \
-  --cluster <cluster-name> \
-  --region <region> \
+  --cluster $CLUSTER_NAME \
+  --region $REGION \
   --approve
 ```
 
