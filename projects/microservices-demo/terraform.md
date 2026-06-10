@@ -1,6 +1,6 @@
 # Phase 2 — Terraform: EKS Infrastructure
 
-> **Status: Work in Progress** — `terraform apply` and post-provisioning steps will be added after execution.
+> **Status: Work in Progress** — `terraform apply` running. Post-provisioning steps will be added after completion.
 
 ---
 
@@ -14,7 +14,7 @@ It delivers a private EKS cluster inside a dedicated VPC, accessible only throug
 | Step 5 | VPC + public/private subnets | ✅ Written |
 | Step 6 | EKS cluster (private) + managed node group | ✅ Written |
 | Step 7 | Bastion host (kubectl/helm access) | ✅ Written |
-| Step 8 | `terraform init / plan / apply` | ⏳ Pending |
+| Step 8 | `terraform init / plan / apply` | 🟡 In Progress |
 
 ---
 
@@ -194,12 +194,61 @@ eks-terraform-validate:
 
 ---
 
+## Issues Encountered
+
+### 1. Security Group Description — Apostrophe Not Allowed
+
+**Error:**
+```
+"ingress.0.description" doesn't comply with restrictions
+("^[0-9A-Za-z_ .:/()#,@\[\]+=&;{}!$*-]*$"):
+"SSH from operator's current public IP"
+```
+
+**Fix:** Removed the apostrophe from the ingress description in `bastion.tf`:
+```
+"SSH from operators current public IP"
+```
+
+AWS Security Group descriptions do not allow single quotes.
+
+### 2. Deprecated Attribute — `data.aws_region.current.name`
+
+**Warning:**
+```
+name is deprecated. Use region instead.
+```
+
+**Fix:** Replaced all occurrences of `data.aws_region.current.name` with
+`data.aws_region.current.region` in `outputs.tf`.
+
+---
+
+## `terraform plan` Output
+
+```
+Plan: 69 to add, 0 to change, 0 to destroy.
+```
+
+| Output | Value |
+|---|---|
+| `aws_account_id` | `211125480533` |
+| `aws_region` | `us-east-1` |
+| `bastion_ami_id` | `ami-0b6d9d3d33ba97d99` |
+| `cluster_name` | `microservices-demo-eks` |
+| `kubeconfig_command` | `aws eks update-kubeconfig --region us-east-1 --name microservices-demo-eks` |
+| `vpc_cidr` | `10.0.0.0/16` |
+| `vpc_id` | (known after apply) |
+| `cluster_endpoint` | (known after apply) |
+| `bastion_public_ip` | (known after apply) |
+
+---
+
 ## ⏳ Pending — To Be Documented After Apply
 
-- [ ] Configure AWS CLI credentials / IAM role
-- [ ] Uncomment S3 backend (if using remote state)
-- [ ] `terraform init`
-- [ ] `terraform plan` — review output
+- [x] Configure AWS CLI credentials / IAM role
+- [x] `terraform init`
+- [x] `terraform plan` — clean, 69 resources
 - [ ] `terraform apply`
 - [ ] SSH into bastion: `ssh -i microservices-demo-bastion-key.pem ubuntu@<bastion-ip>`
 - [ ] Configure kubectl: `aws eks update-kubeconfig --region us-east-1 --name microservices-demo-eks`
