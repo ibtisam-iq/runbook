@@ -160,7 +160,75 @@ helmfile --version
 
 ---
 
-## 6. eksctl
+## 6. AWS CLI v2
+
+The official AWS command-line interface. AWS ships separate installer zips per architecture, so the download URL is constructed dynamically.
+
+```bash
+# Detect architecture
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ]  && AWS_ARCH="x86_64"
+[ "$ARCH" = "aarch64" ] && AWS_ARCH="aarch64"
+
+# Install unzip if not already present
+sudo apt-get install -y unzip
+
+# Download the architecture-specific installer
+curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o "awscliv2.zip"
+
+# Unzip and run the installer
+unzip -q awscliv2.zip
+sudo ./aws/install
+
+# Clean up
+rm -rf awscliv2.zip aws/
+
+# Verify
+aws --version
+```
+
+!!! note "Upgrading an existing install"
+    If AWS CLI is already installed and you want to upgrade in place, add the `--update` flag:
+    ```bash
+    sudo ./aws/install --update
+    ```
+
+### Configuration
+
+After installation, configure credentials and default settings. Run the interactive wizard:
+
+```bash
+aws configure
+```
+
+It will be prompted for four values.
+
+#### Named Profiles
+
+```bash
+# Create a named profile
+aws configure --profile <profile-name>
+
+# Use a named profile for any command
+aws s3 ls --profile <profile-name>
+
+# Set a profile as the active default for the current shell session
+export AWS_PROFILE=<profile-name>
+```
+
+#### Verify Configuration
+
+```bash
+# Confirm the active identity
+aws sts get-caller-identity
+
+# List all configured profiles
+aws configure list-profiles
+```
+
+---
+
+## 7. eksctl
 
 The official CLI for creating and managing Amazon EKS clusters.
 
@@ -200,5 +268,6 @@ helm version --short
 k9s version --short
 kustomize version
 helmfile --version
+aws --version
 eksctl version
 ```
