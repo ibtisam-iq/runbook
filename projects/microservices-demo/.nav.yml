@@ -1,3 +1,4 @@
 title: microservices-demo
 nav:
   - DevSecOps CI: ci.md
+  - Terraform EKS: terraform.md
