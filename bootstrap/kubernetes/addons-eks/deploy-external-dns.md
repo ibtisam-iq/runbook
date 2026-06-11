@@ -1,45 +1,83 @@
 # Deploy ExternalDNS on EKS
 
-Deploy ExternalDNS on an EKS cluster to automatically create and manage Route53 DNS records from Kubernetes `Gateway`, `HTTPRoute`, `Service`, and `Ingress` resources. When a `Gateway` receives an ALB address or a `Service` gets a `LoadBalancer` IP, ExternalDNS reads the hostname and writes the corresponding A or CNAME record in Route53.
+ExternalDNS automatically creates and manages Route53 DNS records from Kubernetes `Gateway`, `HTTPRoute`, `Service`, and `Ingress` resources. When a `Gateway` is assigned an ALB address or a `Service` receives a `LoadBalancer` hostname, ExternalDNS reads the declared hostname and writes the corresponding A or CNAME record in Route53 — no manual Route53 edits are needed after the initial setup.
 
-This runbook uses **Pod Identity** for IAM binding — not IRSA. The distinction matters for how the IAM role is created and how the Helm install is structured. Both methods produce the same end result (a pod with AWS credentials), but through completely different mechanisms.
-
-!!! note "Why Pod Identity instead of IRSA?"
-    | | IRSA | Pod Identity |
-    |---|---|---|
-    | **Pre-requisite component** | OIDC provider (usually already present) | `eks-pod-identity-agent` DaemonSet |
-    | **Binding lives in** | IAM trust policy + ServiceAccount annotation | EKS Pod Identity Association object |
-    | **ServiceAccount annotation needed** | `eks.amazonaws.com/role-arn: <ARN>` | None |
-    | **Helm `values.yaml` change for credentials** | Yes — must add `serviceAccount.annotations` | No — Helm install is plain |
-    | **eksctl command** | `eksctl create iamserviceaccount` | `eksctl create podidentityassociation` |
-    | **Introduced** | EKS 2019 | EKS 2023 (newer) |
-
-!!! note "Prerequisite"
-    The AWS Load Balancer Controller must already be running with Gateway API feature gates enabled, and the `Gateway` resource must already be provisioned before ExternalDNS can pick up hostnames from it. See the [Deploy AWS Load Balancer Controller](./deploy-aws-load-balancer-controller.md) and [Deploy Gateway API](./deploy-gateway-api.md) runbooks.
+This runbook uses **EKS Pod Identity** for IAM binding, not IRSA. The two methods accomplish the same goal — granting a pod AWS credentials at runtime — but through different mechanisms. Pod Identity requires no ServiceAccount annotation and no credential-related flags in the Helm install.
 
 ---
 
-## What ExternalDNS Does
+## Official Sources
+
+| Resource | URL |
+|---|---|
+| ExternalDNS GitHub | https://github.com/kubernetes-sigs/external-dns |
+| AWS tutorial (official) | https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md |
+| ArtifactHub (chart) | https://artifacthub.io/packages/helm/external-dns/external-dns |
+
+Always check ArtifactHub for the latest chart version before installing. The `--version` flag in every command below pins the chart to a specific release; replace it with the current version if a newer one is available.
+
+---
+
+## How ExternalDNS Works
 
 ```
 Gateway / HTTPRoute / Service
-  (hostname: app.example.com)
+  (hostname: app.example.com declared in spec)
           │
           ▼
     ExternalDNS pod
-    watches these resources
+    watches these resources via the Kubernetes API
           │
           ▼
     AWS Route53
-    creates / updates A or CNAME record:
+    CREATE / UPDATE A or CNAME record:
     app.example.com → <ALB DNS name>
 ```
 
-Without ExternalDNS, the ALB address is a long AWS-generated hostname. ExternalDNS is what maps your clean domain (`app.example.com`) to that address automatically, so you never have to touch Route53 manually after the first setup.
+ExternalDNS is a **read-and-sync agent**, not a proxy. It does not sit in the traffic path. It only reads hostnames from Kubernetes resources and writes DNS records to Route53. Route53 then resolves those hostnames to the ALB address so that traffic reaches the cluster.
 
 ---
 
-## Step 1: Set Variables
+## Prerequisites
+
+- An EKS cluster is running and `kubectl` is configured.
+- The AWS Load Balancer Controller is deployed with `NLBGatewayAPI=true` and `ALBGatewayAPI=true` feature gates enabled.
+- Gateway API CRDs are installed and a `Gateway` resource is provisioned.
+- A Route53 hosted zone exists for the target domain.
+- Helm is installed.
+- `eksctl` is installed.
+
+See [deploy-aws-load-balancer-controller.md](./deploy-aws-load-balancer-controller.md) and [deploy-gateway-api.md](./deploy-gateway-api.md) before proceeding.
+
+---
+
+## Deployment Overview
+
+The installation follows these steps in order:
+
+1. **Set variables** — export `CLUSTER_NAME` and `ACCOUNT_ID`.
+2. **Create the IAM policy** — `AllowExternalDNSUpdates` grants Route53 read/write permissions.
+3. **Install the Pod Identity Agent** — `eks-pod-identity-agent` DaemonSet; skip if already present on the cluster.
+4. **Create the namespace** — `external-dns` namespace scopes the Pod Identity Association.
+5. **Create the Pod Identity Association** — binds `external-dns` ServiceAccount in `external-dns` namespace to the IAM role; replaces the IRSA `iamserviceaccount` + annotation pattern entirely.
+6. **Install ExternalDNS via Helm** — plain install, no credential flags required.
+7. **Apply the Gateway API sources patch** — a thin override file adds `gateway-httproute` and related sources so ExternalDNS watches `HTTPRoute` and `Gateway` resources in addition to `Service` and `Ingress`.
+8. **Verify** — confirm the pod is running and Route53 records are being created.
+
+!!! note "Pod Identity vs IRSA — side-by-side"
+    | | IRSA | Pod Identity (this runbook) |
+    |---|---|---|
+    | **Pre-requisite component** | OIDC provider (cluster-level, usually already present) | `eks-pod-identity-agent` DaemonSet |
+    | **Binding lives in** | IAM trust policy + ServiceAccount annotation | EKS Pod Identity Association object |
+    | **ServiceAccount annotation** | `eks.amazonaws.com/role-arn: <ARN>` required | Not needed |
+    | **Helm install credential flag** | `--set serviceAccount.annotations...` required | Not needed |
+    | **eksctl command** | `eksctl create iamserviceaccount` | `eksctl create podidentityassociation` |
+    | **Trust principal in IAM role** | OIDC issuer URL | `pods.eks.amazonaws.com` |
+    | **Introduced** | EKS 2019 | EKS 2023 |
+
+---
+
+## Step 1 — Set Variables
 
 ```bash
 export CLUSTER_NAME=<eks-cluster-name>
@@ -49,15 +87,15 @@ export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 Verify:
 
 ```bash
-echo "CLUSTER_NAME: $CLUSTER_NAME"
-echo "ACCOUNT_ID:   $ACCOUNT_ID"
+echo "CLUSTER_NAME : $CLUSTER_NAME"
+echo "ACCOUNT_ID   : $ACCOUNT_ID"
 ```
 
 ---
 
-## Step 2: Create the IAM Policy
+## Step 2 — Create the IAM Policy
 
-Create the policy document. This grants ExternalDNS the minimum permissions it needs to read hosted zones and write DNS records in Route53:
+Create the policy document file:
 
 ```bash
 cat > policy.json << 'EOF'
@@ -89,7 +127,7 @@ cat > policy.json << 'EOF'
 EOF
 ```
 
-Create the policy in AWS IAM:
+Create the policy in IAM:
 
 ```bash
 aws iam create-policy \
@@ -97,35 +135,37 @@ aws iam create-policy \
   --policy-document file://policy.json
 ```
 
-Export the policy ARN for use in the next step:
+Export the ARN for use in Step 5:
 
 ```bash
 export POLICY_ARN=$(aws iam list-policies \
   --query 'Policies[?PolicyName==`AllowExternalDNSUpdates`].Arn' \
   --output text)
 
-echo "POLICY_ARN: $POLICY_ARN"
+echo "POLICY_ARN : $POLICY_ARN"
 ```
 
-!!! note "Policy permissions explained"
-    | Permission | Scope | Why |
+!!! note "Policy permissions"
+    | Permission | Scope | Purpose |
     |---|---|---|
-    | `route53:ChangeResourceRecordSets` | Hosted zones | Write A/CNAME records |
-    | `route53:ListResourceRecordSets` | Hosted zones | Read existing records to avoid duplicates |
-    | `route53:ListTagsForResources` | Hosted zones | Filter zones by tag if `--aws-zone-tag-filter` is used |
-    | `route53:ListHostedZones` | All (`*`) | Discover which hosted zones exist in the account |
+    | `route53:ChangeResourceRecordSets` | `hostedzone/*` | Create and update A/CNAME records |
+    | `route53:ListResourceRecordSets` | `hostedzone/*` | Read existing records to avoid duplicates |
+    | `route53:ListTagsForResources` | `hostedzone/*` | Filter zones by tag when `--aws-zone-tag-filter` is used |
+    | `route53:ListHostedZones` | `*` | Discover all hosted zones in the account |
 
 ---
 
-## Step 3: Install the Pod Identity Agent (if not already present)
+## Step 3 — Install the Pod Identity Agent
 
-Pod Identity requires an agent DaemonSet (`eks-pod-identity-agent`) running on every node. This agent intercepts pod startups and injects AWS credentials. Check whether it is already installed:
+Check whether the agent DaemonSet is already present:
 
 ```bash
 kubectl get daemonset -n kube-system eks-pod-identity-agent
 ```
 
-If the DaemonSet exists and is `READY`, skip to Step 4. If it is absent, install it as an EKS managed add-on:
+If the output shows a DaemonSet with `READY` matching `DESIRED`, skip to Step 4.
+
+If absent, install it as an EKS managed add-on:
 
 ```bash
 eksctl create addon \
@@ -133,7 +173,7 @@ eksctl create addon \
   --name eks-pod-identity-agent
 ```
 
-Verify the DaemonSet is running on all nodes:
+Verify all nodes have the agent running:
 
 ```bash
 kubectl get daemonset -n kube-system eks-pod-identity-agent
@@ -147,28 +187,24 @@ NAME                     DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE
 eks-pod-identity-agent   2         2         2       2            2
 ```
 
-!!! note "Why this is not needed for IRSA"
-    IRSA injects credentials via environment variables and a projected token volume directly into the pod spec — it is handled by the Kubernetes API server itself. Pod Identity requires an external agent running on the node to intercept and inject credentials at pod startup. That agent is what this step installs.
+!!! note
+    IRSA injects credentials via environment variables and a projected token volume directly into the pod spec — the Kubernetes API server handles this with no extra component. Pod Identity requires this agent DaemonSet on every node to intercept pod startups and inject credentials. This is the one additional component that IRSA-based runbooks (LBC, EBS CSI) do not require.
 
 ---
 
-## Step 4: Create the Namespace
+## Step 4 — Create the Namespace
 
 ```bash
 kubectl create namespace external-dns
 ```
 
-ExternalDNS will run in this namespace. The Pod Identity Association created in the next step is scoped to this exact namespace and ServiceAccount name.
+The Pod Identity Association in Step 5 is scoped to a specific namespace and ServiceAccount name. Both must match exactly what Helm creates at install time.
 
 ---
 
-## Step 5: Create the Pod Identity Association
+## Step 5 — Create the Pod Identity Association
 
-This single command replaces the entire IRSA flow (`eksctl create iamserviceaccount` + ServiceAccount annotation). It:
-
-1. Creates an IAM role named `external-dns-pod-identity-role` with `pods.eks.amazonaws.com` as the trust principal
-2. Attaches the `AllowExternalDNSUpdates` policy to that role
-3. Creates an EKS-level Pod Identity Association binding `external-dns` namespace + `external-dns` ServiceAccount → this role
+This single command replaces the entire IRSA sequence (`eksctl create iamserviceaccount` + ServiceAccount annotation). It creates the IAM role with `pods.eks.amazonaws.com` as the trust principal, attaches the policy, and registers the EKS-level binding in one operation:
 
 ```bash
 eksctl create podidentityassociation \
@@ -179,7 +215,7 @@ eksctl create podidentityassociation \
   --permission-policy-arns $POLICY_ARN
 ```
 
-Verify the association was created:
+Verify the association:
 
 ```bash
 eksctl get podidentityassociation \
@@ -188,7 +224,7 @@ eksctl get podidentityassociation \
 ```
 
 !!! note "IRSA equivalent for reference"
-    If this were IRSA, the equivalent command would be:
+    The IRSA equivalent of this step is:
     ```bash
     eksctl create iamserviceaccount \
       --cluster $CLUSTER_NAME \
@@ -199,26 +235,28 @@ eksctl get podidentityassociation \
       --override-existing-serviceaccounts \
       --approve
     ```
-    And then the Helm `values.yaml` would need:
+    With IRSA, the Helm install also requires an extra values block:
     ```yaml
     serviceAccount:
       annotations:
         eks.amazonaws.com/role-arn: arn:aws:iam::<ACCOUNT_ID>:role/external-dns-irsa-role
     ```
-    With Pod Identity, none of that annotation work is required.
+    Pod Identity requires neither the annotation nor any change to the Helm values for credentials.
 
 ---
 
-## Step 6: Install ExternalDNS with Helm
-
-Add the ExternalDNS Helm chart repository:
+## Step 6 — Add the Helm Repository
 
 ```bash
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 helm repo update external-dns
 ```
 
-Install the chart. No credential-related flags are needed — the Pod Identity Agent handles credential injection transparently at runtime:
+---
+
+## Step 7 — Install ExternalDNS
+
+Install the chart. No credential flags are required — the Pod Identity Agent injects AWS credentials into the pod transparently at startup:
 
 ```bash
 helm install external-dns external-dns/external-dns \
@@ -239,31 +277,28 @@ NAME                            READY   STATUS    RESTARTS   AGE
 external-dns-6f95d4687d-6tc2g   1/1     Running   0          94s
 ```
 
-!!! note "Compare with IRSA Helm install"
-    With IRSA, this same `helm install` would require an additional `--set` or `values.yaml` entry:
+!!! note "IRSA equivalent Helm install"
+    With IRSA, the install command would require an additional flag:
     ```bash
     helm install external-dns external-dns/external-dns \
       --namespace external-dns \
       --version 1.20.0 \
       --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=$ROLE_ARN
     ```
-    With Pod Identity, the install is plain — the agent injects credentials without the pod knowing anything about IAM.
+    With Pod Identity, the install above is complete as written.
 
 ---
 
-## Step 7: Add Gateway API Sources
+## Step 8 — Apply the Gateway API Sources Patch
 
-By default, ExternalDNS watches only `Service` and `Ingress` resources. This project uses Gateway API (`HTTPRoute`, `Gateway`), so the `sources` list must be extended.
+The chart default `sources` list contains only `service` and `ingress`. ExternalDNS ignores `HTTPRoute`, `TCPRoute`, `TLSRoute`, `UDPRoute`, and `Gateway` resources entirely unless those sources are explicitly added.
 
-Export the default values file for editing:
+Create a thin patch file that overrides only the `sources` key and leaves all other chart defaults untouched:
 
 ```bash
-helm show values external-dns/external-dns --version 1.20.0 > external-dns-values-1.20.0.yaml
-```
+mkdir -p helm-values/external-dns
 
-Edit the `sources` section in `external-dns-values-1.20.0.yaml`. Find the existing `sources` block and replace it with:
-
-```yaml
+cat <<'EOF' > helm-values/external-dns/sources-patch.yaml
 sources:
   - service
   - ingress
@@ -271,74 +306,74 @@ sources:
   - gateway-tlsroute
   - gateway-tcproute
   - gateway-udproute
+EOF
 ```
 
-Upgrade the Helm release to apply the updated values:
+Upgrade the release with the patch file:
 
 ```bash
 helm upgrade -i external-dns external-dns/external-dns \
-  -f external-dns-values-1.20.0.yaml \
   --namespace external-dns \
-  --version 1.20.0
+  --version 1.20.0 \
+  -f helm-values/external-dns/sources-patch.yaml
 ```
 
-Verify the pod restarted with the new config:
+Helm deep-merges the patch file with the chart defaults. Only the `sources` key is replaced; everything else remains at its chart default.
+
+Verify the pod restarted and the new sources are active:
 
 ```bash
 kubectl get pods -n external-dns
-kubectl logs -n external-dns deploy/external-dns | head -30
+kubectl logs -n external-dns deploy/external-dns | grep "sources"
 ```
 
-!!! note "Why Gateway API sources are not in the default values"
-    ExternalDNS was built before Gateway API existed. The default `sources` list (`service`, `ingress`) reflects the classic Kubernetes networking model. `gateway-httproute` and the other gateway sources are opt-in additions that tell ExternalDNS to also watch `HTTPRoute`, `TCPRoute`, `TLSRoute`, and `UDPRoute` objects and extract hostnames from them. Without adding these, ExternalDNS completely ignores all `Gateway` and `HTTPRoute` resources — no DNS records are created for your application hostnames.
+!!! note "Why Gateway API sources are not in chart defaults"
+    ExternalDNS predates the Gateway API. The default `sources` list reflects the classic Kubernetes networking model (`Service`, `Ingress`). The gateway sources are opt-in. Without this patch, ExternalDNS never reads hostnames from `HTTPRoute` or `Gateway` objects and no DNS records are created for Gateway API-based applications.
 
 ---
 
-## Step 8: Verify DNS Record Creation
+## Step 9 — Verify DNS Record Creation
 
-Check ExternalDNS logs to confirm it is reading hostnames and writing to Route53:
+Follow ExternalDNS logs and confirm it is detecting hostnames and issuing Route53 changes:
 
 ```bash
 kubectl logs -n external-dns deploy/external-dns --follow
 ```
 
-Look for log lines similar to:
+Look for lines similar to:
 
 ```text
 time="..." level=info msg="Desired change: CREATE app.example.com A [Id: /hostedzone/ZXXXXX]"
 time="..." level=info msg="2 record(s) in zone example.com. were successfully updated"
 ```
 
-Confirm the Route53 record exists in AWS:
+Confirm the record in Route53:
 
 ```bash
 aws route53 list-resource-record-sets \
-  --hosted-zone-id <YOUR_HOSTED_ZONE_ID> \
+  --hosted-zone-id <HOSTED_ZONE_ID> \
   --query "ResourceRecordSets[?Name=='app.example.com.']"
 ```
 
-Confirm DNS resolution from your machine:
+Confirm DNS resolution:
 
 ```bash
 nslookup app.example.com
-# or
 dig app.example.com
 ```
 
 ---
 
-## Comparison: ExternalDNS IAM Binding Methods
+## Upgrade
 
-| Step | IRSA method | Pod Identity method (this runbook) |
-|---|---|---|
-| **Create IAM policy** | Same — `aws iam create-policy` | Same — `aws iam create-policy` |
-| **OIDC provider needed** | ✅ Yes | ❌ No |
-| **Agent DaemonSet needed** | ❌ No | ✅ `eks-pod-identity-agent` |
-| **Create IAM role + binding** | `eksctl create iamserviceaccount` | `eksctl create podidentityassociation` |
-| **ServiceAccount annotation** | ✅ Required | ❌ Not needed |
-| **Helm `values.yaml` change for IAM** | ✅ Add `serviceAccount.annotations` | ❌ None |
-| **Helm `values.yaml` change for Gateway API** | ✅ Add gateway sources | ✅ Add gateway sources (same) |
-| **Credential injection mechanism** | Kubernetes API (projected token + env vars) | Node agent (intercepted at pod startup) |
+To upgrade to a newer chart version, re-run the upgrade command with the new version number. The patch file remains unchanged:
+
+```bash
+helm upgrade -i external-dns external-dns/external-dns \
+  --namespace external-dns \
+  --version <new-version> \
+  -f helm-values/external-dns/sources-patch.yaml
+```
 
 ---
 
@@ -381,8 +416,8 @@ export POLICY_ARN=$(aws iam list-policies \
   --output text)
 
 # Step 3: Pod Identity Agent (skip if already installed)
-eksctl create addon --cluster $CLUSTER_NAME --name eks-pod-identity-agent
 kubectl get daemonset -n kube-system eks-pod-identity-agent
+exsctl create addon --cluster $CLUSTER_NAME --name eks-pod-identity-agent
 
 # Step 4: Namespace
 kubectl create namespace external-dns
@@ -395,7 +430,9 @@ eksctl create podidentityassociation \
   --role-name external-dns-pod-identity-role \
   --permission-policy-arns $POLICY_ARN
 
-# Step 6: Helm install
+eksctl get podidentityassociation --cluster $CLUSTER_NAME --namespace external-dns
+
+# Steps 6 & 7: Helm install
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 helm repo update external-dns
 helm install external-dns external-dns/external-dns \
@@ -403,15 +440,25 @@ helm install external-dns external-dns/external-dns \
   --version 1.20.0
 kubectl get pods -n external-dns
 
-# Step 7: Add Gateway API sources
-helm show values external-dns/external-dns --version 1.20.0 > external-dns-values-1.20.0.yaml
-# Edit sources in external-dns-values-1.20.0.yaml (add gateway-httproute, gateway-tlsroute, etc.)
-helm upgrade -i external-dns external-dns/external-dns \
-  -f external-dns-values-1.20.0.yaml \
-  --namespace external-dns \
-  --version 1.20.0
+# Step 8: Gateway API sources patch
+mkdir -p helm-values/external-dns
 
-# Step 8: Verify
+cat <<'EOF' > helm-values/external-dns/sources-patch.yaml
+sources:
+  - service
+  - ingress
+  - gateway-httproute
+  - gateway-tlsroute
+  - gateway-tcproute
+  - gateway-udproute
+EOF
+
+helm upgrade -i external-dns external-dns/external-dns \
+  --namespace external-dns \
+  --version 1.20.0 \
+  -f helm-values/external-dns/sources-patch.yaml
+
+# Step 9: Verify
 kubectl get pods -n external-dns
-kubectl logs -n external-dns deploy/external-dns | head -30
+kubectl logs -n external-dns deploy/external-dns | head -40
 ```
