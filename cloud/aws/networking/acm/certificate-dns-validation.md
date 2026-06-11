@@ -118,7 +118,13 @@ echo "CNAME Name:  $CNAME_NAME"
 echo "CNAME Value: $CNAME_VALUE"
 ```
 
-Both are long randomised strings in the format `_<hash>.<domain>.`.
+ACM always returns both values with a trailing dot. Example output from a real
+certificate request for `ibtisam.qzz.io`:
+
+```
+CNAME Name:  _2dfb6fc829ca40151f533feb5aab4c86.ibtisam.qzz.io.
+CNAME Value: _cb393cd72cee9292c19b9bbc2b510185.jkddzztszm.acm-validations.aws.
+```
 
 !!! info "What ACM returns for apex vs subdomain"
     For an apex domain `ibtisam.qzz.io`:
@@ -135,8 +141,8 @@ Both are long randomised strings in the format `_<hash>.<domain>.`.
     CNAME Value: _xyz789qrs012.acm-validations.aws.
     ```
 
-    The structure is identical. The difference only matters when entering the
-    Name field in Cloudflare — not in Route 53.
+    The structure is identical. What to do with the trailing dot and domain
+    suffix depends entirely on which DNS provider receives the record.
 
 !!! warning "`describe-certificate` returns `null` for `ResourceRecord`"
     ACM has not yet generated the validation record. Wait 15 to 30 seconds and
@@ -178,25 +184,26 @@ aws route53 change-resource-record-sets \
   --change-batch file:///tmp/acm-validation.json
 ```
 
-!!! note "No trimming in Route 53 — ever"
-    Route 53 accepts the full FQDN exactly as ACM returns it, including the
-    trailing dot. This applies to both apex domains and subdomains. Pass
-    `$CNAME_NAME` and `$CNAME_VALUE` directly with no modification.
+!!! note "Route 53 accepts the trailing dot as-is"
+    Pass `$CNAME_NAME` and `$CNAME_VALUE` directly into the JSON with no
+    modification. Route 53 accepts the full FQDN including the trailing dot for
+    both apex domains and subdomains. No trimming of any kind is required.
 
 ### Option B: Cloudflare
 
 Log in to the Cloudflare dashboard, navigate to the domain, and go to
 **DNS > Records > Add record**.
 
-The Name field behaves differently from Route 53. The table below shows exactly
-what to enter for each case.
+Cloudflare does not auto-strip anything. Every character entered is stored
+exactly as typed. The table below shows what ACM returns and what must be
+entered manually in the Cloudflare UI for each case.
 
 | | Apex domain (`ibtisam.qzz.io`) | Subdomain (`rank.ibtisam.qzz.io`) |
 |---|---|---|
 | **ACM returns (Name)** | `_abc123.ibtisam.qzz.io.` | `_abc123.rank.ibtisam.qzz.io.` |
-| **Enter in Cloudflare Name field** | `_abc123.ibtisam.qzz.io` (trailing dot stripped automatically) | `_abc123.rank` (strip `.ibtisam.qzz.io.` suffix) |
+| **Enter in Cloudflare Name field** | `_abc123.ibtisam.qzz.io` (remove trailing dot manually) | `_abc123.rank` (remove `.ibtisam.qzz.io.` suffix and trailing dot manually) |
 | **ACM returns (Value)** | `_xyz789.acm-validations.aws.` | `_xyz789.acm-validations.aws.` |
-| **Enter in Cloudflare Target field** | `_xyz789.acm-validations.aws` (trailing dot stripped automatically) | `_xyz789.acm-validations.aws` (trailing dot stripped automatically) |
+| **Enter in Cloudflare Target field** | `_xyz789.acm-validations.aws` (remove trailing dot manually) | `_xyz789.acm-validations.aws` (remove trailing dot manually) |
 | **Proxy status** | DNS only (grey cloud) | DNS only (grey cloud) |
 
 !!! warning "Grey cloud is mandatory for the validation CNAME"
@@ -205,12 +212,12 @@ what to enter for each case.
     actual CNAME value. The certificate stays in `PENDING_VALIDATION`
     indefinitely.
 
-!!! info "Why the Name field differs between Route 53 and Cloudflare"
-    Route 53 stores records relative to the hosted zone and accepts the full
-    FQDN. Cloudflare's UI expects only the part relative to the zone root; it
-    appends the apex domain internally. For a subdomain certificate this means
-    stripping the apex domain suffix from the Name before saving. Both providers
-    result in the same DNS record on the wire.
+!!! info "Why Route 53 and Cloudflare differ"
+    Route 53 is operated via the AWS CLI which handles FQDN notation natively.
+    Cloudflare's dashboard UI stores exactly what is typed — nothing is stripped
+    or appended automatically. For a subdomain, Cloudflare also appends the zone
+    root internally, so the apex domain suffix in the Name must be removed before
+    saving, otherwise the record is created with the full domain duplicated.
 
 ---
 
@@ -287,7 +294,8 @@ dig CNAME "$CNAME_NAME" @8.8.8.8 +short
 ```
 
 For Cloudflare: confirm the record is set to **DNS only** (grey cloud), not
-proxied (orange cloud).
+proxied (orange cloud). Also confirm no trailing dot and no apex suffix appears
+in the stored Name field.
 
 **`wait certificate-validated` exits with a non-zero code**
 
@@ -323,7 +331,7 @@ CERT_ARN=$(aws acm request-certificate \
 
 echo "Certificate ARN: $CERT_ARN"
 
-# Retrieve the validation CNAME name and value
+# Retrieve the validation CNAME name and value (ACM returns both with a trailing dot)
 sleep 10
 
 CNAME_NAME=$(aws acm describe-certificate \
@@ -342,9 +350,8 @@ echo "CNAME Name:  $CNAME_NAME"
 echo "CNAME Value: $CNAME_VALUE"
 ```
 
-If DNS is on **Route 53**, capture the hosted zone ID and inject the record.
-Pass `$CNAME_NAME` and `$CNAME_VALUE` as-is — no trimming required for apex or
-subdomain.
+If DNS is on **Route 53**, pass values as-is. Route 53 accepts the trailing dot
+natively — no trimming required for apex or subdomain.
 
 ```bash
 # Capture hosted zone ID (Route 53 only)
@@ -352,7 +359,7 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
   --query "HostedZones[?Name=='${DOMAIN}.'].Id" \
   --output text | cut -d'/' -f3)
 
-# Inject the validation CNAME into Route 53
+# Inject the validation CNAME into Route 53 (trailing dot in $CNAME_NAME is fine)
 cat > /tmp/acm-validation.json <<EOF
 {
   "Changes": [
@@ -374,9 +381,9 @@ aws route53 change-resource-record-sets \
   --change-batch file:///tmp/acm-validation.json
 ```
 
-If DNS is on **Cloudflare**, add the record manually in the Cloudflare dashboard
-(DNS only, grey cloud). For a subdomain certificate, strip the apex domain suffix
-from the Name field — see the provider table in the runbook above.
+If DNS is on **Cloudflare**, add the record manually in the dashboard (DNS only,
+grey cloud). Remove the trailing dot from both Name and Target. For a subdomain
+certificate, also remove the apex domain suffix from the Name field.
 
 ```bash
 # Wait for ACM to detect the CNAME and issue the certificate
