@@ -26,7 +26,7 @@ This runbook covers the following steps in order:
 
 The DNS provider step varies. Follow the Route 53 path if the hosted zone lives
 in Route 53. Follow the Cloudflare path if the domain is managed on Cloudflare.
-The CNAME record handling differs between the two — particularly for subdomains.
+The CNAME Name field is handled differently between the two providers.
 
 ---
 
@@ -120,21 +120,23 @@ echo "CNAME Value: $CNAME_VALUE"
 
 Both are long randomised strings in the format `_<hash>.<domain>.`.
 
-!!! info "What these values look like"
-    For `ibtisam.qzz.io` the output resembles:
+!!! info "What ACM returns for apex vs subdomain"
+    For an apex domain `ibtisam.qzz.io`:
 
     ```
     CNAME Name:  _abc123def456.ibtisam.qzz.io.
     CNAME Value: _xyz789qrs012.acm-validations.aws.
     ```
 
-    For a subdomain such as `retail-microservices.ibtisam-iq.com` the Name
-    carries the full FQDN:
+    For a subdomain `rank.ibtisam.qzz.io`:
 
     ```
-    CNAME Name:  _abc123def456.retail-microservices.ibtisam-iq.com.
+    CNAME Name:  _abc123def456.rank.ibtisam.qzz.io.
     CNAME Value: _xyz789qrs012.acm-validations.aws.
     ```
+
+    The structure is identical. The difference only matters when entering the
+    Name field in Cloudflare — not in Route 53.
 
 !!! warning "`describe-certificate` returns `null` for `ResourceRecord`"
     ACM has not yet generated the validation record. Wait 15 to 30 seconds and
@@ -157,7 +159,7 @@ cat > /tmp/acm-validation.json <<EOF
 {
   "Changes": [
     {
-      "Action": "CREATE",
+      "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "${CNAME_NAME}",
         "Type": "CNAME",
@@ -176,56 +178,39 @@ aws route53 change-resource-record-sets \
   --change-batch file:///tmp/acm-validation.json
 ```
 
-!!! tip "Idempotent re-runs"
-    If this command is run a second time it fails with `InvalidChangeBatch`
-    because the record already exists. Switch `CREATE` to `UPSERT` in the JSON
-    to make subsequent runs safe.
-
-Route 53 accepts the full FQDN (including trailing dot) as the record name.
-No trimming is needed.
+!!! note "No trimming in Route 53 — ever"
+    Route 53 accepts the full FQDN exactly as ACM returns it, including the
+    trailing dot. This applies to both apex domains and subdomains. Pass
+    `$CNAME_NAME` and `$CNAME_VALUE` directly with no modification.
 
 ### Option B: Cloudflare
 
 Log in to the Cloudflare dashboard, navigate to the domain, and go to
 **DNS > Records > Add record**.
 
-**For an apex domain or when the CNAME name is within the zone root:**
+The Name field behaves differently from Route 53. The table below shows exactly
+what to enter for each case.
 
-| Field | Value |
-|---|---|
-| Type | `CNAME` |
-| Name | Full value of `$CNAME_NAME` (trailing dot stripped by Cloudflare automatically) |
-| Target | Full value of `$CNAME_VALUE` (trailing dot stripped automatically) |
-| Proxy status | **DNS only (grey cloud)** |
-
-**For a subdomain certificate (e.g. `retail-microservices.ibtisam-iq.com`):**
-
-ACM returns a `Name` such as:
-
-```
-_abc123def456.retail-microservices.ibtisam-iq.com.
-```
-
-Cloudflare's Name field expects only the subdomain-relative part, not the full
-FQDN. Strip the apex domain suffix before entering the value.
-
-| Field | Value |
-|---|---|
-| Type | `CNAME` |
-| Name | `_abc123def456.retail-microservices` (remove `.ibtisam-iq.com.` suffix) |
-| Target | `_xyz789qrs012.acm-validations.aws` (trailing dot stripped automatically) |
-| Proxy status | **DNS only (grey cloud)** |
+| | Apex domain (`ibtisam.qzz.io`) | Subdomain (`rank.ibtisam.qzz.io`) |
+|---|---|---|
+| **ACM returns (Name)** | `_abc123.ibtisam.qzz.io.` | `_abc123.rank.ibtisam.qzz.io.` |
+| **Enter in Cloudflare Name field** | `_abc123.ibtisam.qzz.io` (trailing dot stripped automatically) | `_abc123.rank` (strip `.ibtisam.qzz.io.` suffix) |
+| **ACM returns (Value)** | `_xyz789.acm-validations.aws.` | `_xyz789.acm-validations.aws.` |
+| **Enter in Cloudflare Target field** | `_xyz789.acm-validations.aws` (trailing dot stripped automatically) | `_xyz789.acm-validations.aws` (trailing dot stripped automatically) |
+| **Proxy status** | DNS only (grey cloud) | DNS only (grey cloud) |
 
 !!! warning "Grey cloud is mandatory for the validation CNAME"
-    Set proxy status to **DNS only** on this record. If the record is orange
-    (proxied), Cloudflare rewrites the DNS response and ACM cannot read the
+    Set proxy status to **DNS only** on this record. If the record is proxied
+    (orange cloud), Cloudflare rewrites the DNS response and ACM cannot read the
     actual CNAME value. The certificate stays in `PENDING_VALIDATION`
     indefinitely.
 
 !!! info "Why the Name field differs between Route 53 and Cloudflare"
     Route 53 stores records relative to the hosted zone and accepts the full
-    FQDN. Cloudflare's UI expects only the subdomain-relative label; it appends
-    the apex domain internally. Both result in the same DNS record on the wire.
+    FQDN. Cloudflare's UI expects only the part relative to the zone root; it
+    appends the apex domain internally. For a subdomain certificate this means
+    stripping the apex domain suffix from the Name before saving. Both providers
+    result in the same DNS record on the wire.
 
 ---
 
@@ -358,6 +343,8 @@ echo "CNAME Value: $CNAME_VALUE"
 ```
 
 If DNS is on **Route 53**, capture the hosted zone ID and inject the record.
+Pass `$CNAME_NAME` and `$CNAME_VALUE` as-is — no trimming required for apex or
+subdomain.
 
 ```bash
 # Capture hosted zone ID (Route 53 only)
@@ -388,8 +375,8 @@ aws route53 change-resource-record-sets \
 ```
 
 If DNS is on **Cloudflare**, add the record manually in the Cloudflare dashboard
-(DNS only, grey cloud). For a subdomain certificate, strip the apex domain
-suffix from the Name field before saving.
+(DNS only, grey cloud). For a subdomain certificate, strip the apex domain suffix
+from the Name field — see the provider table in the runbook above.
 
 ```bash
 # Wait for ACM to detect the CNAME and issue the certificate
