@@ -2,21 +2,31 @@
 
 !!! abstract ""
     **TLS certificate provisioning** — Requests a public certificate from ACM
-    for an apex domain and its wildcard, injects the DNS validation CNAME record
-    into Route 53, and waits for ACM to confirm ownership and issue the
-    certificate. Once issued, ACM auto-renews the certificate before expiry
-    without further intervention.
+    for a domain, injects the DNS validation CNAME record into the authoritative
+    DNS provider, and waits for ACM to confirm ownership and issue the certificate.
+    Once issued, ACM auto-renews the certificate before expiry without further
+    intervention.
 
-    **Prerequisite:** A Route 53 public hosted zone must exist for the domain
-    and NS delegation must be active. See
-    [Create a Public Hosted Zone](../route53/create-hosted-zone.md).
+    **Prerequisite:** AWS CLI configured with credentials that carry
+    `acm:RequestCertificate`, `acm:DescribeCertificate`, and
+    `route53:ChangeResourceRecordSets` permissions. The domain must resolve
+    publicly — NS delegation must be active before ACM can validate.
 
 ---
 
-ACM validates domain ownership by checking for a specific CNAME record in the
-domain's authoritative DNS. The CNAME name and value are unique per certificate
-request and are provided by ACM after the request is submitted. Adding this
-record to Route 53 is what triggers validation and certificate issuance.
+## Workflow Overview
+
+This runbook covers the following steps in order:
+
+- Request the ACM certificate for the target domain
+- Retrieve the CNAME name and value ACM generates for DNS validation
+- Add the CNAME record to the authoritative DNS provider (Route 53 or Cloudflare)
+- Wait for ACM to detect the record and issue the certificate
+- Confirm the issued status
+
+The DNS provider step varies. Follow the Route 53 path if the hosted zone lives
+in Route 53. Follow the Cloudflare path if the domain is managed on Cloudflare.
+The CNAME record handling differs between the two — particularly for subdomains.
 
 ---
 
@@ -24,8 +34,19 @@ record to Route 53 is what triggers validation and certificate issuance.
 
 ```bash
 DOMAIN="ibtisam.qzz.io"
-REGION="us-east-1"   # Use us-east-1 for CloudFront; any region works for ALB
+REGION="us-east-1"   # Use us-east-1 for CloudFront; match service region for ALB
+```
 
+!!! warning "Region matters for CloudFront"
+    CloudFront only accepts ACM certificates from `us-east-1`. For ALB or API
+    Gateway, request the certificate in the same region as the service. Requesting
+    in the wrong region means the certificate will not appear in the service's
+    certificate picker and cannot be attached.
+
+If the validation record will be injected into Route 53, capture the hosted zone
+ID now.
+
+```bash
 HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
   --query "HostedZones[?Name=='${DOMAIN}.'].Id" \
   --output text | cut -d'/' -f3)
@@ -33,11 +54,7 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
 echo "Hosted Zone ID: $HOSTED_ZONE_ID"
 ```
 
-!!! warning "Region matters for CloudFront"
-    CloudFront only accepts ACM certificates from `us-east-1`. For ALB or API
-    Gateway, request the certificate in the same region as the service. Requesting
-    in the wrong region means the certificate will not appear in the service's
-    certificate dropdown and cannot be attached.
+Skip the `HOSTED_ZONE_ID` step entirely if using Cloudflare.
 
 ---
 
@@ -60,6 +77,11 @@ echo "Certificate ARN: $CERT_ARN"
 The certificate is created in `PENDING_VALIDATION` state. It stays there until
 the DNS CNAME record is added and ACM can verify it.
 
+!!! note "One CNAME covers both apex and wildcard"
+    ACM issues a single CNAME validation record that satisfies both
+    `ibtisam.qzz.io` and `*.ibtisam.qzz.io`. Only one record needs to be added
+    to the DNS provider.
+
 ---
 
 ## Retrieve the Validation CNAME
@@ -77,11 +99,9 @@ aws acm describe-certificate \
   --output table
 ```
 
-Copy the `Name` and `Value` fields. Both are long, randomised strings in the
-format `_<hash>.<domain>.`.
+Capture `Name` and `Value` into variables.
 
 ```bash
-# Assign them to variables for use in the next step
 CNAME_NAME=$(aws acm describe-certificate \
   --certificate-arn "$CERT_ARN" \
   --region "$REGION" \
@@ -98,16 +118,39 @@ echo "CNAME Name:  $CNAME_NAME"
 echo "CNAME Value: $CNAME_VALUE"
 ```
 
-!!! note "One CNAME covers both apex and wildcard"
-    ACM issues a single CNAME validation record that satisfies both
-    `ibtisam.qzz.io` and `*.ibtisam.qzz.io`. Only one record needs to be added
-    to Route 53.
+Both are long randomised strings in the format `_<hash>.<domain>.`.
+
+!!! info "What these values look like"
+    For `ibtisam.qzz.io` the output resembles:
+
+    ```
+    CNAME Name:  _abc123def456.ibtisam.qzz.io.
+    CNAME Value: _xyz789qrs012.acm-validations.aws.
+    ```
+
+    For a subdomain such as `retail-microservices.ibtisam-iq.com` the Name
+    carries the full FQDN:
+
+    ```
+    CNAME Name:  _abc123def456.retail-microservices.ibtisam-iq.com.
+    CNAME Value: _xyz789qrs012.acm-validations.aws.
+    ```
+
+!!! warning "`describe-certificate` returns `null` for `ResourceRecord`"
+    ACM has not yet generated the validation record. Wait 15 to 30 seconds and
+    retry. This can happen when `describe-certificate` is called immediately after
+    `request-certificate`.
 
 ---
 
-## Add the Validation Record to Route 53
+## Add the Validation CNAME to DNS
 
-Inject the CNAME into the hosted zone.
+The CNAME record must be added to whichever DNS provider is currently
+authoritative for the domain. Choose the path that applies.
+
+### Option A: Route 53
+
+Inject the CNAME directly into the hosted zone using the AWS CLI.
 
 ```bash
 cat > /tmp/acm-validation.json <<EOF
@@ -134,9 +177,55 @@ aws route53 change-resource-record-sets \
 ```
 
 !!! tip "Idempotent re-runs"
-    If the command is run a second time, it fails with `InvalidChangeBatch`
+    If this command is run a second time it fails with `InvalidChangeBatch`
     because the record already exists. Switch `CREATE` to `UPSERT` in the JSON
     to make subsequent runs safe.
+
+Route 53 accepts the full FQDN (including trailing dot) as the record name.
+No trimming is needed.
+
+### Option B: Cloudflare
+
+Log in to the Cloudflare dashboard, navigate to the domain, and go to
+**DNS > Records > Add record**.
+
+**For an apex domain or when the CNAME name is within the zone root:**
+
+| Field | Value |
+|---|---|
+| Type | `CNAME` |
+| Name | Full value of `$CNAME_NAME` (trailing dot stripped by Cloudflare automatically) |
+| Target | Full value of `$CNAME_VALUE` (trailing dot stripped automatically) |
+| Proxy status | **DNS only (grey cloud)** |
+
+**For a subdomain certificate (e.g. `retail-microservices.ibtisam-iq.com`):**
+
+ACM returns a `Name` such as:
+
+```
+_abc123def456.retail-microservices.ibtisam-iq.com.
+```
+
+Cloudflare's Name field expects only the subdomain-relative part, not the full
+FQDN. Strip the apex domain suffix before entering the value.
+
+| Field | Value |
+|---|---|
+| Type | `CNAME` |
+| Name | `_abc123def456.retail-microservices` (remove `.ibtisam-iq.com.` suffix) |
+| Target | `_xyz789qrs012.acm-validations.aws` (trailing dot stripped automatically) |
+| Proxy status | **DNS only (grey cloud)** |
+
+!!! warning "Grey cloud is mandatory for the validation CNAME"
+    Set proxy status to **DNS only** on this record. If the record is orange
+    (proxied), Cloudflare rewrites the DNS response and ACM cannot read the
+    actual CNAME value. The certificate stays in `PENDING_VALIDATION`
+    indefinitely.
+
+!!! info "Why the Name field differs between Route 53 and Cloudflare"
+    Route 53 stores records relative to the hosted zone and accepts the full
+    FQDN. Cloudflare's UI expects only the subdomain-relative label; it appends
+    the apex domain internally. Both result in the same DNS record on the wire.
 
 ---
 
@@ -153,8 +242,8 @@ echo "Certificate issued."
 ```
 
 The waiter polls every 60 seconds with a maximum of 40 attempts (40 minutes
-total). In practice, issuance takes 2 to 5 minutes once NS delegation is
-full propagated.
+total). In practice, issuance takes 2 to 5 minutes once the CNAME is present
+and NS delegation is fully propagated.
 
 Confirm the final status.
 
@@ -174,13 +263,13 @@ certificate is valid and ready to attach.
 ## Auto-Renewal
 
 ACM renews DNS-validated certificates automatically. The CNAME record added to
-Route 53 remains in place permanently. ACM queries it 60 days before expiry to
-renew the certificate without any manual step.
+the DNS provider remains in place permanently. ACM queries it 60 days before
+expiry to renew without any manual step.
 
 !!! warning "Do not delete the validation CNAME"
-    Removing the validation CNAME from Route 53 breaks auto-renewal. The next
-    renewal attempt will fail and the certificate will eventually expire. Leave
-    the record in place for the lifetime of the certificate.
+    Removing the validation CNAME breaks auto-renewal. The next renewal attempt
+    will fail and the certificate will eventually expire. Leave the record in
+    place for the lifetime of the certificate — on both Route 53 and Cloudflare.
 
 ---
 
@@ -194,10 +283,10 @@ Check whether NS delegation is complete.
 dig NS "$DOMAIN" @8.8.8.8 +short
 ```
 
-If Cloudflare nameservers are still returned, propagation has not finished.
-ACM cannot find the CNAME because Route 53 is not yet authoritative.
+If the old nameservers are still returned, propagation has not finished. ACM
+cannot find the CNAME because Route 53 is not yet authoritative.
 
-Verify the CNAME record was actually added to Route 53.
+Verify the CNAME record is present in Route 53.
 
 ```bash
 aws route53 list-resource-record-sets \
@@ -206,17 +295,14 @@ aws route53 list-resource-record-sets \
   --output table
 ```
 
-Confirm the CNAME is resolvable from the public internet.
+Confirm the CNAME resolves publicly.
 
 ```bash
 dig CNAME "$CNAME_NAME" @8.8.8.8 +short
 ```
 
-**`describe-certificate` returns `null` for `ResourceRecord`**
-
-ACM has not yet generated the validation record. Wait 15 to 30 seconds and
-retry. This can happen when `describe-certificate` is called immediately after
-`request-certificate`.
+For Cloudflare: confirm the record is set to **DNS only** (grey cloud), not
+proxied (orange cloud).
 
 **`wait certificate-validated` exits with a non-zero code**
 
@@ -227,4 +313,96 @@ presence using the steps above, then re-run the waiter.
 aws acm wait certificate-validated \
   --certificate-arn "$CERT_ARN" \
   --region "$REGION"
+```
+
+---
+
+## Quick Reference
+
+Copy and run the setup block. Then choose the DNS injection block that matches
+the authoritative provider. Finish with the verification block.
+
+```bash
+# Set variables
+DOMAIN="ibtisam.qzz.io"
+REGION="us-east-1"
+
+# Request the certificate
+CERT_ARN=$(aws acm request-certificate \
+  --domain-name "$DOMAIN" \
+  --subject-alternative-names "*.${DOMAIN}" \
+  --validation-method DNS \
+  --region "$REGION" \
+  --query "CertificateArn" \
+  --output text)
+
+echo "Certificate ARN: $CERT_ARN"
+
+# Retrieve the validation CNAME name and value
+sleep 10
+
+CNAME_NAME=$(aws acm describe-certificate \
+  --certificate-arn "$CERT_ARN" \
+  --region "$REGION" \
+  --query "Certificate.DomainValidationOptions[0].ResourceRecord.Name" \
+  --output text)
+
+CNAME_VALUE=$(aws acm describe-certificate \
+  --certificate-arn "$CERT_ARN" \
+  --region "$REGION" \
+  --query "Certificate.DomainValidationOptions[0].ResourceRecord.Value" \
+  --output text)
+
+echo "CNAME Name:  $CNAME_NAME"
+echo "CNAME Value: $CNAME_VALUE"
+```
+
+If DNS is on **Route 53**, capture the hosted zone ID and inject the record.
+
+```bash
+# Capture hosted zone ID (Route 53 only)
+HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
+  --query "HostedZones[?Name=='${DOMAIN}.'].Id" \
+  --output text | cut -d'/' -f3)
+
+# Inject the validation CNAME into Route 53
+cat > /tmp/acm-validation.json <<EOF
+{
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "${CNAME_NAME}",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [ { "Value": "${CNAME_VALUE}" } ]
+      }
+    }
+  ]
+}
+EOF
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id "$HOSTED_ZONE_ID" \
+  --change-batch file:///tmp/acm-validation.json
+```
+
+If DNS is on **Cloudflare**, add the record manually in the Cloudflare dashboard
+(DNS only, grey cloud). For a subdomain certificate, strip the apex domain
+suffix from the Name field before saving.
+
+```bash
+# Wait for ACM to detect the CNAME and issue the certificate
+aws acm wait certificate-validated \
+  --certificate-arn "$CERT_ARN" \
+  --region "$REGION"
+
+echo "Certificate issued."
+
+# Confirm issued status
+aws acm describe-certificate \
+  --certificate-arn "$CERT_ARN" \
+  --region "$REGION" \
+  --query "Certificate.{Status:Status,NotAfter:NotAfter,DomainName:DomainName}" \
+  --output table
 ```
