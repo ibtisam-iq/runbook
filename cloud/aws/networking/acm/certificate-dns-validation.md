@@ -29,6 +29,8 @@ REGION="us-east-1"   # Use us-east-1 for CloudFront; any region works for ALB
 HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
   --query "HostedZones[?Name=='${DOMAIN}.'].Id" \
   --output text | cut -d'/' -f3)
+
+echo "Hosted Zone ID: $HOSTED_ZONE_ID"
 ```
 
 !!! warning "Region matters for CloudFront"
