@@ -8,6 +8,7 @@
     a standard approach was blocked and tested against the SCP.
 
     End state:
+    
     - VPC with public/private subnets across 3 AZs
     - Bastion host in a public subnet (SSH-accessible)
     - EKS 1.35 control plane with private API endpoint
