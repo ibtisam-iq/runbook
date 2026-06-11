@@ -1,4 +1,4 @@
-# EKS Cluster Setup on KodeKloud AWS Playground
+# EKS Cluster Setup on KodeKloud AWS Playground via eksctl
 
 ## Overview
 
@@ -29,6 +29,10 @@ Confirm the following before starting:
 | `terraform` installed | `terraform version` — any recent version works |
 | `eksctl` installed | Required only for Option B cluster creation |
 | `kubectl` installed | Required from Step 5 onward |
+
+### Dev Machine
+
+I use [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) — a custom root filesystem on iximiuz Labs, which I maintain with all DevOps tools pre-installed (`kubectl`, `eksctl`, `terraform`, `helm`, `helmfile`, `aws cli`, etc.). No local machine setup is required.
 
 ---
 
@@ -307,8 +311,8 @@ eksctl create cluster -f cluster.yaml
 ```bash
 # Step 2: Associate OIDC provider manually (no iam:PassRole triggered here)
 eksctl utils associate-iam-oidc-provider \
-  --cluster $CLUSTER_NAME \
-  --region $REGION \
+  --cluster <cluster-name> \
+  --region <region> \
   --approve
 ```
 

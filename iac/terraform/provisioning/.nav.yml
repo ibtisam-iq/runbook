@@ -1,4 +1,5 @@
 title: Provisioning
 nav:
-  - eks-on-kodekloud-aws-playground.md
-  - eks-on-kodekloud-playground.md
+  - eks-on-kodekloud-eksctl.md
+  - eks-on-kodekloud-terraform.md
+  - eks-on-kodekloud-terraform-challenges.md
