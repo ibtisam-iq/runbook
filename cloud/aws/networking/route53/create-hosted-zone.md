@@ -89,7 +89,10 @@ them can cause intermittent resolution failures.
 
 Log in to the domain registrar ([DigitalPlat](https://domain.digitalplat.org/) in this case) and navigate to the nameserver management page for the domain.
 
-**Step 1.** Remove all existing nameserver entries. For `ibtisam.qzz.io` this
+!!! info "Get a domain for free"
+    Get a domain for free with [Freenom](https://freenom.com) or [DigitalPlat](https://domain.digitalplat.org/). I got a free `.qzz.io` domain from [DigitalPlat](https://domain.digitalplat.org/) for academic purposes. Thanks DigitalPlat.
+
+**Step 1.** Remove all existing nameserver entries, if there are any. For `ibtisam.qzz.io` this
 meant removing the two Cloudflare nameservers:
 
 ```
