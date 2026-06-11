@@ -461,12 +461,10 @@ watch -n 10 "aws cloudformation describe-stacks \
 
 ### 5.6 — Join Nodes to the Cluster
 
-The AL2023 template with `AuthenticationMode = "EKS API and ConfigMap"` automatically
-creates an `EC2_LINUX` access entry for the node role, so nodes should register
-on their own. Verify first:
+The AL2023 template with `AuthenticationMode = "EKS API and ConfigMap"` automatically creates an `EC2_LINUX` access entry for the node role, so nodes should register on their own. Verify first:
 
 ```bash
-kubectl get nodes
+kubectl get nodes -w
 # Expected: 3 nodes in Ready state within ~2 min of stack completing
 ```
 
@@ -499,7 +497,7 @@ aws iam list-open-id-connect-providers
 
 # Cluster access config
 aws eks describe-cluster \
-  --name silver-stack-eks \
+  --name $CLUSTER_NAME \
   --query "cluster.accessConfig"
 ```
 
