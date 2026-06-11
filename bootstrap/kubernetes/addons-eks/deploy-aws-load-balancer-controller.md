@@ -137,6 +137,8 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set vpcId="$VPC_ID" \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller \
+  --set controllerConfig.featureGates.NLBGatewayAPI=true \
+  --set controllerConfig.featureGates.ALBGatewayAPI=true \
   --version 1.14.0
 ```
 
@@ -147,6 +149,8 @@ This Helm release is configured as follows:
 - `clusterName="$CLUSTER_NAME"` passes the EKS cluster name so the controller can tag and manage AWS resources correctly.
 - `region="$REGION"` passes the AWS region explicitly so the controller does not rely on IMDS for region discovery.
 - `vpcId="$VPC_ID"` passes the VPC ID explicitly. Without this, the controller attempts to fetch the VPC from EC2 instance metadata, which can fail with a `context deadline exceeded` error in some EKS node configurations, causing a `CrashLoopBackOff`.
+- `controllerConfig.featureGates.NLBGatewayAPI=true` enables the Gateway API support for Network Load Balancers.
+- `controllerConfig.featureGates.ALBGatewayAPI=true` enables the Gateway API support for Application Load Balancers.
 
 ---
 
@@ -214,6 +218,8 @@ helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-contro
   --set vpcId="$VPC_ID" \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller \
+  --set controllerConfig.featureGates.NLBGatewayAPI=true \
+  --set controllerConfig.featureGates.ALBGatewayAPI=true \
   --version 1.14.0
 ```
 
@@ -263,6 +269,8 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set vpcId="$VPC_ID" \
   --set serviceAccount.create=false \
   --set serviceAccount.name=aws-load-balancer-controller \
+  --set controllerConfig.featureGates.NLBGatewayAPI=true \
+  --set controllerConfig.featureGates.ALBGatewayAPI=true \
   --version 1.14.0
 
 kubectl get deploy -n kube-system aws-load-balancer-controller
