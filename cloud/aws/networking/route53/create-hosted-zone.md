@@ -45,39 +45,10 @@ aws route53 create-hosted-zone \
   --hosted-zone-config Comment="Public hosted zone for ${DOMAIN}",PrivateZone=false
 ```
 
-The response confirms the zone was created, assigns a hosted zone ID, and
-immediately provides the four NS records in `DelegationSet.NameServers`.
+The response includes the zone ID, the four NS records, and the SOA record.
+Capture the zone ID from the output.
 
-```json
-{
-    "Location": "https://route53.amazonaws.com/2013-04-01/hostedzone/Z07729543U3EXQEV8600T",
-    "HostedZone": {
-        "Id": "/hostedzone/Z07729543U3EXQEV8600T",
-        "Name": "ibtisam.qzz.io.",
-        "CallerReference": "1781177371",
-        "Config": {
-            "Comment": "Public hosted zone for ibtisam.qzz.io",
-            "PrivateZone": false
-        },
-        "ResourceRecordSetCount": 2
-    },
-    "ChangeInfo": {
-        "Id": "/change/C02694491RYHI9Y9PK2BP",
-        "Status": "PENDING",
-        "SubmittedAt": "2026-06-11T11:29:32.763000+00:00"
-    },
-    "DelegationSet": {
-        "NameServers": [
-            "ns-1272.awsdns-31.org",
-            "ns-957.awsdns-55.net",
-            "ns-1698.awsdns-20.co.uk",
-            "ns-24.awsdns-03.com"
-        ]
-    }
-}
-```
-
-`ResourceRecordSetCount: 2` confirms the NS and SOA records were created
+`ResourceRecordSetCount: 2` confirms the NS and SOA records are created
 automatically. `ChangeInfo.Status: PENDING` is normal — Route 53 propagates
 the zone internally within seconds.
 
@@ -89,10 +60,6 @@ HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
   --output text | cut -d'/' -f3)
 
 echo "Hosted Zone ID: $HOSTED_ZONE_ID"
-```
-
-```
-Hosted Zone ID: Z07729543U3EXQEV8600T
 ```
 
 !!! warning "Trailing dot in Name field"
@@ -111,17 +78,6 @@ aws route53 get-hosted-zone \
   --id "$HOSTED_ZONE_ID" \
   --query "DelegationSet.NameServers" \
   --output table
-```
-
-```
------------------------------
-|       GetHostedZone       |
-+---------------------------+
-|  ns-1272.awsdns-31.org    |
-|  ns-957.awsdns-55.net     |
-|  ns-1698.awsdns-20.co.uk  |
-|  ns-24.awsdns-03.com      |
-+---------------------------+
 ```
 
 Copy all four. All four are required at the registrar — omitting any one of
@@ -158,7 +114,7 @@ hours depending on upstream TTLs.
 
 ## Verify Propagation
 
-NS propagation is uneven. Different resolvers will return different answers
+NS propagation is uneven. Different resolvers returned different answers
 during the propagation window. Query Google's resolver (`8.8.8.8`) as the
 primary check — it typically picks up changes faster than local ISP resolvers.
 
@@ -168,13 +124,6 @@ dig NS "$DOMAIN" @8.8.8.8 +short
 
 When `8.8.8.8` returns AWS nameservers, propagation is complete from a
 practical standpoint.
-
-```
-ns-1272.awsdns-31.org.
-ns-1698.awsdns-20.co.uk.
-ns-24.awsdns-03.com.
-ns-957.awsdns-55.net.
-```
 
 The local resolver may still return Cloudflare during this window — this is
 expected and does not indicate a problem.
@@ -226,39 +175,6 @@ is serving the SOA and NS entries.
 aws route53 list-resource-record-sets \
   --hosted-zone-id "$HOSTED_ZONE_ID" \
   --output table
-```
-
-```
----------------------------------------------------------------------------------------
-|                               ListResourceRecordSets                                |
-+-------------------------------------------------------------------------------------+
-||                                ResourceRecordSets                                 ||
-|+------------------------------------------+----------------------+-----------------+|
-||                   Name                   |         TTL          |      Type       ||
-|+------------------------------------------+----------------------+-----------------+|
-||  ibtisam.qzz.io.                         |  172800              |  NS             ||
-|+------------------------------------------+----------------------+-----------------+|
-|||                                 ResourceRecords                                 |||
-||+---------------------------------------------------------------------------------+||
-|||                                      Value                                      |||
-||+---------------------------------------------------------------------------------+||
-|||  ns-1272.awsdns-31.org.                                                         |||
-|||  ns-957.awsdns-55.net.                                                          |||
-|||  ns-1698.awsdns-20.co.uk.                                                       |||
-|||  ns-24.awsdns-03.com.                                                           |||
-||+---------------------------------------------------------------------------------+||
-||                                ResourceRecordSets                                 ||
-|+---------------------------------------------+-----------------+-------------------+|
-||                    Name                     |       TTL       |       Type        ||
-|+---------------------------------------------+-----------------+-------------------+|
-||  ibtisam.qzz.io.                            |  900            |  SOA              ||
-|+---------------------------------------------+-----------------+-------------------+|
-|||                                 ResourceRecords                                 |||
-||+---------------------------------------------------------------------------------+||
-|||                                      Value                                      |||
-||+---------------------------------------------------------------------------------+||
-|||  ns-1272.awsdns-31.org. awsdns-hostmaster.amazon.com. 1 7200 900 1209600 86400  |||
-||+---------------------------------------------------------------------------------+||
 ```
 
 Two records — `NS` (TTL 172800) and `SOA` (TTL 900) — confirm the zone is
