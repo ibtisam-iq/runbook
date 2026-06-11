@@ -82,8 +82,7 @@ at the registrar.
 
 ## Delegate from the Registrar
 
-Log in to the domain registrar (DigitalPlat in this case) and navigate to the
-nameserver management page for the domain.
+Log in to the domain registrar ([DigitalPlat](https://domain.digitalplat.org/) in this case) and navigate to the nameserver management page for the domain.
 
 **Step 1.** Remove all existing nameserver entries. For `ibtisam.qzz.io` this
 meant removing the two Cloudflare nameservers:

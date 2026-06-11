@@ -9,7 +9,7 @@
 
     **Prerequisite:** A Route 53 public hosted zone must exist for the domain
     and NS delegation must be active. See
-    [Create a Public Hosted Zone](../route53/hosted-zone.md).
+    [Create a Public Hosted Zone](../route53/create-hosted-zone.md).
 
 ---
 

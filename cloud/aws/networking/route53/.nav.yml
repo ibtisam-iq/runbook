@@ -1,5 +1,5 @@
 title: Route 53
 nav:
   - index.md
-  - hosted-zone.md
+  - create-hosted-zone.md
   - dns-records.md

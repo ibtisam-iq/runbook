@@ -8,5 +8,5 @@ registrar, and DNS record management.
 
 ## Runbooks
 
-- [**Create a Public Hosted Zone**](hosted-zone.md) — Create a hosted zone, retrieve AWS nameservers, and delegate DNS from an external registrar
+- [**Create a Public Hosted Zone**](create-hosted-zone.md) — Create a hosted zone, retrieve AWS nameservers, and delegate DNS from an external registrar
 - [**Manage DNS Records**](dns-records.md) — Create and update A, CNAME, and ALIAS records via `change-resource-record-sets`
