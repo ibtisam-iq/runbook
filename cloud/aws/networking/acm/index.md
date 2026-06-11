@@ -17,4 +17,4 @@ beyond 90 days without manual intervention.
 
 ## Runbooks
 
-- [**Request and Validate a Public TLS Certificate via DNS**](01-certificate-dns-validation.md) — Request a certificate for apex and wildcard, inject the CNAME validation record into Route 53, and wait for issuance
+- [**Request and Validate a Public TLS Certificate via DNS**](certificate-dns-validation.md) — Request a certificate for apex and wildcard, inject the CNAME validation record into Route 53, and wait for issuance

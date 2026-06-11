@@ -7,7 +7,7 @@
     NS delegation is confirmed.
 
     **Prerequisite:** A hosted zone must exist and `$HOSTED_ZONE_ID` must be set.
-    See [Create a Public Hosted Zone](01-hosted-zone.md).
+    See [Create a Public Hosted Zone](hosted-zone.md).
 
 ---
 

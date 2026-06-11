@@ -1,4 +1,5 @@
 title: Route 53
 nav:
   - index.md
-  - glob: "*"
+  - hosted-zone.md
+  - dns-records.md

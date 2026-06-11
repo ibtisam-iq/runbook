@@ -1,4 +1,6 @@
 title: Cloud
 nav:
-  - index.md
-  # - glob: "*"
+  - aws
+  # - azure
+  # - gcp
+  
