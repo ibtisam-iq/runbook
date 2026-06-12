@@ -1,4 +1,3 @@
 title: Networking
 nav:
-  - index.md
-  # - glob: "*"
+  - domain-tls-setup

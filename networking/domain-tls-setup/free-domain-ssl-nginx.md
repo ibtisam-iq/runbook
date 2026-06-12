@@ -1,30 +1,20 @@
 # Free Domain, Let's Encrypt SSL, and Nginx HTTPS
 
-!!! abstract ""
-    **End-to-end HTTPS with a free domain** — Registers a free subdomain on
-    [freedomain.one](https://freedomain.one) (backed by dnsexit.com), issues a
-    wildcard Let's Encrypt certificate via their DNS-01 challenge panel,
-    points the domain at a Linux server with a public IP, and serves the
-    domain over HTTPS with Nginx.
+**End-to-end HTTPS with a free domain** — Register a free subdomain on
+[freedomain.one](https://freedomain.one) (backed by dnsexit.com), issue a
+wildcard Let's Encrypt certificate via their DNS-01 challenge panel,
+point the domain at a server with a public IP, and serve the
+domain over HTTPS with Nginx.
 
-    **How I discovered this**
+**Discovery**
 
-    I was writing the
-    [Route 53 hosted zone runbook](../../cloud/aws/networking/route53/create-hosted-zone.md)
-    and, while drafting the registrar delegation section in Antigravity (my
-    IDE), the autocomplete suggested `freedomain.one` inline. That surfaced it
-    as a side finding — I was working on something else entirely and this came
-    up as a secondary result. I opened the site, verified it was real, signed
-    up, registered `ibtisam.work.gd` at no cost, and ran the full workflow
-    documented below. Thanks to [freedomain.one](https://freedomain.one) and
-    [dnsexit.com](https://dnsexit.com) for the free service.
+I was writing the [Route 53 hosted zone runbook](../../cloud/aws/networking/route53/create-hosted-zone.md) and, while drafting the registrar delegation section in Antigravity (my IDE), the autocomplete suggested `freedomain.one` inline. I opened the site, verified it was real, signed up, registered `ibtisam.work.gd` at no cost, and ran the full operation as documented below. Thanks to [freedomain.one](https://freedomain.one) and [dnsexit.com](https://dnsexit.com) for the free service.
 
-    **Prerequisites:**
+**Prerequisites:**
 
-    - A Linux server with a static public IP and Nginx installed.
-    - Inbound rules for TCP 80 and TCP 443 open on the server's firewall or
-      security group.
-    - A browser to complete the freedomain.one panel steps.
+- A server with a static public IP and Nginx installed.
+- Inbound rules for TCP 80 and TCP 443 open on the server's firewall or security group.
+- A browser to complete the freedomain.one panel steps.
 
 ---
 
@@ -63,7 +53,7 @@ The registration form shows:
 | Registration Term | 1 Year |
 | Expiration Date | 2027-06-12 (free renew after 2027-05-12) |
 | Total | $0.00 |
-| IP for the domain | Placeholder IP at registration time (updated in Step 3) |
+| IP for the domain | 39.49.208.173 |
 | Is Dynamic IP? | Unchecked |
 
 !!! info "Dynamic IP"
@@ -83,11 +73,10 @@ pointing at the IP entered in the form.
 ## Step 2 — Issue the Let's Encrypt SSL Certificate
 
 With the domain registered, I opened the **Services** panel for
-`ibtisam.work.gd` and requested a free wildcard certificate.
+`ibtisam.work.gd` and requested a free wildcard certificate. It is free.
 
-1. Navigate to the domain's SSL section in the dnsexit panel.
-2. Click the button to issue a wildcard certificate for `ibtisam.work.gd`
-   and `*.ibtisam.work.gd`.
+1. Navigate to the **Domain Panel** in the DNS control panel.
+2. Scroll down to `SSL Digital Certificate (free)` and click **sign up** button to issue a wildcard certificate for `ibtisam.work.gd` and `*.ibtisam.work.gd`.
 
 The panel runs `acme.sh` internally with a DNS-01 challenge. It adds
 `_acme-challenge.ibtisam.work.gd` TXT records automatically, then polls
@@ -150,9 +139,6 @@ within the 30-day window before expiry.
 I launched an EC2 instance (Ubuntu, Nginx installed), noted its public IP
 (`54.157.3.213`), and updated the A record in the dnsexit DNS panel:
 
-1. Open **A / AAAA / Host** under the domain panel.
-2. Replace the placeholder IP set at registration with the server's public IP.
-
 | Host / A Record | IP Address | TTL |
 |---|---|---|
 | `ibtisam.work.gd.` | `54.157.3.213` | 08:00 |
@@ -164,10 +150,10 @@ over plain HTTP:
 
 ```bash
 dig A ibtisam.work.gd +short
-# should return 54.157.3.213
+# returned 54.157.3.213
 
 curl -I http://ibtisam.work.gd
-# should return HTTP/1.1 200 OK with the default Nginx page
+# returned HTTP/1.1 200 OK with the default Nginx page
 ```
 
 Both the server IP and the domain served the default Nginx page over HTTP.
@@ -198,8 +184,6 @@ sudo vim /etc/nginx/ssl/ibtisam.work.gd/chain.pem        # paste SSL Intermediat
 sudo vim /etc/nginx/ssl/ibtisam.work.gd/privkey.pem      # paste SSL Private Key block
 sudo chmod 600 /etc/nginx/ssl/ibtisam.work.gd/privkey.pem
 ```
-
-In vim: `i` to insert, paste, `Esc`, then `:wq`.
 
 !!! note "PEM headers and footers are required"
     Each file must start with `-----BEGIN ...-----` and end with
@@ -306,24 +290,6 @@ working correctly.
 
 ---
 
-## Extending to Subdomains
-
-The wildcard cert covers `*.ibtisam.work.gd`. To add a subdomain:
-
-1. Add an A record for the subdomain in the dnsexit panel pointing at the
-   same server IP.
-2. Add a `server {}` block in Nginx reusing the same `fullchain.pem` and
-   `privkey.pem`.
-
-| Subdomain | Purpose |
-|---|---|
-| `demo.ibtisam.work.gd` | Frontend demo app |
-| `api.ibtisam.work.gd` | Backend API service |
-| `lab.ibtisam.work.gd` | Experimental workloads |
-| `docs.ibtisam.work.gd` | Documentation site |
-
----
-
 ## Troubleshooting
 
 **`ERR_CONNECTION_REFUSED` on HTTPS**
@@ -366,6 +332,6 @@ sudo systemctl reload nginx
 sudo ss -tlnp | grep 443
 
 # Inspect the installed certificate
-openssl x509 -in /etc/nginx/ssl/ibtisam.work.gd/fullchain.pem -noout -text | \
+sudo openssl x509 -in /etc/nginx/ssl/ibtisam.work.gd/fullchain.pem -noout -text | \
   grep -E 'Subject:|Issuer:|Not After|DNS:'
 ```
