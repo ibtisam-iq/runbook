@@ -2,4 +2,4 @@ title: Windows
 nav:
   - index.md
   - Activate Office 2019: activate-office-2019.md
-  - glob: "*"
+  - "*"
