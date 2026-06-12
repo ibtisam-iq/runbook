@@ -16,3 +16,5 @@ nav:
       - EBS CSI Driver: addons-eks/install-ebs-csi-driver.md
       - Prometheus Stack: addons-eks/deploy-kube-prometheus-stack.md
       - Fluent Bit CloudWatch: addons-eks/deploy-fluent-bit-cloudwatch.md
+      - Gateway API: addons-eks/deploy-gateway-api.md
+      - External DNS: addons-eks/deploy-external-dns.md
