@@ -1,101 +1,75 @@
-# Deploy ArgoCD on Bare-Metal (k3s) and Deploy an App
+# Deploy ArgoCD on Bare-Metal and Access via Custom Domain
 
-This runbook walks through every step performed to install ArgoCD on a single-node k3s cluster running on an iximiuz SilverStack lab machine, deploy the **Online Boutique** microservices demo via an ArgoCD `Application` manifest, and expose the app and the ArgoCD UI to the internet using two methods: a **Cloudflare Tunnel** (custom domain) and the **iximiuz lab HTTPS port-forwarding** feature.
+ArgoCD is a declarative, GitOps-based continuous delivery tool for Kubernetes. It watches a Git repository and automatically reconciles the live cluster state with the desired state defined in Git — no manual `kubectl apply` needed after the initial setup.
 
-> **Pre-requisites**
-> - iximiuz SilverStack Dev Machine (all tools pre-installed: `kubectl`, `helm`, `cloudflared`, etc.)
-> - A Cloudflare account with a tunnel token already provisioned at `dash.cloudflare.com → Zero Trust → Networks → Tunnels`
-> - The microservices-demo repo forked/cloned from `https://github.com/ibtisam-iq/microservices-demo`
+This runbook covers:
 
----
-
-## Phase 1 — Bootstrap k3s Cluster
-
-See the full cluster bootstrap guide at: https://runbook.ibtisam-iq.com/bootstrap/kubernetes/cluster-k3s/
-
-```bash
-# Install k3s single-node cluster
-curl -sfL https://get.k3s.io | sh -
-
-# Set up kubeconfig for the current user
-mkdir -p ~/.kube
-sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-sudo chown "$USER:$USER" ~/.kube/config
-echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
-source ~/.bashrc
-
-# Verify
-kubectl get nodes
-```
-
-**Expected output:**
-```
-NAME         STATUS   ROLES                  AGE   VERSION
-dev-machine  Ready    control-plane,master   30s   v1.35.5+k3s1
-```
+1. Installing ArgoCD on a bare-metal Kubernetes cluster via Helm
+2. Exposing the ArgoCD UI (two methods: iximiuz lab port expose and Cloudflare Tunnel)
+3. Deploying a full microservices application using an ArgoCD `Application` manifest, with all key decisions explained
+4. Exposing the deployed app to the internet
+5. Verifying the deployment via the ArgoCD UI
 
 ---
 
-## Phase 2 — Clone the Application Repo
+## Prerequisites
 
-```bash
-git clone https://github.com/ibtisam-iq/microservices-demo.git
-cd microservices-demo
-```
+- A running Kubernetes cluster with `kubectl` configured. For k3s setup, see: [Bootstrap k3s Cluster](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/cluster-k3s/)
+- `helm` installed and available in `PATH`
+- A Cloudflare tunnel token provisioned (only for Option B — custom domain access)
 
-This repo contains the Helm chart at `helm-chart/` which ArgoCD will use as its source.
+### Dev Machine
+
+[SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) is used throughout this runbook — a custom root filesystem on iximiuz Labs with all DevOps tools pre-installed (`kubectl`, `helm`, `cloudflared`, `terraform`, `aws cli`, etc.). No local machine setup is required.
 
 ---
 
-## Phase 3 — Install ArgoCD via Helm
+## Step 1 — Install ArgoCD
 
 ```bash
-# Create the ArgoCD namespace
 kubectl create namespace argocd
 
-# Add the official Argo Helm repo
 helm repo add argo https://argoproj.github.io/argo-helm
 helm repo update argo
 
-# Install ArgoCD (default values — all components)
 helm install argocd argo/argo-cd \
   --namespace argocd
 ```
 
-**Verify all pods are Running:**
+Verify all components are running:
+
 ```bash
 kubectl get po,deploy,sts,svc -n argocd
 ```
 
-You should see these workloads all `Running`:
-
 | Component | Kind | Purpose |
 |---|---|---|
 | `argocd-server` | Deployment | API server + Web UI |
-| `argocd-repo-server` | Deployment | Clones Git repos, renders manifests |
-| `argocd-application-controller` | StatefulSet | Reconciles desired vs live state |
-| `argocd-applicationset-controller` | Deployment | Generates Applications from templates |
+| `argocd-repo-server` | Deployment | Clones Git repos, renders manifests (Helm/Kustomize/raw YAML) |
+| `argocd-application-controller` | StatefulSet | Reconciles desired (Git) vs live (cluster) state |
+| `argocd-applicationset-controller` | Deployment | Generates `Application` objects from templates |
 | `argocd-dex-server` | Deployment | OIDC SSO provider |
-| `argocd-redis` | Deployment | Caching layer |
+| `argocd-redis` | Deployment | Caching layer for repo server and app controller |
 | `argocd-notifications-controller` | Deployment | Sends sync/health event notifications |
 
-**Retrieve the initial admin password:**
+Retrieve the initial admin password:
+
 ```bash
 kubectl get secret argocd-initial-admin-secret \
   -n argocd \
   -o jsonpath="{.data.password}" | base64 --decode; echo
 ```
 
-> **Important:** Delete this secret after logging in and changing the password.
+> **Note:** Delete this secret after the first login and password change.
 > ```bash
 > kubectl delete secret argocd-initial-admin-secret -n argocd
 > ```
 
 ---
 
-## Phase 4 — Expose the ArgoCD UI
+## Step 2 — Expose the ArgoCD UI
 
-By default `argocd-server` is a `ClusterIP` service. On bare-metal there is no cloud load balancer, so we use NodePort.
+By default, `argocd-server` is a `ClusterIP` service. On bare-metal there is no cloud load balancer, so patch it to `NodePort` first:
 
 ```bash
 kubectl patch svc argocd-server -n argocd \
@@ -104,24 +78,34 @@ kubectl patch svc argocd-server -n argocd \
 kubectl get svc argocd-server -n argocd
 ```
 
-**Expected:**
 ```
 NAME            TYPE       CLUSTER-IP   EXTERNAL-IP   PORT(S)                      AGE
 argocd-server   NodePort   10.43.86.5   <none>        80:30340/TCP,443:30440/TCP   4m37s
 ```
 
-ArgoCD server now listens on `NodePort 30340` (HTTP) and `30440` (HTTPS).
+ArgoCD now listens on NodePort `30340` (HTTP) and `30440` (HTTPS). Choose one of the two access methods below.
 
-### Option A — Cloudflare Tunnel (Custom Domain)
+### Option A — iximiuz Lab Port Expose
 
-See full Cloudflare Tunnel setup: https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs/#phase-4-implementation---creating-cloudflare-tunnels
+In the iximiuz lab UI, click **Expose HTTP(S) Ports**:
+
+- Port: `30440`
+- HTTPS: **ON**
+- Click **EXPOSE**
+
+A public URL like `https://6a...ae0c2.node-ap-b1d4.iximiuz.com` is generated.
+
+> **Why port 30440 and not 30340?** ArgoCD enforces HTTPS redirects — connecting over plain HTTP on 30340 immediately redirects to HTTPS. Use the HTTPS NodePort directly.
+
+### Option B — Cloudflare Tunnel (Custom Domain)
+
+For full Cloudflare Tunnel setup, see: [Creating Cloudflare Tunnels](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs/#phase-4-implementation---creating-cloudflare-tunnels)
 
 ```bash
-# Install the cloudflared tunnel daemon (token from Cloudflare dashboard)
 sudo cloudflared service install <YOUR_TUNNEL_TOKEN>
 ```
 
-In the Cloudflare dashboard (`Zero Trust → Networks → Tunnels → your tunnel → Public Hostnames`):
+In the Cloudflare dashboard (`Zero Trust → Networks → Tunnels → your tunnel → Public Hostnames`), add a route:
 
 | Field | Value |
 |---|---|
@@ -130,32 +114,33 @@ In the Cloudflare dashboard (`Zero Trust → Networks → Tunnels → your tunne
 | Full hostname | `argocd.ibtisam-iq.com` |
 | Service Type | `HTTPS` |
 | Service URL | `localhost:30440` |
-| No TLS Verify | `ON` (because ArgoCD uses a self-signed cert) |
+| No TLS Verify | **ON** |
 
-> **Why HTTPS + No TLS Verify?** ArgoCD server serves HTTPS on port 443 (NodePort 30440). Cloudflare must connect to it over HTTPS, but the certificate is self-signed, so TLS verification must be disabled on the tunnel route.
+> **Why HTTPS + No TLS Verify?** ArgoCD's server certificate is self-signed. Cloudflare must reach it over HTTPS (because ArgoCD only speaks HTTPS), but cannot verify the certificate chain. `No TLS Verify` allows the tunnel to connect without a trusted CA.
 
-The app is then reachable at `https://argocd.ibtisam-iq.com`.
-
-### Option B — iximiuz Lab Port Expose
-
-In the iximiuz lab UI, click **Expose HTTP(S) Ports**:
-
-- Port: `30440`
-- HTTPS: `ON`
-- Click **EXPOSE**
-
-This gives a public URL like `https://6a...ae0c2.node-ap-b1d4.iximiuz.com`.
-
-> Use port **30440** (HTTPS NodePort), NOT 30340 (HTTP). ArgoCD enforces HTTPS redirects, so connecting over plain HTTP will redirect you immediately.
+Access the UI at `https://argocd.ibtisam-iq.com`.
 
 ---
 
-## Phase 5 — Create the ArgoCD Application
+## Step 3 — Clone the Application Repo
 
-The `Application` is the core ArgoCD custom resource. It tells ArgoCD:
-1. **Where** to pull manifests from (Git source)
-2. **Where** to deploy them (Kubernetes destination)
-3. **How** to keep them in sync (sync policy)
+The application being deployed is **Online Boutique** — a microservices demo originally by Google. It has been forked to [`ibtisam-iq/microservices-demo`](https://github.com/ibtisam-iq/microservices-demo) with the following additions:
+
+- A CI pipeline (`.github/workflows/ci.trigger.yml` and `build.yml`) that builds all service images and pushes them to `ghcr.io/ibtisam-iq/microservices-demo` instead of Google's registry
+- A Helm chart at `helm-chart/` that references these custom images via `images.repository` and `images.tag` values
+
+```bash
+git clone https://github.com/ibtisam-iq/microservices-demo.git
+cd microservices-demo
+```
+
+The Helm chart at `helm-chart/` is what ArgoCD will use as its source in the next step.
+
+---
+
+## Step 4 — Deploy the Application via ArgoCD
+
+Create the ArgoCD `Application` manifest:
 
 ```bash
 cat <<'EOF' > boutique-app.yaml
@@ -163,14 +148,13 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: boutique-app
-  namespace: argocd          # Application resource always lives in argocd namespace
+  namespace: argocd
 spec:
-  project: default           # ArgoCD project — controls RBAC boundaries
-
+  project: default
   source:
     repoURL: https://github.com/ibtisam-iq/microservices-demo
-    targetRevision: main     # branch, tag, or commit SHA
-    path: helm-chart         # folder inside repo — ArgoCD auto-detects Chart.yaml here → uses Helm
+    targetRevision: main
+    path: helm-chart
     helm:
       parameters:
         - name: images.repository
@@ -178,182 +162,109 @@ spec:
         - name: images.tag
           value: "latest"
         - name: loadGenerator.create
-          value: "false"     # skip load generator pod in this demo
-
+          value: "false"
   destination:
-    server: https://kubernetes.default.svc   # in-cluster deployment
+    server: https://kubernetes.default.svc
     namespace: boutique-app
-
   syncPolicy:
     automated:
-      prune: true       # delete resources removed from Git
-      selfHeal: true    # revert any manual kubectl changes
+      prune: true
+      selfHeal: true
     syncOptions:
-      - CreateNamespace=true   # create boutique-app namespace if it doesn't exist
+      - CreateNamespace=true
 EOF
 
 kubectl apply -f boutique-app.yaml
 ```
 
-### Application Manifest — Field-by-Field Reference
+### Decisions Explained
 
-#### `metadata`
+**`path: helm-chart`**
+ArgoCD auto-detects the deployment tool from the contents of this directory. Since `helm-chart/` contains a `Chart.yaml`, ArgoCD treats it as a Helm chart and runs `helm template` internally before applying.
 
-| Field | Value used | Meaning |
+| Files found in `path` | Tool used | How deployed |
 |---|---|---|
-| `name` | `boutique-app` | Name of the ArgoCD Application object |
-| `namespace` | `argocd` | **Always `argocd`** — Application CRs must live here |
+| `Chart.yaml` | Helm | `helm template` → `kubectl apply` |
+| `kustomization.yaml` | Kustomize | `kustomize build` → `kubectl apply` |
+| Plain `*.yaml` | Raw manifests | `kubectl apply` directly |
 
-#### `spec.project`
+**`images.repository: ghcr.io/ibtisam-iq/microservices-demo`**
+The upstream chart defaults to Google's own image registry. Since all images have been rebuilt and pushed to GitHub Container Registry under this account, the repository is overridden here.
 
-`default` is the built-in project that allows deploying to any namespace on any cluster. Custom projects can restrict which repos, clusters, and namespaces are allowed.
+**`images.tag: latest`**
+The Helm chart defaults to using the chart's `appVersion` as the image tag. Overriding with `latest` ensures the most recently pushed image is always pulled, which is appropriate for this demo setup.
 
-#### `spec.source` — mandatory fields
+**`loadGenerator.create: false`**
+The load generator service requires its own custom-built image, which was not pushed to GHCR as part of this setup. Disabling it avoids an `ImagePullBackOff` error on that pod.
 
-| Field | Description |
-|---|---|
-| `repoURL` | Git repository URL (HTTPS or SSH). For Helm chart repos, this would be the chart repo URL instead. |
-| `targetRevision` | Branch name, tag, or full commit SHA to track. `HEAD` means the default branch tip. |
-| `path` | Directory inside the repo. ArgoCD **auto-detects** the tool based on what files exist here (see table below). |
+> **Note:** `images.tag: latest` is fine for demos. In production, pin to an immutable tag (e.g., a Git commit SHA) so deployments are reproducible and rollbacks are reliable.
 
-**Auto-detection logic — what ArgoCD looks for inside `path`:**
+**`destination.server: https://kubernetes.default.svc`**
+This is the in-cluster Kubernetes API server address. It means ArgoCD deploys to the same cluster it runs in. For deploying to an external cluster, register it first with `argocd cluster add`.
 
-| Files found in `path` | Tool ArgoCD uses | How it deploys |
-|---|---|---|
-| `Chart.yaml` | **Helm** | `helm template` then `kubectl apply` |
-| `kustomization.yaml` | **Kustomize** | `kustomize build` then `kubectl apply` |
-| Plain `*.yaml` / `*.json` | **Raw manifests** | `kubectl apply` directly |
-| `Chart.yaml` + `kustomization.yaml` | Helm takes priority | |
+**`syncPolicy.automated.prune: true`**
+Resources deleted from Git are also deleted from the cluster. Without this, removed manifests would stay running indefinitely.
 
-> In this runbook, `path: helm-chart` contains a `Chart.yaml`, so ArgoCD uses Helm automatically. No need to set `spec.source.helm` unless you want to override values — which we do below.
+**`syncPolicy.automated.selfHeal: true`**
+Any manual `kubectl` changes to cluster resources are automatically reverted to match Git. This enforces strict GitOps — Git is the single source of truth.
 
-#### `spec.source.helm` — optional Helm overrides
-
-```yaml
-helm:
-  parameters:            # equivalent to --set on the CLI
-    - name: images.tag
-      value: "latest"
-  valueFiles:            # equivalent to -f values-prod.yaml
-    - values-prod.yaml
-  values: |              # inline values, equivalent to --values with a string
-    replicaCount: 2
-  releaseName: boutique  # override the Helm release name (default: Application name)
-  version: v3            # force Helm v3 (default)
-```
-
-#### `spec.destination`
-
-| Field | Description |
-|---|---|
-| `server` | Target cluster API endpoint. `https://kubernetes.default.svc` = the same cluster ArgoCD runs in. For external clusters, register them first with `argocd cluster add`. |
-| `namespace` | Namespace to deploy resources into. Must match `CreateNamespace=true` in syncOptions if it doesn't exist yet. |
-
-#### `spec.syncPolicy`
-
-```yaml
-syncPolicy:
-  automated:
-    prune: true      # Remove resources from cluster when deleted from Git
-    selfHeal: true   # Re-apply Git state if someone manually edits live resources
-  syncOptions:
-    - CreateNamespace=true     # Auto-create destination namespace
-    - ServerSideApply=true     # Use server-side apply (better for CRDs)
-    - ApplyOutOfSyncOnly=true  # Only apply resources that are actually out of sync
-    - PruneLast=true           # Prune resources only after all others are synced
-    - Replace=true             # Use kubectl replace instead of apply (for immutable fields)
-  retry:
-    limit: 5
-    backoff:
-      duration: 5s
-      factor: 2
-      maxDuration: 3m
-```
-
-| Option | What it does |
-|---|---|
-| `prune: true` | Dangerous without care — deletes live resources not in Git |
-| `selfHeal: true` | Overrides any manual `kubectl` changes — disable when debugging |
-| `CreateNamespace=true` | Needed when destination namespace doesn't pre-exist |
-| `ServerSideApply=true` | Recommended for complex CRDs and Helm charts |
-| `PruneLast=true` | Prevents race condition where prune happens before new resources are healthy |
-
-#### Multiple Sources (`spec.sources`)
-
-For referencing a Helm chart from one repo but values files from another:
-
-```yaml
-spec:
-  sources:
-    - repoURL: https://github.com/ibtisam-iq/microservices-demo
-      targetRevision: main
-      ref: appcode                   # give this source a reference name
-    - repoURL: https://charts.example.com
-      chart: my-chart
-      targetRevision: 1.2.3
-      helm:
-        valueFiles:
-          - $appcode/helm-chart/values-prod.yaml   # reference the other source by name
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: boutique-app
-```
+**`syncOptions.CreateNamespace=true`**
+The `boutique-app` namespace does not exist before this manifest is applied. This option tells ArgoCD to create it automatically.
 
 ---
 
-## Phase 6 — Expose the Frontend App
+## Step 5 — Expose the Frontend
 
-The Helm chart creates `frontend-external` as a `LoadBalancer` service. On bare-metal it stays `<pending>`. Patch it to `NodePort`:
+The Helm chart creates `frontend-external` as a `LoadBalancer` service. On bare-metal without MetalLB, it stays `<pending>` indefinitely. Patch it to `NodePort`.
+
+First, disable `selfHeal` — otherwise ArgoCD will revert the manual patch within seconds:
 
 ```bash
-# First disable selfHeal so ArgoCD doesn't revert our manual patch
 kubectl patch application boutique-app -n argocd \
   --type merge \
   -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false}}}}'
+```
 
-# Patch frontend-external to NodePort on port 30080
+Then patch the service:
+
+```bash
 kubectl patch svc frontend-external -n boutique-app \
   -p '{"spec":{"type":"NodePort","ports":[{"port":80,"targetPort":8080,"nodePort":30080,"protocol":"TCP"}]}}'
 
-# Verify
 kubectl get svc frontend-external -n boutique-app
 ```
 
-**Expected:**
 ```
 NAME                TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
 frontend-external   NodePort   10.43.28.247  <none>        80:30080/TCP   3m
 ```
 
-> **Why disable selfHeal first?** When `selfHeal: true`, ArgoCD continuously reconciles. The moment you manually patch the service, ArgoCD sees drift from Git and reverts your patch within seconds. Disabling selfHeal prevents this revert.
+### Expose the Frontend — Two Methods
 
-### Expose Frontend — Two Methods
+#### Option A — iximiuz Lab Port Expose
 
-#### Method A — Cloudflare Tunnel
+In the iximiuz lab UI → **Expose HTTP(S) Ports**:
 
-In the Cloudflare dashboard, add a second public hostname for the same tunnel:
+- Port: `30080`
+- HTTPS: **OFF** (the app serves plain HTTP)
+- Click **EXPOSE**
+
+#### Option B — Cloudflare Tunnel
+
+In the Cloudflare dashboard, add a second public hostname on the same tunnel:
 
 | Field | Value |
 |---|---|
-| Subdomain | `boutique` (or any name) |
+| Subdomain | `boutique` |
 | Domain | `ibtisam-iq.com` |
 | Service Type | `HTTP` |
 | Service URL | `localhost:30080` |
 
-Access at: `https://boutique.ibtisam-iq.com`
-
-#### Method B — iximiuz Lab Port Expose
-
-In the iximiuz lab UI → **Expose HTTP(S) Ports**:
-- Port: `30080`
-- HTTPS: `OFF` (the app is plain HTTP)
-- Click **EXPOSE**
-
-This gives a public URL like `https://6a...ae0c2.node-ap-b1d4.iximiuz.com`.
+Access at `https://boutique.ibtisam-iq.com`.
 
 ---
 
-## Phase 7 — Verify Full Deployment
+## Step 6 — Verify
 
 ```bash
 # All 11 microservice pods should be Running
@@ -362,74 +273,33 @@ kubectl get po -n boutique-app
 # All services should be present
 kubectl get svc -n boutique-app
 
-# Check ArgoCD application health
+# ArgoCD application status
 kubectl get application boutique-app -n argocd
 ```
 
-**Healthy application output:**
 ```
 NAME          SYNC STATUS   HEALTH STATUS
 boutique-app  Synced        Healthy
 ```
 
-In the ArgoCD UI, the application card will show:
-- **APP HEALTH**: `Healthy` (green heart)
-- **SYNC STATUS**: `Synced` — or `OutOfSync` if Git has newer commits not yet deployed
-- **LAST SYNC**: timestamp of the last successful sync
+In the ArgoCD UI at `argocd.ibtisam-iq.com`, the application shows:
 
-> `OutOfSync` after the service patch is expected if selfHeal was disabled. It means the live cluster differs from Git. This is acceptable for local development experiments.
-
----
-
-## Understanding the OutOfSync State (Seen in Screenshot)
-
-After patching `frontend-external` to NodePort, ArgoCD shows **OutOfSync** because:
-1. Git still defines `frontend-external` as `LoadBalancer`
-2. The live cluster has it as `NodePort` (our manual patch)
-3. selfHeal is now disabled, so ArgoCD reports the drift but does not fix it
-
-This is intentional. To restore full sync, either:
-- Re-enable selfHeal (ArgoCD will revert the patch → service goes back to LoadBalancer)
-- Update the Helm chart values in Git to set `frontend.externalService.type: NodePort` → triggers a new sync with the correct state
+- **APP HEALTH**: `Healthy`
+- **SYNC STATUS**: `Synced` (or `OutOfSync` after the manual service patch — expected, since selfHeal is now disabled and Git still has `LoadBalancer`)
+- **LAST SYNC**: timestamp of the last successful reconciliation
 
 ---
 
 ## Cleanup
 
 ```bash
-# Delete the application (and all deployed resources if prune is enabled)
+# Delete the ArgoCD Application (prune will remove all deployed resources)
 kubectl delete application boutique-app -n argocd
-
-# Or via ArgoCD CLI
-argocd app delete boutique-app
 
 # Uninstall ArgoCD
 helm uninstall argocd -n argocd
 kubectl delete namespace argocd
 
-# Tear down k3s
+# Tear down k3s (if needed)
 /usr/local/bin/k3s-uninstall.sh
-```
-
----
-
-## Quick Reference
-
-```bash
-# Get ArgoCD initial password
-kubectl get secret argocd-initial-admin-secret -n argocd \
-  -o jsonpath="{.data.password}" | base64 --decode; echo
-
-# Manually trigger a sync
-kubectl patch application boutique-app -n argocd \
-  --type merge -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{}}}'
-
-# Force refresh (re-fetch from Git)
-argocd app get boutique-app --refresh
-
-# Watch application status live
-watch kubectl get application boutique-app -n argocd
-
-# Check what ArgoCD would change (dry-run diff)
-argocd app diff boutique-app
 ```
