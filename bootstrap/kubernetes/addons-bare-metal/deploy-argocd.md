@@ -60,10 +60,11 @@ kubectl get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 --decode; echo
 ```
 
-> **Note:** Delete this secret after the first login and password change.
-> ```bash
-> kubectl delete secret argocd-initial-admin-secret -n argocd
-> ```
+!!! warning "Delete the initial secret"
+    Delete this secret after the first login and password change.
+    ```bash
+    kubectl delete secret argocd-initial-admin-secret -n argocd
+    ```
 
 ---
 
@@ -95,7 +96,8 @@ In the iximiuz lab UI, click **Expose HTTP(S) Ports**:
 
 A public URL like `https://6a...ae0c2.node-ap-b1d4.iximiuz.com` is generated.
 
-> **Why port 30440 and not 30340?** ArgoCD enforces HTTPS redirects — connecting over plain HTTP on 30340 immediately redirects to HTTPS. Use the HTTPS NodePort directly.
+!!! question "Why port 30440 and not 30340?"
+    ArgoCD enforces HTTPS redirects — connecting over plain HTTP on 30340 immediately redirects to HTTPS. Use the HTTPS NodePort directly.
 
 ### Option B — Cloudflare Tunnel (Custom Domain)
 
@@ -115,7 +117,8 @@ In the Cloudflare dashboard (`Zero Trust → Networks → Tunnels → your tunne
 | Service URL | `localhost:30440` |
 | No TLS Verify | **ON** |
 
-> **Why HTTPS + No TLS Verify?** ArgoCD's server certificate is self-signed. Cloudflare must reach it over HTTPS (because ArgoCD only speaks HTTPS), but cannot verify the certificate chain. `No TLS Verify` allows the tunnel to connect without a trusted CA.
+!!! question "Why HTTPS + No TLS Verify?"
+    ArgoCD's server certificate is self-signed. Cloudflare must reach it over HTTPS (because ArgoCD only speaks HTTPS), but cannot verify the certificate chain. `No TLS Verify` allows the tunnel to connect without a trusted CA.
 
 ---
 
@@ -128,14 +131,13 @@ git clone https://github.com/ibtisam-iq/microservices-demo.git
 cd microservices-demo
 ```
 
-> **About this fork**
->
-> The upstream repo is the [Google Cloud microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo). After forking, the following CI workflows were added:
->
-> - [`ci-trigger.yaml`](https://github.com/ibtisam-iq/microservices-demo/blob/main/.github/workflows/ci-trigger.yaml) — detects which services changed and triggers targeted builds
-> - [`reusable-build.yaml`](https://github.com/ibtisam-iq/microservices-demo/blob/main/.github/workflows/reusable-build.yaml) — builds each service image and pushes it to `ghcr.io/ibtisam-iq/microservices-demo`
->
-> The Helm chart at `helm-chart/` references these custom images via `images.repository` and `images.tag` values. ArgoCD uses this chart as its source in the next step.
+!!! info "About this fork"
+    The upstream repo is the [Google Cloud microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo). After forking, the following CI workflows were added:
+
+    - [`ci-trigger.yaml`](https://github.com/ibtisam-iq/microservices-demo/blob/main/.github/workflows/ci-trigger.yaml) — detects which services changed and triggers targeted builds
+    - [`reusable-build.yaml`](https://github.com/ibtisam-iq/microservices-demo/blob/main/.github/workflows/reusable-build.yaml) — builds each service image and pushes it to `ghcr.io/ibtisam-iq/microservices-demo`
+
+    The Helm chart at `helm-chart/` references these custom images via `images.repository` and `images.tag` values. ArgoCD uses this chart as its source in the next step.
 
 ---
 
@@ -178,17 +180,16 @@ EOF
 kubectl apply -f boutique-app.yaml
 ```
 
-> **Why `images.repository: ghcr.io/ibtisam-iq/microservices-demo`?**
->
-> The upstream Helm chart defaults to Google's own image registry. All service images have been rebuilt and pushed to GitHub Container Registry under this account, so the repository is overridden here to pull from the correct location.
+!!! question "Why `images.repository: ghcr.io/ibtisam-iq/microservices-demo`?"
+    The upstream Helm chart defaults to Google's own image registry. All service images have been rebuilt and pushed to GitHub Container Registry under this account, so the repository is overridden here to pull from the correct location.
 
-> **Why `images.tag: latest`?**
->
-> The Helm chart defaults to using the chart's `appVersion` as the image tag. Overriding with `latest` ensures the most recently pushed image is always pulled — appropriate for this demo setup. In production, pin to an immutable tag (e.g., a Git commit SHA) for reproducible deployments and reliable rollbacks.
+!!! question "Why `images.tag: latest`?"
+    The Helm chart defaults to using the chart's `appVersion` as the image tag. Overriding with `latest` ensures the most recently pushed image is always pulled — appropriate for this demo setup.
 
-> **Why `loadGenerator.create: false`?**
->
-> The load generator service requires its own custom-built image, which was not pushed to GHCR as part of this setup. Disabling it avoids an `ImagePullBackOff` error on that pod.
+    In production, pin to an immutable tag (e.g., a Git commit SHA) for reproducible deployments and reliable rollbacks.
+
+!!! question "Why `loadGenerator.create: false`?"
+    The load generator service requires its own custom-built image, which was not pushed to GHCR as part of this setup. Disabling it avoids an `ImagePullBackOff` error on that pod.
 
 ---
 
@@ -329,4 +330,5 @@ kubectl delete application boutique-app -n argocd
 helm uninstall argocd -n argocd && kubectl delete namespace argocd
 ```
 
-> **Dev Machine:** All commands above are run on the [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) — no local setup required.
+!!! note "Dev Machine"
+    All commands above are run on the [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) — no local setup required.
