@@ -169,3 +169,18 @@ The installer places an uninstall script on the system during setup.
 # Uninstall an agent node
 /usr/local/bin/k3s-agent-uninstall.sh
 ```
+
+---
+
+## Quick Reference
+
+```bash
+curl -sfL https://get.k3s.io | sh -
+
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown "$USER:$USER" ~/.kube/config
+
+echo 'export KUBECONFIG=~/.kube/config' >> ~/.bashrc
+source ~/.bashrc
+```
