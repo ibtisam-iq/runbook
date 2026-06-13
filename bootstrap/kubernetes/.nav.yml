@@ -10,6 +10,7 @@ nav:
       - Local Path Provisioner: addons-bare-metal/deploy-local-path-provisioner.md
       - Ingress NGINX Controller: addons-bare-metal/deploy-ingress-nginx-controller.md
       - MetalLB Load Balancer: addons-bare-metal/deploy-metallb-load-balancer.md
+      - ArgoCD with Custom Domain: addons-bare-metal/deploy-argocd.md
       - addons-bare-metal/deploy-gateway-api
   - EKS Add-ons:
       - AWS Load Balancer Controller: addons-eks/deploy-aws-load-balancer-controller.md
