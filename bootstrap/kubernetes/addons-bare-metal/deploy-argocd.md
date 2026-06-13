@@ -1,4 +1,4 @@
-# Deploy ArgoCD on Bare-Metal and Access via Custom Domain
+# Deploy ArgoCD on Bare-Metal Kubernetes
 
 ArgoCD is a declarative, GitOps-based continuous delivery tool for Kubernetes. It watches a Git repository and automatically reconciles the live cluster state with the desired state defined in Git — no manual `kubectl apply` needed after the initial setup.
 
@@ -20,7 +20,7 @@ This runbook covers:
 
 ### Dev Machine
 
-[SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) is used throughout this runbook — a custom root filesystem on iximiuz Labs with all DevOps tools pre-installed (`kubectl`, `helm`, `cloudflared`, `terraform`, `aws cli`, etc.). No local machine setup is required.
+I use [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) — a custom root filesystem on iximiuz Labs, which I maintain with all DevOps tools pre-installed (`kubectl`, `helm`, `cloudflared`, `terraform`, `aws cli`, etc.). No local machine setup is required.
 
 ---
 
@@ -110,31 +110,32 @@ In the Cloudflare dashboard (`Zero Trust → Networks → Tunnels → your tunne
 | Field | Value |
 |---|---|
 | Subdomain | `argocd` |
-| Domain | `ibtisam-iq.com` |
-| Full hostname | `argocd.ibtisam-iq.com` |
+| Domain | `<your-domain>` |
 | Service Type | `HTTPS` |
 | Service URL | `localhost:30440` |
 | No TLS Verify | **ON** |
 
 > **Why HTTPS + No TLS Verify?** ArgoCD's server certificate is self-signed. Cloudflare must reach it over HTTPS (because ArgoCD only speaks HTTPS), but cannot verify the certificate chain. `No TLS Verify` allows the tunnel to connect without a trusted CA.
 
-Access the UI at `https://argocd.ibtisam-iq.com`.
-
 ---
 
 ## Step 3 — Clone the Application Repo
 
-The application being deployed is **Online Boutique** — a microservices demo originally by Google. It has been forked to [`ibtisam-iq/microservices-demo`](https://github.com/ibtisam-iq/microservices-demo) with the following additions:
-
-- A CI pipeline (`.github/workflows/ci.trigger.yml` and `build.yml`) that builds all service images and pushes them to `ghcr.io/ibtisam-iq/microservices-demo` instead of Google's registry
-- A Helm chart at `helm-chart/` that references these custom images via `images.repository` and `images.tag` values
+The application being deployed is **Online Boutique** — a microservices demo originally by Google. It has been forked to [`ibtisam-iq/microservices-demo`](https://github.com/ibtisam-iq/microservices-demo).
 
 ```bash
 git clone https://github.com/ibtisam-iq/microservices-demo.git
 cd microservices-demo
 ```
 
-The Helm chart at `helm-chart/` is what ArgoCD will use as its source in the next step.
+> **About this fork**
+>
+> The upstream repo is the [Google Cloud microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo). After forking, the following CI workflows were added:
+>
+> - [`ci-trigger.yaml`](https://github.com/ibtisam-iq/microservices-demo/blob/main/.github/workflows/ci-trigger.yaml) — detects which services changed and triggers targeted builds
+> - [`reusable-build.yaml`](https://github.com/ibtisam-iq/microservices-demo/blob/main/.github/workflows/reusable-build.yaml) — builds each service image and pushes it to `ghcr.io/ibtisam-iq/microservices-demo`
+>
+> The Helm chart at `helm-chart/` references these custom images via `images.repository` and `images.tag` values. ArgoCD uses this chart as its source in the next step.
 
 ---
 
@@ -177,39 +178,17 @@ EOF
 kubectl apply -f boutique-app.yaml
 ```
 
-### Decisions Explained
+> **Why `images.repository: ghcr.io/ibtisam-iq/microservices-demo`?**
+>
+> The upstream Helm chart defaults to Google's own image registry. All service images have been rebuilt and pushed to GitHub Container Registry under this account, so the repository is overridden here to pull from the correct location.
 
-**`path: helm-chart`**
-ArgoCD auto-detects the deployment tool from the contents of this directory. Since `helm-chart/` contains a `Chart.yaml`, ArgoCD treats it as a Helm chart and runs `helm template` internally before applying.
+> **Why `images.tag: latest`?**
+>
+> The Helm chart defaults to using the chart's `appVersion` as the image tag. Overriding with `latest` ensures the most recently pushed image is always pulled — appropriate for this demo setup. In production, pin to an immutable tag (e.g., a Git commit SHA) for reproducible deployments and reliable rollbacks.
 
-| Files found in `path` | Tool used | How deployed |
-|---|---|---|
-| `Chart.yaml` | Helm | `helm template` → `kubectl apply` |
-| `kustomization.yaml` | Kustomize | `kustomize build` → `kubectl apply` |
-| Plain `*.yaml` | Raw manifests | `kubectl apply` directly |
-
-**`images.repository: ghcr.io/ibtisam-iq/microservices-demo`**
-The upstream chart defaults to Google's own image registry. Since all images have been rebuilt and pushed to GitHub Container Registry under this account, the repository is overridden here.
-
-**`images.tag: latest`**
-The Helm chart defaults to using the chart's `appVersion` as the image tag. Overriding with `latest` ensures the most recently pushed image is always pulled, which is appropriate for this demo setup.
-
-**`loadGenerator.create: false`**
-The load generator service requires its own custom-built image, which was not pushed to GHCR as part of this setup. Disabling it avoids an `ImagePullBackOff` error on that pod.
-
-> **Note:** `images.tag: latest` is fine for demos. In production, pin to an immutable tag (e.g., a Git commit SHA) so deployments are reproducible and rollbacks are reliable.
-
-**`destination.server: https://kubernetes.default.svc`**
-This is the in-cluster Kubernetes API server address. It means ArgoCD deploys to the same cluster it runs in. For deploying to an external cluster, register it first with `argocd cluster add`.
-
-**`syncPolicy.automated.prune: true`**
-Resources deleted from Git are also deleted from the cluster. Without this, removed manifests would stay running indefinitely.
-
-**`syncPolicy.automated.selfHeal: true`**
-Any manual `kubectl` changes to cluster resources are automatically reverted to match Git. This enforces strict GitOps — Git is the single source of truth.
-
-**`syncOptions.CreateNamespace=true`**
-The `boutique-app` namespace does not exist before this manifest is applied. This option tells ArgoCD to create it automatically.
+> **Why `loadGenerator.create: false`?**
+>
+> The load generator service requires its own custom-built image, which was not pushed to GHCR as part of this setup. Disabling it avoids an `ImagePullBackOff` error on that pod.
 
 ---
 
@@ -239,9 +218,7 @@ NAME                TYPE       CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
 frontend-external   NodePort   10.43.28.247  <none>        80:30080/TCP   3m
 ```
 
-### Expose the Frontend — Two Methods
-
-#### Option A — iximiuz Lab Port Expose
+### Option A — iximiuz Lab Port Expose
 
 In the iximiuz lab UI → **Expose HTTP(S) Ports**:
 
@@ -249,18 +226,16 @@ In the iximiuz lab UI → **Expose HTTP(S) Ports**:
 - HTTPS: **OFF** (the app serves plain HTTP)
 - Click **EXPOSE**
 
-#### Option B — Cloudflare Tunnel
+### Option B — Cloudflare Tunnel
 
 In the Cloudflare dashboard, add a second public hostname on the same tunnel:
 
 | Field | Value |
 |---|---|
 | Subdomain | `boutique` |
-| Domain | `ibtisam-iq.com` |
+| Domain | `<your-domain>` |
 | Service Type | `HTTP` |
 | Service URL | `localhost:30080` |
-
-Access at `https://boutique.ibtisam-iq.com`.
 
 ---
 
@@ -282,10 +257,10 @@ NAME          SYNC STATUS   HEALTH STATUS
 boutique-app  Synced        Healthy
 ```
 
-In the ArgoCD UI at `argocd.ibtisam-iq.com`, the application shows:
+In the ArgoCD UI, the application shows:
 
 - **APP HEALTH**: `Healthy`
-- **SYNC STATUS**: `Synced` (or `OutOfSync` after the manual service patch — expected, since selfHeal is now disabled and Git still has `LoadBalancer`)
+- **SYNC STATUS**: `Synced` (or `OutOfSync` after the manual service patch — expected, since `selfHeal` is now disabled and Git still has `LoadBalancer`)
 - **LAST SYNC**: timestamp of the last successful reconciliation
 
 ---
@@ -303,3 +278,55 @@ kubectl delete namespace argocd
 # Tear down k3s (if needed)
 /usr/local/bin/k3s-uninstall.sh
 ```
+
+---
+
+## Quick Reference
+
+```bash
+# 1. Create namespace and install ArgoCD via Helm
+kubectl create namespace argocd
+helm repo add argo https://argoproj.github.io/argo-helm && helm repo update argo
+helm install argocd argo/argo-cd --namespace argocd
+
+# 2. Verify components
+kubectl get po,deploy,sts,svc -n argocd
+
+# 3. Retrieve initial admin password
+kubectl get secret argocd-initial-admin-secret -n argocd \
+  -o jsonpath="{.data.password}" | base64 --decode; echo
+
+# 4. Patch argocd-server to NodePort
+kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
+kubectl get svc argocd-server -n argocd
+
+# 5. Expose ArgoCD UI (Option A: iximiuz — port 30440 HTTPS ON)
+#    (Option B: Cloudflare Tunnel → subdomain argocd, HTTPS, localhost:30440, No TLS Verify ON)
+
+# 6. Clone the application repo
+git clone https://github.com/ibtisam-iq/microservices-demo.git && cd microservices-demo
+
+# 7. Apply the ArgoCD Application manifest
+kubectl apply -f boutique-app.yaml
+
+# 8. Disable selfHeal before patching the frontend service
+kubectl patch application boutique-app -n argocd \
+  --type merge -p '{"spec":{"syncPolicy":{"automated":{"selfHeal":false}}}}'
+
+# 9. Patch frontend-external to NodePort
+kubectl patch svc frontend-external -n boutique-app \
+  -p '{"spec":{"type":"NodePort","ports":[{"port":80,"targetPort":8080,"nodePort":30080,"protocol":"TCP"}]}}'
+
+# 10. Expose frontend (Option A: iximiuz — port 30080 HTTPS OFF)
+#     (Option B: Cloudflare Tunnel → subdomain boutique, HTTP, localhost:30080)
+
+# 11. Verify deployment
+kubectl get po -n boutique-app
+kubectl get application boutique-app -n argocd
+
+# 12. Cleanup
+kubectl delete application boutique-app -n argocd
+helm uninstall argocd -n argocd && kubectl delete namespace argocd
+```
+
+> **Dev Machine:** All commands above are run on the [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) — no local setup required.
