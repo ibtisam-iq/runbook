@@ -417,7 +417,7 @@ export POLICY_ARN=$(aws iam list-policies \
 
 # Step 3: Pod Identity Agent (skip if already installed)
 kubectl get daemonset -n kube-system eks-pod-identity-agent
-exsctl create addon --cluster $CLUSTER_NAME --name eks-pod-identity-agent
+eksctl create addon --cluster $CLUSTER_NAME --name eks-pod-identity-agent
 
 # Step 4: Namespace
 kubectl create namespace external-dns
