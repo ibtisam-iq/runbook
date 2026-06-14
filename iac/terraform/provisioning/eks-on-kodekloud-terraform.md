@@ -478,6 +478,7 @@ NODE_ROLE_ARN=$(aws cloudformation describe-stacks \
 
 curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/cloudformation/2020-10-29/aws-auth-cm.yaml
 sed -i "s|<ARN of instance role (not instance profile)>|$NODE_ROLE_ARN|g" aws-auth-cm.yaml
+aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
 kubectl apply -f aws-auth-cm.yaml
 ```
 
