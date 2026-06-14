@@ -376,6 +376,19 @@ app-route   ["app.example.com"]    default/app-alb-gateway      30s
 ## Quick Sequence
 
 ```bash
+export REGION=$(aws configure get region)
+export CERT_DOMAIN="ibtisam.qzz.io"       # domain used to issue the ACM cert
+export ROUTE_DOMAIN="argocd.ibtisam.qzz.io"  # domain used in HTTPRoute / Gateway listeners
+
+export CERT_ARN=$(aws acm list-certificates \
+  --region "$REGION" \
+  --query "CertificateSummaryList[?DomainName=='${CERT_DOMAIN}'].CertificateArn | [0]" \
+  --output text)
+
+echo "CERT_ARN: $CERT_ARN"
+```
+
+```bash
 # Step 1: Standard CRDs
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
 
@@ -388,14 +401,64 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/aws-load-bala
 # Verify all CRDs
 kubectl get crds | grep -E 'gateway.networking.k8s.io|gateway.k8s.aws'
 
-# Step 4: GatewayClass
-kubectl apply -f gateway-class.yaml
+mkdir -p k8s/gateway-api
 
-# Step 5: LoadBalancerConfiguration
-kubectl apply -f alb-config.yaml
+cat <<'EOF' > k8s/gateway-api/gateway-config.yaml
+---
+# Step 4 — GatewayClass
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: aws-alb-gateway-class
+spec:
+  controllerName: gateway.k8s.aws/alb
+---
+# Step 5 — LoadBalancerConfiguration
+apiVersion: gateway.k8s.aws/v1beta1
+kind: LoadBalancerConfiguration
+metadata:
+  name: app-gw-lbconfig
+  namespace: default
+spec:
+  scheme: internet-facing
+  listenerConfigurations:
+    - protocolPort: HTTPS:443
+      defaultCertificate: "${CERT_ARN}"
+---
+# Step 6 — Gateway
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: app-alb-gateway
+  namespace: default
+spec:
+  gatewayClassName: aws-alb-gateway-class
+  infrastructure:
+    parametersRef:
+      kind: LoadBalancerConfiguration
+      name: app-gw-lbconfig
+      group: gateway.k8s.aws
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.${ROUTE_DOMAIN}"
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.${ROUTE_DOMAIN}"
+      allowedRoutes:
+        namespaces:
+          from: All
+EOF
 
-# Step 6: Gateway
-kubectl apply -f gateway.yaml
+envsubst < k8s/gateway-api/gateway-config.yaml \
+  > k8s/gateway-api/gateway-config-rendered.yaml
+
+kubectl apply -f k8s/gateway-api/gateway-config-rendered.yaml
 
 # Step 7: Verify
 kubectl get gatewayclass
