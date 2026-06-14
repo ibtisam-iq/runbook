@@ -378,7 +378,7 @@ app-route   ["app.example.com"]    default/app-alb-gateway      30s
 ```bash
 export REGION=$(aws configure get region)
 export CERT_DOMAIN="ibtisam.qzz.io"       # domain used to issue the ACM cert
-export ROUTE_DOMAIN="argocd.ibtisam.qzz.io"  # domain used in HTTPRoute / Gateway listeners
+export ROUTE_DOMAIN="ibtisam.qzz.io"  # domain used in HTTPRoute / Gateway listeners
 
 export CERT_ARN=$(aws acm list-certificates \
   --region "$REGION" \
