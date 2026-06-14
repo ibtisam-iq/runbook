@@ -462,6 +462,6 @@ kubectl apply -f k8s/gateway-api/gateway-config-rendered.yaml
 
 # Step 7: Verify
 kubectl get gatewayclass
-kubectl get gateway -n default
+kubectl get gateway -n default        # usually requires 5 min to turn True
 kubectl get loadbalancerconfiguration -n default
 ```
