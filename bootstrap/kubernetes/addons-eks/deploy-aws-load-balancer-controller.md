@@ -273,6 +273,8 @@ helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set controllerConfig.featureGates.ALBGatewayAPI=true \
   --version 1.14.0
 
+sleep 30
+
 kubectl get deploy -n kube-system aws-load-balancer-controller
 kubectl get sa -n kube-system aws-load-balancer-controller
 kubectl get sa -n kube-system aws-load-balancer-controller -o yaml | grep role-arn
