@@ -435,6 +435,10 @@ helm upgrade -i external-dns external-dns/external-dns \
   --namespace external-dns \
   --version 1.20.0 \
   -f helm-values/external-dns/sources-patch.yaml
+
+sleep 15
+
+kubectl logs -n external-dns deploy/external-dns
 ```
 
 ### IRSA (Method B, recommended Pattern 2)
@@ -504,4 +508,8 @@ helm upgrade -i external-dns external-dns/external-dns \
   -f helm-values/external-dns/sources-patch.yaml \
   --set serviceAccount.create=false \
   --set serviceAccount.name=external-dns
+
+sleep 15
+
+kubectl logs -n external-dns deploy/external-dns
 ```
