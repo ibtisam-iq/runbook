@@ -83,7 +83,7 @@ Install the **ECK operator** into the `logging` namespace:
 
 ```bash
 helm install eck-operator elastic/eck-operator \
-  --version 3.3.0 \
+  --version 3.4.0 \
   -n logging
 ```
 
@@ -132,7 +132,7 @@ Install the **eck-elasticsearch** chart into the `logging` namespace:
 
 ```bash
 helm install eck-elasticsearch elastic/eck-elasticsearch \
-  --version 0.18.0 \
+  --version 0.19.0 \
   -n logging
 ```
 
@@ -281,7 +281,7 @@ EOF
 
 ```bash
 helm upgrade -i eck-beats elastic/eck-beats \
-  --version 0.18.0 \
+  --version 0.19.0 \
   -f helm-values/logging/eck-beats-values.yaml \
   -n logging
 ```
@@ -312,7 +312,7 @@ EOF
 
 ```bash
 helm install eck-kibana elastic/eck-kibana \
-  --version 0.18.0 \
+  --version 0.19.0 \
   -f helm-values/logging/eck-kibana-values.yaml \
   -n logging
 ```
@@ -338,6 +338,7 @@ Set `APP_GATEWAY_NAME` to the appropriate Gateway name. The examples below assum
 
 ```bash
 export APP_GATEWAY_NAME=app-alb-gateway
+export KIBANA_HOST=kibana.ibtisam.qzz.io
 ```
 
 ### 5.2 HTTPRoute for Kibana
@@ -353,7 +354,7 @@ metadata:
   namespace: logging
 spec:
   hostnames:
-    - "${KIBANA_HOST}"
+    - "${KIBANA_HOST}"        
   parentRefs:
   - group: gateway.networking.k8s.io
     namespace: default
@@ -367,17 +368,19 @@ spec:
     sectionName: https
   rules:
   - backendRefs:
-    - name: eck-kibana-kb-http
-      port: 5601
+    - name: eck-kibana-kb-http   # kibana-service created by eck-kibana helm chart
+      port: 5601                 # default port for kibana service
 EOF
 
-envsubst < helm-values/logging/httproute-kibana.yaml | kubectl apply -f -
+envsubst < helm-values/logging/httproute-kibana.yaml
 ```
 
-Commentary:
+```bash
+kubectl apply -f helm-values/logging/httproute-kibana.yaml
+```
 
-- `backendRefs.name: eck-kibana-kb-http` refers to the Kibana Service created by the `eck-kibana` chart.  
-- Traffic to `${KIBANA_HOST}` on the shared Gateway is routed to this Service on port `5601`.
+!!! info "info"
+    Traffic to `${KIBANA_HOST}` on the shared Gateway is routed to this Service `eck-kibana-kb-http` on port `5601`.
 
 ### 5.3 TargetGroupConfiguration for Kibana
 
@@ -390,7 +393,7 @@ metadata:
   namespace: logging
 spec:
   targetReference:
-    name: eck-kibana-kb-http
+    name: eck-kibana-kb-http      # Kibana Service created by eck-kibana helm chart
   defaultConfiguration:
     targetType: ip
     protocol: HTTPS
@@ -398,14 +401,14 @@ spec:
       healthCheckProtocol: HTTPS
       healthCheckPath: /api/status
 EOF
+```
 
+```bash
 kubectl apply -f helm-values/logging/target-grp-kibana.yaml
 ```
 
-Commentary:
-
-- `targetReference.name: eck-kibana-kb-http` refers to the same Kibana Service used in the HTTPRoute.  
-- `protocol: HTTPS` and `healthCheckProtocol: HTTPS` are used because the ALB terminates TLS and health checks the Kibana HTTPS endpoint on `/api/status`.
+!!! info "info"
+    `protocol: HTTPS` and `healthCheckProtocol: HTTPS` are used because the ALB terminates TLS and health checks the Kibana HTTPS endpoint on `/api/status`.
 
 ### 5.4 Verify Gateway resources
 
@@ -422,8 +425,7 @@ Step 6 — Retrieve credentials and verify logs
 ```bash
 kubectl get secret eck-elasticsearch-es-elastic-user \
   -n logging \
-  -o go-template='{{.data.elastic | base64decode}}'
-echo
+  -o go-template='{{.data.elastic | base64decode}}'; echo
 ```
 
 ### 6.2 Access Kibana
@@ -440,3 +442,52 @@ Log in with:
 - Password: value from the secret above.
 
 Navigate to **Discover**, select the Filebeat index pattern (for example `filebeat-*`), and filter on `kubernetes.namespace` or `app` labels to inspect application logs.
+
+## Quick reference
+
+```bash
+# Create logging namespace
+kubectl get namespace logging >/dev/null 2>&1 || kubectl create namespace logging
+
+# Add elastic helm repository
+helm repo add elastic https://helm.elastic.co
+helm repo update
+
+# Install ECK operator
+helm install eck-operator elastic/eck-operator \
+  --version 3.4.0 \
+  -n logging
+
+helm install eck-elasticsearch elastic/eck-elasticsearch \
+  --version 0.19.0 \
+  -n logging
+
+# Deploy eck-beats
+helm upgrade -i eck-beats elastic/eck-beats \
+  --version 0.19.0 \
+  -f helm-values/logging/eck-beats-values.yaml \
+  -n logging
+
+# Install eck-kibana
+helm install eck-kibana elastic/eck-kibana \
+  --version 0.19.0 \
+  -f helm-values/logging/eck-kibana-values.yaml \
+  -n logging
+
+# Retrieve elastic user password
+kubectl get secret eck-elasticsearch-es-elastic-user \
+  -n logging \
+  -o go-template='{{.data.elastic | base64decode}}'; echo
+
+sleep 60
+
+# Verify ECK components
+kubectl get pods,svc,deploy,sts,ds,sa,elastic -n logging
+
+# Expose Kibana via Gateway API and ALB
+kubectl apply -f helm-values/logging/httproute-kibana.yaml
+kubectl apply -f helm-values/logging/target-grp-kibana.yaml
+
+# Verify Gateway resources
+kubectl get httproute,targetgroupconfiguration -n logging
+```
