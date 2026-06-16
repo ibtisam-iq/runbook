@@ -19,3 +19,4 @@ nav:
       - Fluent Bit CloudWatch: addons-eks/deploy-fluent-bit-cloudwatch.md
       - Gateway API: addons-eks/deploy-gateway-api.md
       - External DNS: addons-eks/deploy-external-dns.md
+      - Elastic Logging Stack: addons-eks/deploy-elastic-logging-stack.md
