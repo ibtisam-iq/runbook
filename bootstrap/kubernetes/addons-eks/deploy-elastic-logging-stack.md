@@ -45,7 +45,8 @@ aws eks list-addons --cluster-name silver-stack-eks --region us-east-1
 
 If `aws-ebs-csi-driver` is **not** present, follow this runbook first:
 
-- https://runbook.ibtisam-iq.com/bootstrap/kubernetes/addons-eks/install-ebs-csi-driver/
+!!! info "Runbook"
+    https://runbook.ibtisam-iq.com/bootstrap/kubernetes/addons-eks/install-ebs-csi-driver/
 
 Environment variables
 ---------------------
@@ -54,7 +55,7 @@ Environment variables
 export CLUSTER_NAME=silver-stack-eks
 export REGION=us-east-1
 
-# DNS hostname for Kibana (must exist in Route 53 and be covered by an ACM certificate)
+# DNS hostname for Kibana
 export KIBANA_HOST=kibana.ibtisam.qzz.io
 
 # Optional: name of the Gateway that fronts the ALB
