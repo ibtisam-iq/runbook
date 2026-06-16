@@ -87,19 +87,23 @@ helm install eck-operator elastic/eck-operator \
   -n logging
 ```
 
-Verify that the operator pod is running:
+Verify that the operator statefulset is running:
 
 ```bash
-kubectl get pods -n logging
+kubectl get sts,pods,svc,sa -n logging
 ```
 
 Step 2 — Deploy Elasticsearch via eck-elasticsearch
 ---------------------------------------------------
 
 !!! info
-    A default StorageClass (`gp2` or `gp3`) is required for Elasticsearch PersistentVolumeClaims.  
-    Verify the default StorageClass and ensure that `gp3` is marked as default where required.  
-    To switch the default StorageClass from `gp2` to `gp3`, run:
+    A default StorageClass (`gp3`) is required for Elasticsearch PersistentVolumeClaims.  
+    To verify the default StorageClass, run:
+
+    ```bash
+    kubectl get sc
+    ```
+    If StorageClass is not `gp3` or not exists, run the following command to create a new StorageClass `gp3` and mark it as default.
 
     ```bash
     cat <<EOF | kubectl apply -f -
@@ -132,11 +136,10 @@ helm install eck-elasticsearch elastic/eck-elasticsearch \
   -n logging
 ```
 
-Check pods and Elasticsearch custom resource:
+Check sts, pods and Elasticsearch custom resource:
 
 ```bash
-kubectl get pods -n logging
-kubectl get elasticsearch -n logging
+kubectl get sts,pods,svc,es -n logging
 ```
 
 Verify that a PersistentVolume and PersistentVolumeClaim have been provisioned using the cluster default StorageClass:
@@ -157,14 +160,9 @@ Filebeat runs as a DaemonSet and ships container logs to Elasticsearch.
 mkdir -p helm-values/logging
 
 cat <<'EOF' > helm-values/logging/eck-beats-values.yaml
-# Top-level configuration: Beats type and version.
-version: 9.3.0
-
 type: filebeat
 
 # Reference to the Elasticsearch cluster managed by ECK.
-# The value of `name` must match the Elasticsearch CR name installed by the eck-elasticsearch chart.
-# Default CR name from the chart is `eck-elasticsearch`.
 elasticsearchRef:
   name: eck-elasticsearch
   namespace: logging
@@ -288,11 +286,10 @@ helm upgrade -i eck-beats elastic/eck-beats \
   -n logging
 ```
 
-Verify Beats health and Filebeat pods:
+Verify Beats health and Filebeat daemonset and pods:
 
 ```bash
-kubectl get beats -n logging
-kubectl get pods -n logging
+kubectl get sa,ds,pods,beats -n logging
 ```
 
 Step 4 — Deploy Kibana via eck-kibana
@@ -305,8 +302,6 @@ mkdir -p helm-values/logging
 
 cat <<'EOF' > helm-values/logging/eck-kibana-values.yaml
 # Reference to the Elasticsearch cluster managed by ECK.
-# The value of `name` must match the Elasticsearch CR name installed by the eck-elasticsearch chart.
-# Default CR name from the chart is `eck-elasticsearch`.
 elasticsearchRef:
   name: eck-elasticsearch
   namespace: logging
@@ -325,8 +320,7 @@ helm install eck-kibana elastic/eck-kibana \
 Verify:
 
 ```bash
-kubectl get kibana -n logging
-kubectl get pods -n logging
+kubectl get deploy,pods,svc,kibana -n logging
 ```
 
 Step 5 — Expose Kibana via Gateway API and ALB
