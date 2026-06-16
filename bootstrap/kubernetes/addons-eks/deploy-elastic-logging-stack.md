@@ -16,11 +16,11 @@ Official sources
 
 This runbook deploys a **centralized logging stack** on EKS using:
 
-- **ECK operator** — manages Elasticsearch, Kibana, and Beats via CRDs  
-- **Elasticsearch** — stores and indexes logs on EBS-backed volumes  
-- **Filebeat (eck-beats)** — DaemonSet log shipper, reads container logs and sends to Elasticsearch  
-- **Kibana** — UI for log search and dashboards  
-- **Gateway API + AWS Load Balancer Controller** — exposes Kibana at an HTTPS hostname via ALB
+- **ECK operator** — manages Elasticsearch, Kibana, and Beats via CRDs.  
+- **Elasticsearch** — stores and indexes logs on EBS-backed volumes.  
+- **Filebeat (eck-beats)** — DaemonSet log shipper, reads container logs and sends to Elasticsearch.  
+- **Kibana** — UI for log search and dashboards.  
+- **Gateway API + AWS Load Balancer Controller** — exposes Kibana at an HTTPS hostname via ALB.
 
 Data flow:
 
@@ -56,19 +56,21 @@ export REGION=us-east-1
 
 # DNS hostname for Kibana (must exist in Route 53 and be covered by an ACM certificate)
 export KIBANA_HOST=kibana.ibtisam.qzz.io
+
+# Optional: name of the Gateway that fronts the ALB
+export APP_GATEWAY_NAME=app-alb-gateway
 ```
 
-Step 1 — Create logging namespace
----------------------------------
-
-Create a dedicated namespace for logging components:
-
-```bash
-kubectl create namespace logging
-```
-
-Step 2 — Install ECK operator
+Step 1 — Install ECK operator
 -----------------------------
+
+!!! note
+    ECK components are deployed into the `logging` namespace.  
+    If the namespace does not exist, create it with:
+
+    ```bash
+    kubectl get namespace logging >/dev/null 2>&1 || kubectl create namespace logging
+    ```
 
 Add the Elastic Helm repository:
 
@@ -91,12 +93,36 @@ Verify that the operator pod is running:
 kubectl get pods -n logging
 ```
 
-Step 3 — Deploy Elasticsearch via eck-elasticsearch
+Step 2 — Deploy Elasticsearch via eck-elasticsearch
 ---------------------------------------------------
 
 !!! info
-    Most EKS clusters already have a suitable default StorageClass (`gp2` or `gp3`) configured when the EBS CSI driver runbook is followed.  
-    This runbook relies on that default StorageClass and does not create a new one.
+    A default StorageClass (`gp2` or `gp3`) is required for Elasticsearch PersistentVolumeClaims.  
+    Verify the default StorageClass and ensure that `gp3` is marked as default where required.  
+    To switch the default StorageClass from `gp2` to `gp3`, run:
+
+    ```bash
+    cat <<EOF | kubectl apply -f -
+    apiVersion: storage.k8s.io/v1
+    kind: StorageClass
+    metadata:
+      name: gp3
+      annotations:
+        storageclass.kubernetes.io/is-default-class: "true"
+    provisioner: ebs.csi.aws.com
+    parameters:
+      type: gp3
+      fsType: ext4
+    reclaimPolicy: Delete
+    volumeBindingMode: WaitForFirstConsumer
+    allowVolumeExpansion: true
+    EOF
+
+    kubectl patch storageclass gp2 -p \
+      '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+
+    kubectl get storageclass
+    ```
 
 Install the **eck-elasticsearch** chart into the `logging` namespace:
 
@@ -120,25 +146,30 @@ kubectl get pv
 kubectl get pvc -n logging
 ```
 
-Step 4 — Deploy Filebeat via eck-beats
+Step 3 — Deploy Filebeat via eck-beats
 --------------------------------------
 
 Filebeat runs as a DaemonSet and ships container logs to Elasticsearch.
 
-### 4.1 Create values file for eck-beats
+### 3.1 Create values file for eck-beats
 
 ```bash
 mkdir -p helm-values/logging
 
 cat <<'EOF' > helm-values/logging/eck-beats-values.yaml
+# Top-level configuration: Beats type and version.
 version: 9.3.0
 
 type: filebeat
 
+# Reference to the Elasticsearch cluster managed by ECK.
+# The value of `name` must match the Elasticsearch CR name installed by the eck-elasticsearch chart.
+# Default CR name from the chart is `eck-elasticsearch`.
 elasticsearchRef:
   name: eck-elasticsearch
   namespace: logging
 
+# DaemonSet-level configuration: run Filebeat on every node and mount container log paths.
 daemonSet:
   podTemplate:
     spec:
@@ -177,6 +208,7 @@ daemonSet:
             path: /var/lib/docker/containers
             type: Directory
 
+# Filebeat configuration: Kubernetes autodiscover and log parsing.
 config:
   filebeat:
     autodiscover:
@@ -201,6 +233,7 @@ config:
     - add_cloud_metadata: {}
     - add_host_metadata: {}
 
+# RBAC: service account, ClusterRole and ClusterRoleBinding for autodiscover.
 serviceAccount:
   name: elastic-beat-filebeat
   namespace: logging
@@ -246,7 +279,7 @@ clusterRole:
 EOF
 ```
 
-### 4.2 Install eck-beats
+### 3.2 Install eck-beats
 
 ```bash
 helm upgrade -i eck-beats elastic/eck-beats \
@@ -262,22 +295,25 @@ kubectl get beats -n logging
 kubectl get pods -n logging
 ```
 
-Step 5 — Deploy Kibana via eck-kibana
+Step 4 — Deploy Kibana via eck-kibana
 --------------------------------------
 
-### 5.1 Create values file for eck-kibana
+### 4.1 Create values file for eck-kibana
 
 ```bash
 mkdir -p helm-values/logging
 
 cat <<'EOF' > helm-values/logging/eck-kibana-values.yaml
+# Reference to the Elasticsearch cluster managed by ECK.
+# The value of `name` must match the Elasticsearch CR name installed by the eck-elasticsearch chart.
+# Default CR name from the chart is `eck-elasticsearch`.
 elasticsearchRef:
   name: eck-elasticsearch
   namespace: logging
 EOF
 ```
 
-### 5.2 Install eck-kibana
+### 4.2 Install eck-kibana
 
 ```bash
 helm install eck-kibana elastic/eck-kibana \
@@ -293,12 +329,24 @@ kubectl get kibana -n logging
 kubectl get pods -n logging
 ```
 
-Step 6 — Expose Kibana via Gateway API and ALB
+Step 5 — Expose Kibana via Gateway API and ALB
 ----------------------------------------------
 
-An HTTPRoute and TargetGroupConfiguration are required to expose Kibana through the shared `app-alb-gateway`.
+An HTTPRoute and TargetGroupConfiguration are required to expose Kibana through a Gateway fronted by the AWS Load Balancer Controller.
 
-### 6.1 HTTPRoute for Kibana
+### 5.1 Determine the Gateway name
+
+```bash
+kubectl get gateways.gateway.networking.k8s.io -A
+```
+
+Set `APP_GATEWAY_NAME` to the appropriate Gateway name. The examples below assume `app-alb-gateway`:
+
+```bash
+export APP_GATEWAY_NAME=app-alb-gateway
+```
+
+### 5.2 HTTPRoute for Kibana
 
 ```bash
 mkdir -p helm-values/logging
@@ -316,12 +364,12 @@ spec:
   - group: gateway.networking.k8s.io
     namespace: default
     kind: Gateway
-    name: app-alb-gateway
+    name: ${APP_GATEWAY_NAME}
     sectionName: http
   - group: gateway.networking.k8s.io
     namespace: default
     kind: Gateway
-    name: app-alb-gateway
+    name: ${APP_GATEWAY_NAME}
     sectionName: https
   rules:
   - backendRefs:
@@ -332,7 +380,12 @@ EOF
 envsubst < helm-values/logging/httproute-kibana.yaml | kubectl apply -f -
 ```
 
-### 6.2 TargetGroupConfiguration for Kibana
+Commentary:
+
+- `backendRefs.name: eck-kibana-kb-http` refers to the Kibana Service created by the `eck-kibana` chart.  
+- Traffic to `${KIBANA_HOST}` on the shared Gateway is routed to this Service on port `5601`.
+
+### 5.3 TargetGroupConfiguration for Kibana
 
 ```bash
 cat <<'EOF' > helm-values/logging/target-grp-kibana.yaml
@@ -355,17 +408,22 @@ EOF
 kubectl apply -f helm-values/logging/target-grp-kibana.yaml
 ```
 
-### 6.3 Verify Gateway resources
+Commentary:
+
+- `targetReference.name: eck-kibana-kb-http` refers to the same Kibana Service used in the HTTPRoute.  
+- `protocol: HTTPS` and `healthCheckProtocol: HTTPS` are used because the ALB terminates TLS and health checks the Kibana HTTPS endpoint on `/api/status`.
+
+### 5.4 Verify Gateway resources
 
 ```bash
 kubectl get httproute -n logging
 kubectl get targetgroupconfiguration -n logging
 ```
 
-Step 7 — Retrieve credentials and verify logs
+Step 6 — Retrieve credentials and verify logs
 ---------------------------------------------
 
-### 7.1 Retrieve `elastic` user password
+### 6.1 Retrieve `elastic` user password
 
 ```bash
 kubectl get secret eck-elasticsearch-es-elastic-user \
@@ -374,7 +432,7 @@ kubectl get secret eck-elasticsearch-es-elastic-user \
 echo
 ```
 
-### 7.2 Access Kibana
+### 6.2 Access Kibana
 
 Open the Kibana URL in a browser:
 
@@ -384,16 +442,7 @@ https://${KIBANA_HOST}
 
 Log in with:
 
-- Username: `elastic`  
-- Password: value from the secret above
+- Username: `elastic`.  
+- Password: value from the secret above.
 
 Navigate to **Discover**, select the Filebeat index pattern (for example `filebeat-*`), and filter on `kubernetes.namespace` or `app` labels to inspect application logs.
-
-File location
--------------
-
-Recommended location in the runbook repository:
-
-```text
-bootstrap/kubernetes/addons-eks/deploy-elastic-logging-stack.md
-```
