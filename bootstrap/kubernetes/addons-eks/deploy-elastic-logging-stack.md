@@ -455,11 +455,11 @@ helm repo add elastic https://helm.elastic.co
 helm repo update
 
 # Install ECK operator
-helm install eck-operator elastic/eck-operator \
+helm upgrade -i eck-operator elastic/eck-operator \
   --version 3.4.0 \
   -n logging
 
-helm install eck-elasticsearch elastic/eck-elasticsearch \
+helm upgrade -i eck-elasticsearch elastic/eck-elasticsearch \
   --version 0.19.0 \
   -n logging
 
@@ -470,7 +470,7 @@ helm upgrade -i eck-beats elastic/eck-beats \
   -n logging
 
 # Install eck-kibana
-helm install eck-kibana elastic/eck-kibana \
+helm upgrade -i eck-kibana elastic/eck-kibana \
   --version 0.19.0 \
   -f helm-values/logging/eck-kibana-values.yaml \
   -n logging
