@@ -8,6 +8,7 @@ nav:
   - Bare-Metal Add-ons:
       - addons-bare-metal/install-cni
       - Local Path Provisioner: addons-bare-metal/deploy-local-path-provisioner.md
+      - Metrics Server: addons-bare-metal/deploy-metrics-server.md
       - Ingress NGINX Controller: addons-bare-metal/deploy-ingress-nginx-controller.md
       - MetalLB Load Balancer: addons-bare-metal/deploy-metallb-load-balancer.md
       - ArgoCD with Custom Domain: addons-bare-metal/deploy-argocd.md
