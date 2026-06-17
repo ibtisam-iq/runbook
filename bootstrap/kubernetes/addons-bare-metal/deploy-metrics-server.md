@@ -92,6 +92,8 @@ On EKS, Metrics Server can be installed in two ways.
 Follow the same Helm or manifest steps from the [bare-metal section](#bare-metal--kubeadm) above. On EKS, kubelet certificates are valid, so **omit** the `--kubelet-insecure-tls` flag:
 
 ```bash
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+helm repo update metrics-server
 helm install metrics-server metrics-server/metrics-server \
   --namespace kube-system
 ```
@@ -109,8 +111,8 @@ Install Metrics Server as a managed EKS add-on using `eksctl`:
 ```bash
 eksctl create addon \
   --name metrics-server \
-  --cluster <cluster-name> \
-  --region <region>
+  --cluster $CLUSTER_NAME \
+  --region $REGION
 ```
 
 Verify the add-on status:
@@ -118,8 +120,8 @@ Verify the add-on status:
 ```bash
 eksctl get addon \
   --name metrics-server \
-  --cluster <cluster-name> \
-  --region <region>
+  --cluster $CLUSTER_NAME \
+  --region $REGION
 ```
 
 !!! info "Managed Add-on Benefits"
@@ -207,6 +209,8 @@ kubectl patch deployment metrics-server -n kube-system \
   -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
 
 # --- EKS: Helm (no --kubelet-insecure-tls) ---
+helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+helm repo update metrics-server
 helm install metrics-server metrics-server/metrics-server --namespace kube-system
 
 # --- EKS: Managed Add-on ---
