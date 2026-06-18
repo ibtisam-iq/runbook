@@ -176,9 +176,7 @@ daemonSet:
           - mountPath: /var/log/containers
             name: varlogcontainers
           - mountPath: /var/log/pods
-            name: varlogpods
-          - mountPath: /var/lib/docker/containers
-            name: varlibdockercontainers  
+            name: varlogpods 
       volumes:
         - name: varlogcontainers
           hostPath:
@@ -187,10 +185,6 @@ daemonSet:
         - name: varlogpods
           hostPath:
             path: /var/log/pods
-            type: Directory
-        - name: varlibdockercontainers
-          hostPath:
-            path: /var/lib/docker/containers
             type: Directory
 
 # Filebeat configuration: Kubernetes autodiscover and log parsing.
@@ -474,12 +468,12 @@ helm upgrade -i eck-kibana elastic/eck-kibana \
   -f helm-values/logging/eck-kibana-values.yaml \
   -n logging
 
+sleep 60
+
 # Retrieve elastic user password
 kubectl get secret eck-elasticsearch-es-elastic-user \
   -n logging \
   -o go-template='{{.data.elastic | base64decode}}'; echo
-
-sleep 60
 
 # Verify ECK components
 kubectl get pods,svc,deploy,sts,ds,sa,elastic -n logging
