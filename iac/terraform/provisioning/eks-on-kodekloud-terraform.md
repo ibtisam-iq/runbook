@@ -429,7 +429,7 @@ cat > /tmp/cf-params.json << EOF
   {"ParameterKey": "Subnets",                             "ParameterValue": "$SUBNET_IDS"},
   {"ParameterKey": "KeyName",                             "ParameterValue": "$BASTION_KEY"},
   {"ParameterKey": "NodeAutoScalingGroupMinSize",         "ParameterValue": "1"},
-  {"ParameterKey": "NodeAutoScalingGroupMaxSize",         "ParameterValue": "3"},
+  {"ParameterKey": "NodeAutoScalingGroupMaxSize",         "ParameterValue": "5"},
   {"ParameterKey": "NodeAutoScalingGroupDesiredCapacity", "ParameterValue": "3"}
 ]
 EOF
