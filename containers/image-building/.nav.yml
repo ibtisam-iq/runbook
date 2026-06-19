@@ -1,4 +1,3 @@
 title: Image Building
 nav:
-  - index.md
-  - "*"
+  - configure-multi-arch-docker-build.md

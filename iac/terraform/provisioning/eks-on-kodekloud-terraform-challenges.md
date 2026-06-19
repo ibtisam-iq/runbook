@@ -21,17 +21,17 @@
 | 3 | `Invalid count argument` on `aws_eks_cluster_versions` | Module bug | [Fix](#3-invalid-count-argument-on-aws_eks_cluster_versions) |
 | 4 | `iam:TagPolicy` blocked on KMS policy creation | SCP | [Fix](#4-iamtagpolicy-blocked-on-kms-policy-creation) |
 | 5 | `cluster_encryption_config` unsupported argument | Wrong variable name | [Fix](#5-wrong-variable-names-in-eks-module-v21x) |
-| 6 | `encryption_config.0.provider.0.key_arn` required | Incomplete fix | [Fix](#6-encryption_config-key_arn-required) |
+| 6 | `encryption_config.0.provider.0.key_arn` required | Incomplete fix | [Fix]() |
 | 7 | `eks:CreateNodegroup` blocked | SCP | [Fix](#7-ekscreatenodegroup-blocked-unconditionally) |
 | 8 | `eks:AssociateAccessPolicy` blocked | SCP | [Fix](#8-eksassociateaccesspolicy-blocked) |
 | 9 | `eks:UpdateAccessEntry` blocked | SCP | [Fix](#9-eksupdateaccessentry-blocked) |
 | 10 | `system:masters` invalid for STANDARD access entry | EKS restriction | [Fix](#10-systemmasters-invalid-for-standard-access-entry) |
 | 11 | kubectl 403 Forbidden after access entry created | No RBAC | [Fix](#11-kubectl-403-forbidden) |
-| 12 | kubectl 401 after taint deleted the access entry | No auth entry | [Fix](#12-kubectl-401-after-taint) |
+| 12 | kubectl 401 after taint deleted the access entry | No auth entry | [Fix]() |
 | 13 | `eks:DeleteAddon` blocked on destroy | SCP | [Fix](#13-eksdeleteaddon-blocked-on-destroy) |
-| 14 | CoreDNS addon hangs at `Still creating...` for 17+ min | Ordering issue | [Fix](#14-coredns-addon-hangs) |
+| 14 | CoreDNS addon hangs at `Still creating...` for 17+ min | Ordering issue | [Fix]() |
 | 15 | Stale state from expired lab session | Wrong account | [Fix](#15-stale-state-from-expired-lab-session) |
-| 16 | `bootstrapClusterCreatorAdminPermissions` not working in module v21.x | Module bug | [Fix](#16-bootstrapclustercreatoradminpermissions-not-working) |
+| 16 | `bootstrapClusterCreatorAdminPermissions` not working in module v21.x | Module bug | [Fix]() |
 | 17 | AWS credentials not configured on bastion | Ops mistake | [Fix](#17-aws-credentials-not-configured-on-bastion) |
 
 ---

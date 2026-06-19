@@ -238,7 +238,7 @@ These are things the scripts do that manual guides do not:
 | Limitation | Detail |
 |---|---|
 | Ubuntu/Debian only | Scripts use `apt-get` and Debian package format. CentOS, RHEL, and Fedora are not supported. |
-| `reset-calico.sh` and `reset-flannel.sh` are incomplete | Both scripts currently exit early without running their cleanup logic. Manual cleanup commands are documented in the [Maintenance & Reset runbook](./maintenance-and-reset.md). |
+| `reset-calico.sh` and `reset-flannel.sh` are incomplete | Both scripts currently exit early without running their cleanup logic. Manual cleanup commands are documented in the [Maintenance & Reset runbook](./ref-maintenance-and-reset.md). |
 | No HA control plane setup | The `--upload-certs` flag is passed to `kubeadm init` (enabling future HA joins), but the scripts do not automate joining a second control plane node. |
 | No offline/air-gapped mode | All scripts download from the internet at runtime. Air-gapped environments are not supported. |
 | Single-OS tested | Tested on Ubuntu 22.04 and 24.04. Behaviour on other Debian-based distributions is not guaranteed. |
@@ -266,7 +266,7 @@ For a deep dive into what each script does, see the internal runbooks:
 - [Node Preparation](ref-node-preparation.md)
 - [Container Runtime](ref-container-runtime.md)
 - [Kubernetes Packages](ref-kubernetes-packages.md)
-- [Cluster Bootstrap](cluster-bootstrap.md)
+- [Cluster Bootstrap](ref-cluster-bootstrap.md)
 - [Kubeconfig & CNI](ref-kubeconfig-and-cni.md)
 - [Maintenance & Reset](ref-maintenance-and-reset.md)
 
