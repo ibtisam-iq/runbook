@@ -56,9 +56,34 @@ git clone https://github.com/ibtisam-iq/platform-engineering-systems.git
 cd platform-engineering-systems/systems/microservices-demo/
 ```
 
+The project directory tree at the time of this phase:
+ 
+```
+systems/microservices-demo/
+├── application.yaml                          # ArgoCD Application CR
+├── kustomization.yaml                        # Kustomize entry point (Helm chart + manifests)
+├── chart/
+│   └── values-eks.yaml                       # Patch-only Helm values for EKS
+├── manifests/
+│   ├── hpa-frontend.yaml                     
+│   ├── httproute-frontend.yaml               # Frontend HTTPRoute (app.ibtisam.qzz.io)
+│   └── target-grp-frontend.yaml              # Frontend ALB target group (targetType: ip)
+├── addons/
+│   ├── argocd/                               
+│   │   ├── patch-values.yaml                 #   ArgoCD Helm values (insecure, kustomize-helm, HTTPRoute)
+│   │   └── target-grp-config.yaml            #   ArgoCD ALB target group
+│   ├── image-updater/                        
+│   │   └── image-updater.yaml                #   ImageUpdater CR (digest strategy, 10 images)
+│   ├── elastic-logging/
+│   ├── external-dns/
+│   ├── gateway-api/
+│   └── kube-prometheus/
+└── terraform/
+```
+
 !!! abstract "Decision: All Manifests in CD Repo, Nothing in CI Repo"
 
-    I never added any deployment manifests, values files, or Kubernetes resources to the source repo. The source repo owns code and CI workflows only. This separation means the CI pipeline has zero knowledge of the cluster, and the CD repo is the single source of truth for what runs where.
+    I didn't add any deployment manifests, values files, or Kubernetes resources to the source repo. The source repo owns code and CI workflows only. This separation means the CI pipeline has zero knowledge of the cluster, and the CD repo is the single source of truth for what runs where.
 
 ---
 
