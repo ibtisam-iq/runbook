@@ -8,8 +8,8 @@ This is Phase 3 of a 6-phase project.
 
 | Phase | Title | What It Covers |
 |-------|-------|----------------|
-| 1 | [CI Pipeline and DevSecOps](../phase-1-ci/) | GitHub Actions workflows, Trivy scanning, GHCR image and chart publish |
-| 2 | [AWS Infrastructure](../phase-2-infra/) | DNS, ACM certificate, VPC, EKS cluster, bastion host, self-managed nodes |
+| 1 | [CI Pipeline and DevSecOps](ci.md) | GitHub Actions workflows, Trivy scanning, GHCR image and chart publish |
+| 2 | [AWS Infrastructure](aws-infrastructure.md) | DNS, ACM certificate, VPC, EKS cluster, bastion host, self-managed nodes |
 | **3** | **Cluster Add-ons and Gateway API (this runbook)** | **ALB Controller, EBS CSI, Gateway API, ExternalDNS** |
 | 4 | GitOps with ArgoCD | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
 | 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
@@ -241,4 +241,4 @@ The cluster was ready to accept HTTPRoutes from any namespace and automatically 
 
 ## Next Phase
 
-[Phase 4: GitOps with ArgoCD](../phase-4-gitops/) covers installing ArgoCD, creating the Application manifest, deploying the Online Boutique via the CD repo, and configuring ArgoCD Image Updater for continuous delivery.
+[Phase 4: GitOps with ArgoCD](gitops.md) covers installing ArgoCD, creating the Application manifest, deploying the Online Boutique via the CD repo, and configuring ArgoCD Image Updater for continuous delivery.

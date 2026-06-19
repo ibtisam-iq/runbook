@@ -8,9 +8,9 @@ This is Phase 2 of a 6-phase project.
 
 | Phase | Title | What It Covers |
 |-------|-------|----------------|
-| 1 | [CI Pipeline and DevSecOps](../ci.md) | GitHub Actions workflows, Trivy scanning, GHCR image and chart publish |
+| 1 | [CI Pipeline and DevSecOps](ci.md) | GitHub Actions workflows, Trivy scanning, GHCR image and chart publish |
 | **2** | **AWS Infrastructure (this runbook)** | **DNS, ACM certificate, VPC, EKS cluster, bastion host, self-managed nodes (Terraform)** |
-| 3 | Cluster Add-ons and Gateway API | ALB Controller, EBS CSI, Gateway API CRDs, GatewayClass, Gateway, ExternalDNS |
+| 3 | [Cluster Add-ons and Gateway API](cluster-addons.md) | ALB Controller, EBS CSI, Gateway API CRDs, GatewayClass, Gateway, ExternalDNS |
 | 4 | GitOps with ArgoCD | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
 | 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
 | 6 | Autoscaling and Load Testing | Metrics Server, HPA, load generation, scaling verification |
@@ -290,4 +290,4 @@ Every step in this phase was recorded. The terminal sessions capture the exact c
 
 ## Next Phase
 
-[Phase 3: Cluster Add-ons and Gateway API](../cluster-addons.md) covers installing the AWS Load Balancer Controller, EBS CSI Driver, Gateway API CRDs, GatewayClass, Gateway, and ExternalDNS.
+[Phase 3: Cluster Add-ons and Gateway API](cluster-addons.md) covers installing the AWS Load Balancer Controller, EBS CSI Driver, Gateway API CRDs, GatewayClass, Gateway, and ExternalDNS.

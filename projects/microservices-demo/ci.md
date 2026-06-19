@@ -9,8 +9,8 @@ This is Phase 1 of a 6-phase project. The full project deploys a 10-service poly
 | Phase | Title | What It Covers |
 |-------|-------|----------------|
 | **1** | **CI Pipeline and DevSecOps (this runbook)** | **GitHub Actions workflows, Trivy scanning, GHCR image and chart publish** |
-| 2 | AWS Infrastructure | VPC, EKS cluster, self-managed nodes, Bastion host, Route 53 hosted zone, ACM certificate (Terraform) |
-| 3 | Cluster Add-ons and Gateway API | ALB Controller, EBS CSI, Gateway API CRDs, GatewayClass, Gateway, ExternalDNS |
+| 2 | [AWS Infrastructure](aws-infrastructure.md) | VPC, EKS cluster, self-managed nodes, Bastion host, Route 53 hosted zone, ACM certificate (Terraform) |
+| 3 | [Cluster Add-ons and Gateway API](cluster-addons.md) | ALB Controller, EBS CSI, Gateway API CRDs, GatewayClass, Gateway, ExternalDNS |
 | 4 | GitOps with ArgoCD | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
 | 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
 | 6 | Autoscaling and Load Testing | Metrics Server, HPA, load generation, scaling verification |
@@ -442,4 +442,4 @@ Secrets required:
 
 ## Next Phase
 
-[Phase 2: AWS Infrastructure](../aws-infrastructure.md) covers provisioning the EKS cluster, VPC, and self-managed node groups using Terraform.
+[Phase 2: AWS Infrastructure](aws-infrastructure.md) covers provisioning the EKS cluster, VPC, and self-managed node groups using Terraform.
