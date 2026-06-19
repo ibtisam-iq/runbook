@@ -43,7 +43,7 @@ Step 4  Installed ExternalDNS (IRSA + Helm, configured for Gateway API route sou
 
 !!! abstract "Decision: Gateway API Instead of Ingress"
 
-    The previous iteration of this project used Ingress resources. I migrated to Gateway API because the Kubernetes project itself [recommends Gateway over Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) and states that the Ingress API has been frozen. Gateway API is the modern, actively developed replacement with a cleaner separation between infrastructure operators (who define the Gateway) and application developers (who define HTTPRoutes).
+    I chose Gateway API because the Kubernetes project itself [recommends Gateway over Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/) and states that the Ingress API has been frozen. Gateway API is the modern, actively developed replacement with a cleaner separation between infrastructure operators (who define the Gateway) and application developers (who define HTTPRoutes).
 
 ---
 
@@ -98,7 +98,7 @@ kubectl get deploy -n kube-system aws-load-balancer-controller
 
 ## EBS CSI Driver
 
-EKS does not include a storage driver by default. Without the EBS CSI Driver, any PersistentVolumeClaim requesting `gp2` or `gp3` storage stays in `Pending` forever. I installed it now because the Elasticsearch data nodes in Phase 5 need persistent volumes for index storage.
+EKS creates a `gp2` StorageClass by default using the legacy in-tree `kubernetes.io/aws-ebs` provisioner. The EBS CSI Driver provides the modern `ebs.csi.aws.com` provisioner, which is required for `gp3` volumes and supports features like volume expansion. I installed it now because the Elasticsearch data nodes in Phase 5 need persistent volumes for index storage.
 
 !!! info "Runbook: EBS CSI Driver"
 
@@ -121,7 +121,20 @@ aws eks create-addon \
   --resolve-conflicts "OVERWRITE"
 ```
 
-After the add-on was active, I created a `gp3` StorageClass and set it as the cluster default:
+On KodeKloud, the `--service-account-role-arn` parameter does not work with `aws eks create-addon` due to SCP restrictions. I had to manually annotate the service account with the IRSA role ARN after the add-on was created:
+
+```bash
+ROLE_ARN=$(aws iam get-role --role-name AmazonEKS_EBS_CSI_DriverRole --query "Role.Arn" --output text)
+
+kubectl annotate serviceaccount ebs-csi-controller-sa \
+  -n kube-system \
+  eks.amazonaws.com/role-arn=$ROLE_ARN \
+  --overwrite
+
+kubectl rollout restart deployment ebs-csi-controller -n kube-system
+```
+
+After the driver was active, I created a `gp3` StorageClass and set it as the cluster default:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -140,15 +153,15 @@ allowVolumeExpansion: true
 EOF
 ```
 
-!!! abstract "Decision: gp3 Over gp2"
+!!! abstract "Decision: gp3 as Default StorageClass"
 
-    `gp3` provides 3,000 IOPS and 125 MB/s throughput baseline at a lower cost than `gp2`. There is no reason to use `gp2` on new clusters. I set `gp3` as the default StorageClass so any PVC without an explicit class gets `gp3` automatically.
+    EKS creates a `gp2` StorageClass by default, but `gp3` is cheaper and provides a better baseline: 3,000 IOPS and 125 MB/s throughput included at no extra cost. I created a `gp3` class with the `ebs.csi.aws.com` provisioner and set it as the cluster default so any PVC without an explicit class gets `gp3` automatically.
 
 ---
 
 ## Gateway API
 
-I replaced the Ingress model with Gateway API. The architecture is: one shared Gateway provisions a single ALB, and multiple HTTPRoutes (from different namespaces) attach to it. This means the entire project runs behind one ALB, not one per Ingress.
+I chose Gateway API instead of Ingress. The architecture is: one shared Gateway provisions a single ALB, and multiple HTTPRoutes (from different namespaces) attach to it. This means the entire project runs behind one ALB.
 
 !!! info "Runbook: Gateway API on EKS"
 
@@ -161,7 +174,7 @@ Three resources were created:
 
 **LoadBalancerConfiguration** specifies the ALB parameters: internet-facing scheme, public subnets, and the ACM certificate ARN from Phase 2 (`arn:aws:acm:us-east-1:767397778924:certificate/47da9369-...`) for HTTPS termination.
 
-**Gateway** (`app-alb-gateway`) defines two listeners: HTTP on port 80 and HTTPS on port 443. Both accept HTTPRoutes from any namespace (`allowedRoutes.namespaces.from: All`). When this Gateway is created, the ALB Controller provisions the actual AWS ALB.
+**Gateway** (`app-alb-gateway`) defines two listeners: HTTP on port 80 and HTTPS on port 443. Both accept HTTPRoutes from any namespace (`allowedRoutes.namespaces.from: All`). When this Gateway is created, the ALB Controller provisions the actual AWS ALB. The Gateway status took approximately 5 minutes to transition to `Programmed: True` while the ALB was being provisioned and health checks passed.
 
 The manifests for these three resources live in the CD repo at [`addons/gateway-api/`](https://github.com/ibtisam-iq/platform-engineering-systems/tree/main/systems/microservices-demo/addons/gateway-api).
 
@@ -241,4 +254,4 @@ The cluster was ready to accept HTTPRoutes from any namespace and automatically 
 
 ## Next Phase
 
-[Phase 4: GitOps with ArgoCD](gitops.md) covers installing ArgoCD, creating the Application manifest, deploying the Online Boutique via the CD repo, and configuring ArgoCD Image Updater for continuous delivery.
+[Phase 4: GitOps with ArgoCD](gitops-argocd.md) covers installing ArgoCD, creating the Application manifest, deploying the Online Boutique via the CD repo, and configuring ArgoCD Image Updater for continuous delivery.

@@ -227,7 +227,7 @@ I scan the source tree before building the image. Two passes:
 
 !!! warning "Design: BuildKit Epoch Timestamps"
 
-    BuildKit sets the image config's `created` field to `1970-01-01T00:00:00Z` for reproducible builds. I discovered this when ArgoCD Image Updater's `newest-build` strategy failed to differentiate tags. All images appeared identical in age. This constraint drove the `digest` strategy choice on the CD side (see [Phase 4](../phase-4-gitops/)).
+    BuildKit sets the image config's `created` field to `1970-01-01T00:00:00Z` for reproducible builds. I discovered this when ArgoCD Image Updater's `newest-build` strategy failed to differentiate tags. All images appeared identical in age. This constraint drove the `digest` strategy choice on the CD side (see [Phase 4](gitops-argocd.md)).
 
 ### Stage 6: Trivy Image Scan
 
@@ -354,7 +354,7 @@ I evaluated three approaches:
 | CD repo noise | High | Low | High |
 | Conflicts with Image Updater | Yes | N/A | Yes, if not scoped |
 
-I chose Approach B. CI pushes images with `sha-<40>`, `sha-<7>`, and `latest` tags, then stops. It has zero knowledge of the CD repo for code pushes. Image Updater watches GHCR for new digests behind `:latest` and handles deployments on the cluster side (configured in [Phase 4](../phase-4-gitops/)).
+I chose Approach B. CI pushes images with `sha-<40>`, `sha-<7>`, and `latest` tags, then stops. It has zero knowledge of the CD repo for code pushes. Image Updater watches GHCR for new digests behind `:latest` and handles deployments on the cluster side (configured in [Phase 4](gitops-argocd.md)).
 
 This eliminated `reusable-gitops.yaml` entirely. Its two responsibilities were redistributed:
 
@@ -382,7 +382,7 @@ ci-trigger.yaml -> detect-changes emitted ["frontend"]
   -> CI done. No CD repo commit.
 ```
 
-On the cluster side, Image Updater detected the new digest behind `frontend:latest` within 2 minutes and rolled the pods (documented in [Phase 4](../phase-4-gitops/)).
+On the cluster side, Image Updater detected the new digest behind `frontend:latest` within 2 minutes and rolled the pods (documented in [Phase 4](gitops-argocd.md)).
 
 ### Chart change (CI + CD repo update)
 

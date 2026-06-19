@@ -3,3 +3,4 @@ nav:
   - ci.md
   - aws-infrastructure.md
   - cluster-addons.md
+  - gitops-argocd.md
