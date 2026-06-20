@@ -11,9 +11,9 @@ This is Phase 2 of a 6-phase project.
 | 1 | [CI Pipeline and DevSecOps](ci.md) | GitHub Actions workflows, Trivy scanning, GHCR image and chart publish |
 | **2** | **AWS Infrastructure (this runbook)** | **DNS, ACM certificate, VPC, EKS cluster, bastion host, self-managed nodes (Terraform)** |
 | 3 | [Cluster Add-ons and Gateway API](cluster-addons.md) | ALB Controller, EBS CSI, Gateway API CRDs, GatewayClass, Gateway, ExternalDNS |
-| 4 | GitOps with ArgoCD | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
-| 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
-| 6 | Autoscaling and Load Testing | Metrics Server, HPA, load generation, scaling verification |
+| 4 | [GitOps with ArgoCD](gitops-argocd.md) | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
+| 5 | [Observability Stack](observability.md) | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
+| 6 | [Autoscaling, Load Testing, and Final Verification](autoscaling.md) | Metrics Server, HPA, scaling validation, full cluster audit |
 
 At the end of this phase, the EKS cluster is fully operational with worker nodes ready to accept workloads, DNS is delegated, and the ACM certificate is issued for TLS termination in later phases.
 

@@ -11,9 +11,9 @@ This is Phase 3 of a 6-phase project.
 | 1 | [CI Pipeline and DevSecOps](ci.md) | GitHub Actions workflows, Trivy scanning, GHCR image and chart publish |
 | 2 | [AWS Infrastructure](aws-infrastructure.md) | DNS, ACM certificate, VPC, EKS cluster, bastion host, self-managed nodes |
 | **3** | **Cluster Add-ons and Gateway API (this runbook)** | **ALB Controller, EBS CSI, Gateway API, ExternalDNS** |
-| 4 | GitOps with ArgoCD | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
-| 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
-| 6 | Autoscaling and Load Testing | Metrics Server, HPA, load generation, scaling verification |
+| 4 | [GitOps with ArgoCD](gitops-argocd.md) | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
+| 5 | [Observability Stack](observability.md) | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
+| 6 | [Autoscaling, Load Testing, and Final Verification](autoscaling.md) | Metrics Server, HPA, scaling validation, full cluster audit |
 
 At the end of this phase, the cluster can provision ALBs via Gateway API, automatically create DNS records in Route 53, and provide persistent storage for stateful workloads.
 

@@ -4,7 +4,7 @@
 
 This runbook documents how I deployed ArgoCD, deployed the Online Boutique application via the CD repo, and configured ArgoCD Image Updater for continuous delivery. This was the most iterative phase of the project: the Image Updater went through three strategy changes and multiple debugging cycles before working correctly with BuildKit-produced images.
 
-This is Phase 4 of a 6-phase project.
+This is Phase 4, the most comprehensive phase of a 6-phase project.
 
 | Phase | Title | What It Covers |
 |-------|-------|----------------|
@@ -12,8 +12,8 @@ This is Phase 4 of a 6-phase project.
 | 2 | [AWS Infrastructure](aws-infrastructure.md) | DNS, ACM certificate, VPC, EKS cluster, bastion host, self-managed nodes |
 | 3 | [Cluster Add-ons and Gateway API](cluster-addons.md) | ALB Controller, EBS CSI, Gateway API, ExternalDNS |
 | **4** | **GitOps with ArgoCD (this runbook)** | **ArgoCD install, application deployment, Image Updater, CI-CD integration** |
-| 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
-| 6 | Autoscaling and Load Testing | Metrics Server, HPA, load generation, scaling verification |
+| 5 | [Observability Stack](observability.md) | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
+| 6 | [Autoscaling, Load Testing, and Final Verification](autoscaling.md) | Metrics Server, HPA, scaling validation, full cluster audit |
 
 At the end of this phase, the full CI/CD loop is operational: a code push to `src/` in the source repo triggers CI, which builds and pushes images to GHCR. Image Updater detects the new digest within 2 minutes and rolls the pods. No manual intervention.
 
@@ -42,8 +42,8 @@ Step 14  Verified: Image Updater detected new digest, rolled pods (revision 3)
 | Codebase | [`systems/microservices-demo/`](https://github.com/ibtisam-iq/platform-engineering-systems/tree/main/systems/microservices-demo) |
 | ArgoCD manifests | [`addons/argocd/`](https://github.com/ibtisam-iq/platform-engineering-systems/tree/main/systems/microservices-demo/addons/argocd) |
 | Image Updater manifests | [`addons/image-updater/`](https://github.com/ibtisam-iq/platform-engineering-systems/tree/main/systems/microservices-demo/addons/image-updater) |
-| ArgoCD URL | [argocd.ibtisam.qzz.io](https://argocd.ibtisam.qzz.io/) |
-| App URL | [app.ibtisam.qzz.io](https://app.ibtisam.qzz.io/) |
+| ArgoCD URL | `argocd.ibtisam.qzz.io` |
+| App URL | `app.ibtisam.qzz.io` |
 
 ---
 
@@ -84,6 +84,10 @@ systems/microservices-demo/
 !!! abstract "Decision: All Manifests in CD Repo, Nothing in CI Repo"
 
     I didn't add any deployment manifests, values files, or Kubernetes resources to the source repo. The source repo owns code and CI workflows only. This separation means the CI pipeline has zero knowledge of the cluster, and the CD repo is the single source of truth for what runs where.
+
+!!! info "Decision: ArgoCD Manages the App, Not the Platform"
+ 
+    Only the boutique application is deployed via ArgoCD. Platform components (monitoring, logging, ArgoCD itself) are installed directly via Helm from the bastion host. This keeps the observability stack independent of ArgoCD: if ArgoCD breaks, Prometheus and Grafana are still running to debug it. See [Phase 5: Observability Stack](observability.md) for the full rationale.
 
 ---
 
@@ -381,4 +385,4 @@ ArgoCD Application: microservices-demo
 
 ## Next Phase
 
-[Phase 5: Observability Stack](../phase-5-observability/) covers deploying kube-prometheus-stack (Prometheus, Grafana, AlertManager with Slack), the ELK stack (Elasticsearch, Filebeat, Kibana), and exposing all dashboards via HTTPRoutes on custom subdomains.
+[Phase 5: Observability Stack](observability.md) covers deploying kube-prometheus-stack (Prometheus, Grafana, AlertManager with Slack), the ELK stack (Elasticsearch, Filebeat, Kibana), and exposing all dashboards via HTTPRoutes on custom subdomains.

@@ -11,9 +11,9 @@ This is Phase 1 of a 6-phase project. The full project deploys a 10-service poly
 | **1** | **CI Pipeline and DevSecOps (this runbook)** | **GitHub Actions workflows, Trivy scanning, GHCR image and chart publish** |
 | 2 | [AWS Infrastructure](aws-infrastructure.md) | VPC, EKS cluster, self-managed nodes, Bastion host, Route 53 hosted zone, ACM certificate (Terraform) |
 | 3 | [Cluster Add-ons and Gateway API](cluster-addons.md) | ALB Controller, EBS CSI, Gateway API CRDs, GatewayClass, Gateway, ExternalDNS |
-| 4 | GitOps with ArgoCD | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
-| 5 | Observability Stack | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
-| 6 | Autoscaling and Load Testing | Metrics Server, HPA, load generation, scaling verification |
+| 4 | [GitOps with ArgoCD](gitops-argocd.md) | ArgoCD, Application manifest, Image Updater, CD repo structure, deployment manifests |
+| 5 | [Observability Stack](observability.md) | kube-prometheus-stack, ELK stack, Slack alerting, HTTPRoutes |
+| 6 | [Autoscaling, Load Testing, and Final Verification](autoscaling.md) | Metrics Server, HPA, scaling validation, full cluster audit |
 
 At the end of this phase, every code push to `src/` builds, scans, and pushes container images to GHCR automatically. Every change to `helm-chart/` packages and publishes the Helm chart to GHCR and updates the CD repo. CI does not touch the cluster. ArgoCD Image Updater (configured in Phase 4) watches GHCR and handles deployments.
 
@@ -100,9 +100,9 @@ CD repo updated.
 
 ## Forking and Evaluating the Upstream
 
-I forked [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo). The fork stays pristine: I never modify upstream files. All customization lives in files I add alongside upstream. The `src/` directory, `helm-chart/` directory, and all templates remain untouched. This keeps the fork syncable with upstream.
+I forked [GoogleCloudPlatform/microservices-demo](https://github.com/GoogleCloudPlatform/microservices-demo). The fork stays pristine: I did not modify upstream files. All customization lives in files I add alongside upstream. The `src/` directory, `helm-chart/` directory, and all templates remain untouched. This keeps the fork syncable with upstream.
 
-!!! abstract "Decision: Never Modify Upstream Files"
+!!! abstract "Decision: Do Not Modify Upstream Files"
 
     Every custom file I created (workflow files, values overrides, manifests) is an addition, not a modification. If upstream releases a new chart version or patches a service, I can sync the fork without merge conflicts.
 
