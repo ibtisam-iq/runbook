@@ -1,8 +1,8 @@
-# Microservices Demo
+# End-to-End DevOps: CI/CD, GitOps, and Observability on Amazon EKS
 
-## What This Is
-
-A production-grade GitOps pipeline deploying Google's [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) (10-service polyglot monorepo) on Amazon EKS. I forked the upstream repo, built a DevSecOps CI pipeline with GitHub Actions, packaged and published the Helm chart to my own GHCR, and deployed it via ArgoCD with Image Updater handling continuous delivery. The platform includes full observability (Prometheus, Grafana, ELK stack with Slack alerting) and autoscaling (HPA).
+## Overview
+ 
+I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) (10-service polyglot monorepo) on Amazon EKS with a production-grade DevOps pipeline built from scratch: GitHub Actions CI with Trivy security scanning, Helm chart packaging to GHCR, ArgoCD GitOps with Image Updater for continuous delivery, full observability (Prometheus, Grafana, ELK, Slack alerting), Gateway API networking, and HPA autoscaling.
 
 | Item | Value |
 |------|-------|
