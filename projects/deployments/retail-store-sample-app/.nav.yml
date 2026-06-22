@@ -1,4 +1,9 @@
-title: "Project 02: retail-store-sample-app"
+title: "Retail Microservices: End-to-End Platform Engineering on EKS"
 nav:
   - index.md
-  
+  - aws-infrastructure.md
+  - cluster-addons.md
+  - application-resources.md
+  - microservices-deployment.md
+  - observability.md
+  - validation.md
