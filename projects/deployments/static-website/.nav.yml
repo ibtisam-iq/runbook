@@ -1,0 +1,8 @@
+title: "Static Website: Serverless CDN on AWS"
+nav:
+  - index.md
+  - storage-encryption.md
+  - iam-replication.md
+  - cloudfront-cdn.md
+  - observability-lifecycle.md
+  - verification.md
