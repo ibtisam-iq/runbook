@@ -1,4 +1,4 @@
-# Phase 10 — End-to-End Validation
+# Phase 10: End-to-End Validation
 
 ### ALB & Target Groups
 
@@ -24,7 +24,7 @@ All three target groups report `healthy` in the ALB console resource map.
 
 ```bash
 curl https://retail-microservices.ibtisam-iq.com
-# INCOMING TRANSMISSION — 23:47 UTC
+# INCOMING TRANSMISSION - 23:47 UTC
 # TO: FIELD AGENT | FROM: HEADQUARTERS, SUPPLIES DIVISION
 # RE: GADGET REPOSITORY ACCESS
 # Agent, welcome to the repository...

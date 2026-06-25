@@ -1,13 +1,13 @@
-# Phase 0 — Prerequisites & Environment Setup
+# Phases 0-3: Prerequisites & AWS Infrastructure Setup
 
 !!! info "Lab Context"
-    I executed this entire deployment inside [KodeKloud's AWS Playground](https://learn.kodekloud.com/user/playgrounds/playground-aws) — a time-boxed AWS environment with a real account, real services, but a restricted IAM user. No personal AWS account was used.
+    I executed this entire deployment inside [KodeKloud's AWS Playground](https://learn.kodekloud.com/user/playgrounds/playground-aws) - a time-boxed AWS environment with a real account, real services, but a restricted IAM user. No personal AWS account was used.
 
     Running EKS on this playground comes with non-trivial IAM permission gaps (e.g., no `iam:PassRole`, no `iam:PutRolePolicy` in some contexts). The workarounds for those restrictions are documented in a dedicated runbook: [EKS on KodeKloud AWS Playground →](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-aws-playground/)
 
 ### Dev Machine
 
-I used [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) — a custom root filesystem on iximiuz Labs, which I maintain with all DevOps tools pre-installed (`kubectl`, `eksctl`, `terraform`, `helm`, `helmfile`, `aws cli`, etc.). No local machine setup is required.
+I used [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) - a custom root filesystem on iximiuz Labs, which I maintain with all DevOps tools pre-installed (`kubectl`, `eksctl`, `terraform`, `helm`, `helmfile`, `aws cli`, etc.). No local machine setup is required.
 
 ### Configure AWS CLI
 
@@ -33,10 +33,10 @@ echo $ACCOUNT_ID   # 730335615031
 
 ---
 
-## Phase 1 — IAM Roles for EKS Cluster via Terraform
+## Phase 1 - IAM Roles for EKS Cluster via Terraform
 
 !!! info "Why Terraform instead of eksctl?"
-    The lab IAM user does not have `iam:PassRole` permission, which `eksctl create cluster` triggers internally when it creates and assigns roles. Creating the roles with Terraform beforehand — and then referencing them in `cluster.yaml` — avoids that permission entirely.
+    The lab IAM user does not have `iam:PassRole` permission, which `eksctl create cluster` triggers internally when it creates and assigns roles. Creating the roles with Terraform beforehand - and then referencing them in `cluster.yaml` - avoids that permission entirely.
 
     For more information, see [Terraform Code for IAM Roles for EKS Cluster](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-aws-playground/)
 
@@ -105,7 +105,7 @@ terraform apply -auto-approve
 
 ---
 
-## Phase 2 — EKS Control Plane via eksctl
+## Phase 2 - EKS Control Plane via eksctl
 
 ### Write `cluster.yaml`
 
@@ -168,7 +168,7 @@ eksctl utils associate-iam-oidc-provider \
 
 ---
 
-## Phase 3 — Self-Managed Worker Nodes via CloudFormation
+## Phase 3 - Self-Managed Worker Nodes via CloudFormation
 
 !!! info "Why Self-Managed Nodes?"
     Managed node groups are the standard way to run worker nodes in EKS, but they come with a catch:

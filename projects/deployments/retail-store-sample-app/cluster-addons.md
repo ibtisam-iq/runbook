@@ -1,6 +1,6 @@
-# Phase 4 — EKS Add-ons
+# Phase 4 & 5: EKS Add-ons & ACM Certificate
 
-### 4A — AWS Load Balancer Controller
+### 4A - AWS Load Balancer Controller
 
 !!! info "For more details, see: [Deploy AWS Load Balancer Controller](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/addons-eks/deploy-aws-load-balancer-controller/)
 
@@ -50,12 +50,12 @@ kubectl get sa -n kube-system aws-load-balancer-controller -o yaml | grep role-a
 
 ---
 
-### 4B — EBS CSI Driver
+### 4B - EBS CSI Driver
 
 !!! info "For more details, see: [Install EBS CSI Driver](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/addons-eks/install-ebs-csi-driver/)"
 
 ```bash
-# 1. Create IAM role only (no SA creation yet — addon creates it)
+# 1. Create IAM role only (no SA creation yet - addon creates it)
 eksctl create iamserviceaccount \
   --name ebs-csi-controller-sa \
   --namespace kube-system \
@@ -75,7 +75,7 @@ aws eks create-addon \
 ```
 
 !!! warning "SA annotation race condition"
-    The addon creates `ebs-csi-controller-sa` asynchronously. Wait for it to appear before annotating — polling with `kubectl get deploy -n kube-system | grep ebs-csi` until `0/2` appears works, then annotate and restart.
+    The addon creates `ebs-csi-controller-sa` asynchronously. Wait for it to appear before annotating - polling with `kubectl get deploy -n kube-system | grep ebs-csi` until `0/2` appears works, then annotate and restart.
 
 ```bash
 # 3. Annotate SA and restart controller
@@ -118,7 +118,7 @@ kubectl get sc
 
 ---
 
-## Phase 5 — ACM Certificate (TLS for Custom Domain)
+## Phase 5 - ACM Certificate (TLS for Custom Domain)
 
 ```bash
 export CERT_ARN=$(aws acm request-certificate \

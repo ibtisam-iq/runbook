@@ -1,4 +1,4 @@
-# Phase 8 — Monitoring Stack (Prometheus + Grafana)
+# Phase 8 & 9: Monitoring Stack & Container Insights
 
 !!! note "For more details, see: [Deploy kube-prometheus-stack](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/addons-eks/deploy-kube-prometheus-stack)"
 
@@ -106,11 +106,11 @@ kubectl get po -n monitoring
 ```
 
 !!! info "Shared ALB via Ingress Group"
-    All three services (`ui`, `grafana`, `prometheus`) share a single ALB (`k8s-ecomeks-ca3679ea54`) through `alb.ingress.kubernetes.io/group.name: ecom-eks`. The ALB routes by Host header — no separate load balancer is provisioned per service.
+    All three services (`ui`, `grafana`, `prometheus`) share a single ALB (`k8s-ecomeks-ca3679ea54`) through `alb.ingress.kubernetes.io/group.name: ecom-eks`. The ALB routes by Host header - no separate load balancer is provisioned per service.
 
 ---
 
-## Phase 9 — CloudWatch Container Insights (Fluent Bit)
+## Phase 9 - CloudWatch Container Insights (Fluent Bit)
 
 > Full reference: [Deploy Fluent Bit for CloudWatch](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/addons-eks/deploy-fluent-bit-cloudwatch)
 

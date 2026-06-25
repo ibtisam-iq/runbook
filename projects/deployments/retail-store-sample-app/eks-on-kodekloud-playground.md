@@ -29,17 +29,17 @@ The Terraform module at `terraform/lib/eks/eks.tf` wraps `terraform-aws-modules/
 
 Because of the restrictions above, deployment happens in **two phases**:
 
-1. **Pre-apply patches** — modify Terraform source to avoid blocked actions, then run `terraform apply` (first apply)
-2. **Node bootstrap** — manually provision self-managed worker nodes via CloudFormation, join them to the cluster, then run `terraform apply` again (second apply)
+1. **Pre-apply patches** - modify Terraform source to avoid blocked actions, then run `terraform apply` (first apply)
+2. **Node bootstrap** - manually provision self-managed worker nodes via CloudFormation, join them to the cluster, then run `terraform apply` again (second apply)
 
 !!! warning "Do not skip straight to `terraform apply`"
     Running `terraform apply` without the patches in Phase 1 will fail immediately. Running the second `terraform apply` without worker nodes will fail on Helm addon webhooks.
 
 ---
 
-## Phase 1 — Patch Terraform & First Apply
+## Phase 1 - Patch Terraform & First Apply
 
-### Fix 1 — Disable CloudWatch Log Group
+### Fix 1 - Disable CloudWatch Log Group
 
 **File:** `terraform/lib/eks/eks.tf`
 
@@ -56,7 +56,7 @@ create_cloudwatch_log_group = false
 
 ---
 
-### Fix 2 — Replace Inline IAM Role with Custom Role
+### Fix 2 - Replace Inline IAM Role with Custom Role
 
 **File:** `terraform/lib/eks/eks.tf`
 
@@ -106,7 +106,7 @@ resource "aws_iam_role_policy_attachment" "eks_vpc_resource_controller" {
 
 ---
 
-### Fix 3 — Disable Managed Node Groups
+### Fix 3 - Disable Managed Node Groups
 
 **File:** `terraform/lib/eks/eks.tf`
 
@@ -136,15 +136,15 @@ terraform apply
 
 | Resource | Error | Resolution |
 |---|---|---|
-| `helm_release.cert_manager` | `no endpoints available for service "aws-load-balancer-webhook-service"` | No worker nodes yet — resolved after Phase 2 |
+| `helm_release.cert_manager` | `no endpoints available for service "aws-load-balancer-webhook-service"` | No worker nodes yet - resolved after Phase 2 |
 
 ---
 
-## Phase 2 — Self-Managed Worker Nodes
+## Phase 2 - Self-Managed Worker Nodes
 
 With the control plane running but no worker nodes, the `cert-manager` Helm webhook fails because the `aws-load-balancer-controller` has nowhere to schedule. Worker nodes must be provisioned manually via the AWS-provided CloudFormation template.
 
-### Step 1 — Create Node IAM Role
+### Step 1 - Create Node IAM Role
 
 ```bash
 aws iam create-role \
@@ -164,7 +164,7 @@ aws iam attach-role-policy --role-name eksNodeRole \
   --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
 ```
 
-### Step 2 — Create EC2 Key Pair
+### Step 2 - Create EC2 Key Pair
 
 ```bash
 aws ec2 create-key-pair \
@@ -175,7 +175,7 @@ aws ec2 create-key-pair \
 chmod 400 ~/.ssh/eks-nodes-key.pem
 ```
 
-### Step 3 — Fetch Required IDs
+### Step 3 - Fetch Required IDs
 
 Fetch VPC ID:
 
@@ -208,7 +208,7 @@ aws ec2 describe-subnets \
   --output text
 ```
 
-### Step 4 — Create Parameters File
+### Step 4 - Create Parameters File
 
 !!! note ""
     Pass parameters via a JSON file. Passing the subnet list inline (even with `\,` escaping) causes the AWS CLI to misparse the value as a Python list.
@@ -233,7 +233,7 @@ EOF
 
 Replace all `<PLACEHOLDER>` values with the IDs collected in Step 3.
 
-### Step 5 — Launch CloudFormation Stack
+### Step 5 - Launch CloudFormation Stack
 
 ```bash
 aws cloudformation create-stack \
@@ -252,7 +252,7 @@ aws cloudformation describe-stacks \
   --output text
 ```
 
-### Step 6 — Join Nodes to Cluster
+### Step 6 - Join Nodes to Cluster
 
 ```bash
 NODE_ROLE_ARN=$(aws cloudformation describe-stacks \
@@ -269,7 +269,7 @@ aws eks update-kubeconfig --region us-east-1 --name retail-store
 kubectl apply -f aws-auth-cm.yaml
 ```
 
-### Step 7 — Verify Nodes
+### Step 7 - Verify Nodes
 
 ```bash
 kubectl get nodes

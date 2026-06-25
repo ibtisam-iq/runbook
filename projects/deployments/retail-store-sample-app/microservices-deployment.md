@@ -1,4 +1,4 @@
-# Phase 7 — Microservices Deployment via Helmfile
+# Phase 7: Microservices Deployment via Helmfile
 
 ### Prepare Ingress Values for UI
 
@@ -41,10 +41,10 @@ Helmfile deployed five Helm releases:
 | Release | Namespace | Backend | Storage |
 |---|---|---|---|
 | `catalog` | `catalog` | MySQL 8.0 (StatefulSet) | gp3 PVC 1Gi |
-| `cart` | `cart` | DynamoDB (IRSA-bound) | — |
+| `cart` | `cart` | DynamoDB (IRSA-bound) | - |
 | `orders` | `orders` | PostgreSQL 16.1 (StatefulSet) + SQS | gp3 PVC 1Gi |
-| `checkout` | `checkout` | Redis 6.0-alpine | — |
-| `ui` | `ui` | ALB Ingress (HTTPS) | — |
+| `checkout` | `checkout` | Redis 6.0-alpine | - |
+| `ui` | `ui` | ALB Ingress (HTTPS) | - |
 
 ### Verify
 

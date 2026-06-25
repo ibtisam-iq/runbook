@@ -199,6 +199,18 @@
    Clean hierarchy with hover indent + teal active state
    ============================================================================= */
 
+/* Adjust left sidebar width for desktop view */
+@media screen and (min-width: 76.25em) {
+  .md-sidebar--primary {
+    width: 16.5rem !important;
+    flex: 0 0 16.5rem !important;
+  }
+  .md-sidebar--primary .md-nav__list,
+  .md-sidebar--primary .md-nav {
+    width: 16.5rem !important;
+  }
+}
+
 .md-nav__title {
   font-weight: 800;
   font-size: 0.72rem;
@@ -215,6 +227,9 @@
   padding: 0.3rem 0.6rem !important;
   transition: background 0.15s ease, color 0.15s ease, padding-left 0.2s ease;
 }
+
+/* Let the text stretch and truncate normally if it exceeds 16.5rem */
+/* Restoring default MkDocs ellipsis behavior since we now have enough width */
 
 .md-nav__link:hover {
   background: rgba(38, 198, 218, 0.07);

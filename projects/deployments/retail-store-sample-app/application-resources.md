@@ -1,6 +1,6 @@
-# Phase 6 — Application-Level AWS Resources
+# Phase 6: Application-Level AWS Resources
 
-### 6A — DynamoDB Table for Cart Service
+### 6A - DynamoDB Table for Cart Service
 
 ```bash
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -52,7 +52,7 @@ eksctl create iamserviceaccount \
 
 ---
 
-### 6B — SQS Queue for Orders Service
+### 6B - SQS Queue for Orders Service
 
 ```bash
 # 1. Create queue
@@ -97,9 +97,9 @@ eksctl create iamserviceaccount \
 
 ---
 
-### 6C — SNS Topic + Lambda for Order Notifications
+### 6C - SNS Topic + Lambda for Order Notifications
 
-!!! warning "IAM Constraint — Lambda created via Console"
+!!! warning "IAM Constraint - Lambda created via Console"
     `iam:PassRole` and `iam:PutRolePolicy` were blocked for the lab user via CLI. The Lambda function and its event source mapping (SQS trigger) were created through the AWS Console. `AdministratorAccess` was attached to the Lambda execution role as a lab workaround.
 
 ```bash

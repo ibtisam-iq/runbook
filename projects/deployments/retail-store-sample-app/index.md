@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a complete operational record of deploying the **Retail Store Sample App** onto Amazon EKS cluster `ibtisam-iq-eks-cluster` (us-east-1, Kubernetes 1.34). It documents every infrastructure decision, command, and validation step taken — from IAM roles and CloudFormation node groups through Helmfile orchestration, EBS storage, ALB Ingress, AWS-managed databases, and observability.
+This is a complete operational record of deploying the **Retail Store Sample App** onto Amazon EKS cluster `ibtisam-iq-eks-cluster` (us-east-1, Kubernetes 1.34). It documents every infrastructure decision, command, and validation step taken - from IAM roles and CloudFormation node groups through Helmfile orchestration, EBS storage, ALB Ingress, AWS-managed databases, and observability.
 
 ---
 
@@ -14,14 +14,14 @@ store, originally authored by the
 and forked at
 [ibtisam-iq/retail-store-sample-app](https://github.com/ibtisam-iq/retail-store-sample-app).
 
-It models the kind of heterogeneous stack found in real-world platform engineering —
+It models the kind of heterogeneous stack found in real-world platform engineering -
 five independent services, five different runtimes, five different persistence backends.
 
 Since this project marked my transition from monolithic 3-tier architectures to polyglot microservices, I conducted an in-depth analysis of the application's source code and inter-service communication. My detailed architectural breakdowns for each service can be found in the [repository's runbooks directory](https://github.com/ibtisam-iq/retail-store-sample-app/tree/main/runbooks).
 
 | Service | Language | Role | Database |
 |---|---|---|---|
-| **UI** | Java | Store frontend — routes all user traffic | None (calls all services) |
+| **UI** | Java | Store frontend - routes all user traffic | None (calls all services) |
 | **Catalog** | Go | Product catalog REST API | MySQL / MariaDB |
 | **Cart** | Java | Shopping cart state management | DynamoDB / In-memory |
 | **Orders** | Java | Order processing and persistence | PostgreSQL + SQS (on EKS) |
@@ -37,15 +37,15 @@ Everything below is original work I authored on top of that foundation.
 **Per-service `values-*.yaml` overrides**
 
 Each service ships with a base `values.yaml` inside its own `chart/` directory.
-I studied each one and authored additional override files on top — one per deployment
-scenario — so the same chart can be deployed across different target environments
+I studied each one and authored additional override files on top - one per deployment
+scenario - so the same chart can be deployed across different target environments
 without touching the chart itself. Each service has its own dedicated runbook
 documenting every override decision.
 
 **Three Helmfile configurations**
 
 Rather than running five separate `helm install` commands in the right order every
-time, I authored three Helmfile configurations — one per deployment target — each
+time, I authored three Helmfile configurations - one per deployment target - each
 declaring all five releases with explicit dependency ordering via `needs:`:
 
 | Helmfile | Target | Storage | Message Broker | UI Exposure |
@@ -56,10 +56,10 @@ declaring all five releases with explicit dependency ordering via `needs:`:
 
 !!! tip "Any cluster, any Helmfile"
     The ephemeral and persistent Helmfiles are not bare-metal-exclusive. They can run
-    on any Kubernetes cluster — kubeadm, EKS, GKE — wherever the referenced
+    on any Kubernetes cluster - kubeadm, EKS, GKE - wherever the referenced
     `values-*.yaml` assumptions hold. The EKS Helmfile is the one that requires
     AWS-specific infrastructure: EBS CSI driver, ALB Ingress Controller, DynamoDB,
-    SQS, and ACM — which is exactly what this runbook provisions.
+    SQS, and ACM - which is exactly what this runbook provisions.
 
 **This runbook**
 
