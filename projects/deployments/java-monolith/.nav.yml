@@ -1,0 +1,11 @@
+title: "Java 3-Tier Monolith: End-to-End CI/CD, DevSecOps, and Cloud Deployments"
+nav:
+  - "Overview": index.md
+  - "Phase 0: Codebase Modernization": phase-0-codebase-modernization.md
+  - "Phase 1: Local Bare-Metal Validation": phase-1-local-validation.md
+  - "Phase 2: Containerization": phase-2-docker-containerization.md
+  - "Phase 3a: Jenkins CI Pipeline": phase-3a-jenkins-pipeline.md
+  - "Phase 3b: GitHub Actions CI": phase-3b-github-actions.md
+  - "Phase 4: AWS EC2 Auto Scaling": phase-4-ec2-auto-scaling.md
+  - "Phase 5: Amazon ECS Fargate": phase-5-ecs-fargate.md
+  - "Phase 6: Kubernetes Deployments": phase-6-kubernetes-deployments.md

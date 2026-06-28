@@ -3,4 +3,5 @@ nav:
   - index.md
   - microservices-demo
   - retail-store-sample-app
+  - java-monolith
   - static-website
