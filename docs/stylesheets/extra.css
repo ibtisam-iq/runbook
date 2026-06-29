@@ -199,17 +199,7 @@
    Clean hierarchy with hover indent + teal active state
    ============================================================================= */
 
-/* Adjust left sidebar width for desktop view */
-@media screen and (min-width: 76.25em) {
-  .md-sidebar--primary {
-    width: 16.5rem !important;
-    flex: 0 0 16.5rem !important;
-  }
-  .md-sidebar--primary .md-nav__list,
-  .md-sidebar--primary .md-nav {
-    width: 16.5rem !important;
-  }
-}
+/* Left sidebar width customization has been removed to restore MkDocs default size. */
 
 .md-nav__title {
   font-weight: 800;
@@ -485,4 +475,29 @@
     font-size: 0.72rem !important;
     letter-spacing: 0.04em !important;
   }
+}
+
+/* =============================================================================
+   16. SIDEBAR RESIZER
+   ============================================================================= */
+
+/* The interactive drag handle for adjusting the left navigation width */
+.md-sidebar-resizer {
+  position: fixed;
+  width: 12px;
+  cursor: col-resize;
+  z-index: 100;
+  background-color: rgba(38, 198, 218, 0.5); /* Runbook teal accent */
+  transition: background-color 0.2s ease;
+}
+
+.md-sidebar-resizer:hover,
+.md-sidebar-resizer:active {
+  background-color: var(--md-primary-fg-color);
+  opacity: 0.8;
+}
+
+/* Hide the horizontal scrollbar that appears when sidebar text occasionally overflows */
+.md-sidebar__scrollwrap {
+  overflow-x: hidden !important;
 }
