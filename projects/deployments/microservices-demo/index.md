@@ -1,8 +1,8 @@
-# End-to-End DevOps: CI/CD, GitOps, and Observability on Amazon EKS
+# Event-Driven GitOps: Deploying Polyglot Microservices on AWS EKS featuring 3 CI Pipelines for change detection, Trivy scanning, and chart releases; Terraform for infrastructure provisioning; Helm for GHCR chart packaging; Kustomize for combining raw Gateway API manifests with the Helm chart; Gateway API for traffic routing; ExternalDNS for automated Route 53 DNS; ArgoCD for GitOps deployments; Image Updater for zero-touch continuous delivery; kube-prometheus-stack for monitoring; AlertManager and Slack for notifications; and Elastic Stack for logging
 
 ## Overview
  
-I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) (10-service polyglot monorepo) on Amazon EKS with a production-grade, highly automated DevOps pipeline built from scratch: GitHub Actions CI with Trivy security scanning, Helm chart packaging to GHCR, ArgoCD GitOps with Image Updater for event-driven continuous delivery, Gateway API networking, ExternalDNS for automated Route 53 record provisioning, full observability (Prometheus, Grafana, ELK, Slack alerting), and HPA autoscaling.
+I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) (10-service polyglot monorepo) on Amazon EKS with a production-grade, highly automated DevOps architecture built from scratch. I provisioned the underlying infrastructure using Terraform. For the CI/CD lifecycle, I engineered 3 CI pipelines for change detection, Trivy security scanning, and automated Helm chart releases to GHCR. On the cluster side, I configured ArgoCD for declarative GitOps deployments, utilizing Kustomize to combine raw Gateway API manifests alongside the packaged Helm chart. The platform utilizes the Kubernetes Gateway API for advanced traffic routing, ExternalDNS for automated Route 53 record provisioning, and ArgoCD Image Updater for zero-touch continuous delivery. Comprehensive observability is achieved via kube-prometheus-stack for monitoring, AlertManager and Slack for notifications, and the Elastic Stack for centralized logging.
 
 | Item | Value |
 |------|-------|
@@ -23,32 +23,49 @@ I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/mic
 The entire CI/CD pipeline operates as a fully automated, **event-driven system**. It reacts to events from source to cluster, guaranteeing continuous delivery with absolutely **zero manual intervention**, Git writes, or PR approvals for deployments.
 
 ```text
+[Infrastructure Provisioning]
+Terraform ──> VPC, EKS Cluster, Route 53 Zone, ACM Certificate
+
 [Event: Code Push] Developer pushes code to src/
     │
     ▼
-GitHub Actions (CI)
-    ├── Trivy filesystem + image scan
-    ├── Docker build (BuildKit + GHA cache)
-    └── [Event: Image Publish] Push 3 tags to GHCR (:sha-<40>, :sha-<7>, :latest)
+GitHub Actions (3 CI Pipelines)
+    ├── Change Detection & Trivy Scans
+    ├── Docker Build & Helm Packaging
+    └── [Event: Image Publish] Push artifacts to GHCR
           │
           ▼
-ArgoCD Image Updater (on cluster)
+ArgoCD Image Updater (Continuous Delivery)
     ├── Polls GHCR every 2 min
     ├── [Event: Registry Detection] Detects new :latest digest
     └── Patches ArgoCD Application
           │
           ▼
-[Event: GitOps Sync] ArgoCD syncs, pods roll
-    ├── 10 microservices in boutique-app namespace
-    ├── Gateway API HTTPRoute -> shared ALB -> app.ibtisam.qzz.io
-    └── ExternalDNS auto-creates Route 53 records
+ArgoCD (GitOps Controller)
+    ├── Combines Helm Chart + raw Gateway API manifests via Kustomize
+    └── [Event: GitOps Sync] Deploys to EKS Cluster
+          ├── 10 microservices in boutique-app namespace
+          ├── Gateway API HTTPRoute -> shared ALB -> app.ibtisam.qzz.io
+          └── ExternalDNS auto-creates Route 53 records
 
-Observability
-    ├── Prometheus + Grafana + AlertManager (Slack)
-    └── Elasticsearch + Filebeat + Kibana
+Observability Stack
+    ├── kube-prometheus-stack (Monitoring & Slack Alerts)
+    └── Elastic Stack (Centralized Logging)
 
 5 subdomains, 1 ALB, 1 wildcard cert, 0 manual DNS records
 ```
+
+---
+
+## Top Architectural Highlights
+
+This project intentionally deviates from standard deployments by making several advanced engineering decisions. These are the core differentiators:
+
+1. **Automated Route 53 Provisioning:** I entirely avoided manual DNS management. Instead, I integrated **ExternalDNS** with the Kubernetes Gateway API to automatically create, update, and reconcile AWS Route 53 records based on cluster HTTPRoutes.
+2. **Immutable Upstream Helm Charts via Kustomize:** I refused to modify the upstream Helm chart to avoid breaking future syncs. I used the developer's provided values to configure the chart, and then used **Kustomize** to inject my own custom Gateway API manifests (HTTPRoutes, ALB target groups) alongside the Helm package directly within ArgoCD.
+3. **Decoupling Application from Platform:** I intentionally deployed only the microservices application via ArgoCD. The observability stacks (kube-prometheus-stack and Elastic Stack) were deployed independently. If ArgoCD or the deployment pipeline fails, the monitoring and logging infrastructure remains fully operational to debug the outage.
+4. **Zero-Touch Continuous Delivery:** The workflow requires absolutely zero manual intervention. A developer pushes code, the CI pipeline builds/scans/publishes the artifact to GHCR, ArgoCD Image Updater detects the new digest, ArgoCD autonomously rolls out the pods, and AlertManager pushes notifications to Slack.
+5. **Gateway API over Legacy Ingress:** Following official Kubernetes documentation, I abandoned the frozen Ingress API in favor of the modern Gateway API. This provides a highly scalable, role-oriented networking architecture that elegantly handles advanced traffic routing and native resource sharing (one ALB mapping to multiple independent HTTPRoutes).
 
 ---
 
