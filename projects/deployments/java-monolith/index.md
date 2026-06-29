@@ -92,7 +92,7 @@ To overcome this, I engineered a highly customized Terraform configuration that 
 
 ## Phases
 
-The project is thoroughly documented across 9 sequential phases. Each phase contains deep, code-verified technical analysis, explaining not just *what* was done, but *why* it was designed that way.
+The project is thoroughly documented across 8 sequential documents. Each document contains deep, code-verified technical analysis, explaining not just *what* was done, but *why* it was designed that way.
 
 <div class="grid cards" markdown>
 
@@ -164,13 +164,11 @@ This project represents months of dedicated engineering. Rather than simply depl
 - **IAM Execution Abstraction:** Replaced EC2 S3 access profiles with the `ecsTaskExecutionRole`, granting the Fargate engine precise permissions to authenticate to Amazon ECR and pull the Docker image.
 - **Headless Observability:** Integrated the `awslogs` driver directly into the Task Definition to stream container stdout to Amazon CloudWatch, achieving centralized logging for instances without SSH access.
 
-### Phase 6: Bare-Metal Kubernetes
+### Phase 6: Kubernetes Deployments
 - **DRY Kustomize Architecture:** Designed a platform-agnostic DevSecOps strategy using Kustomize overlays (`base`, `bare-metal`, `eks`) to eliminate YAML duplication across diverse deployment environments.
-- **Storage Class Decoupling:** Dynamically patched the database PersistentVolumeClaim (PVC) with the `local-path` Storage Class in the `bare-metal` overlay, allowing developers to provision stateful MySQL persistence entirely on local machines.
+- **Storage Class Decoupling:** Dynamically patched the database PersistentVolumeClaim (PVC) with the `local-path` Storage Class in the `bare-metal` overlay, and AWS EBS `gp3` in the EKS overlay.
 - **Decoupled Gateway API Routing:** Future-proofed ingress by utilizing the Gateway API over traditional Ingress. Implemented the Nginx Gateway Fabric exclusively in the `bare-metal` overlay, dynamically resolving HTTP-01 challenges via `cert-manager`.
-
-### Phase 7: Amazon EKS
-- **AWS Native Gateway Integration:** Replaced the internal Nginx proxy with the AWS Load Balancer Controller, dynamically provisioning an external ALB by applying the Gateway manifest.
-- **TLS Edge Termination:** Injected an Amazon Certificate Manager (ACM) ARN directly into the Gateway `LoadBalancerConfiguration` via Kustomize patches, offloading SSL decryption from the application pods.
-- **Production State Decoupling:** Replaced the in-cluster MySQL StatefulSet by patching the `bankapp-config` ConfigMap to route the application's connection pool directly to a highly-available Amazon RDS instance.
-- **Elastic Scale Boundaries:** Deployed a Horizontal Pod Autoscaler (HPA), relying on the EKS Metrics Server, to elastically scale the deployment from 2 to 5 replicas based on CPU and memory utilization spikes.
+- **AWS Native Gateway Integration:** In the EKS overlay, replaced the internal Nginx proxy with the AWS Load Balancer Controller, dynamically provisioning an external ALB via the Gateway manifest mapped to a custom Route 53 domain.
+- **TLS Edge Termination & Reusability:** Injected an ACM ARN directly into the Gateway `LoadBalancerConfiguration` via Kustomize patches, reusing the Route 53 hosted zone and ACM certificates originally provisioned in Phase 4.
+- **Production State Decoupling:** Replaced the in-cluster MySQL StatefulSet in the EKS overlay by patching the `bankapp-config` ConfigMap to route the application's connection pool directly to an Amazon RDS instance.
+- **Elastic Scale Boundaries:** Exclusively deployed a Horizontal Pod Autoscaler (HPA) in the EKS overlay, relying on the EKS Metrics Server to elastically scale the deployment from 2 to 5 replicas while keeping the bare-metal environment lightweight.
