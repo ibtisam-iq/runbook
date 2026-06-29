@@ -1,23 +1,47 @@
-# End-to-End Platform Engineering: eksctl, Helmfile Orchestration, and AWS Managed Services on Amazon EKS
+# Multi-Environment Orchestration: Deploying Polyglot Microservices from Bare-Metal to Amazon EKS [eksctl, Terraform, AWS CloudFormation, Helmfile, ALB Ingress Controller, ACM, EBS CSI Driver, DynamoDB, AWS SQS, AWS Lambda, AWS SNS, Fluent Bit, CloudWatch Container Insights]
 
 ## Overview
 
-This is a complete operational record of deploying the **Retail Store Sample App** onto Amazon EKS cluster `ibtisam-iq-eks-cluster` (us-east-1, Kubernetes 1.34). It documents every infrastructure decision, command, and validation step taken - from IAM roles and CloudFormation node groups through Helmfile orchestration, EBS storage, ALB Ingress, AWS-managed databases, and observability.
+Although this application was originally built as a demo project by the [AWS Containers team](https://github.com/aws-containers/retail-store-sample-app) specifically for Amazon EKS, I set out to deploy it across **three entirely different target environments**: an ephemeral bare-metal cluster, a persistent bare-metal cluster, and finally, Amazon EKS.
+
+It models a real-world heterogeneous stack: five independent services, five different runtimes, and five different persistence backends.
+
+**The Approach (Decoupled Values):**
+
+AWS provided the base Helm charts for the microservices. However, rather than manually editing their charts to accommodate my three target environments, I left the upstream charts completely untouched. Instead, I navigated into each service's `src/` directory and authored my own environment-specific `values-*.yaml` overrides.
+
+**Bare-Metal First:**
+
+Because this application is heavily AWS-oriented, deploying it to a bare-metal Kubernetes cluster required explicitly severing its cloud dependencies. Using the custom `values-*.yaml` overrides, I systematically ripped out AWS DynamoDB (Cart), AWS SQS/SNS (Orders), AWS ElastiCache (Checkout), and the ALB Ingress Controller (UI). I rewired the microservices to run entirely on local, containerized alternatives—such as a local DynamoDB container, RabbitMQ/in-memory messaging, local Redis, and standard NodePorts. This successfully proved the application's portability completely outside of the AWS ecosystem.
+
+!!! info "Bare-Metal Infrastructure Provisioning"
+    For the bare-metal environments, I utilized my own custom [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) to bypass all local setup. On top of this machine, I provisioned a complete multi-node `kubeadm` cluster. The automation and architecture of this cluster are fully documented in my [Cluster Bootstrap Runbook](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/cluster-kubeadm/).
+
+**Helmfile Orchestration:**
+
+While the bare-metal deployment was successful, it required executing five separate `helm install` commands in strict dependency order. To eliminate this manual toil, I engineered a Helmfile orchestration layer. This allowed me to deploy the entire stack—with databases provisioning before microservices—via a single command. 
+
+For the bare-metal validations, I authored and applied the following two Helmfile targets:
+
+```bash
+# Bare-metal — ephemeral
+helmfile -f helmfile/helmfile-baremetal-ephemeral.yaml apply
+
+# Bare-metal — persistent
+helmfile -f helmfile/helmfile-baremetal-persistent.yaml apply
+```
+*(Configurations: [`helmfile-baremetal-ephemeral.yaml`](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/helmfile/helmfile-baremetal-ephemeral.yaml) and [`helmfile-baremetal-persistent.yaml`](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/helmfile/helmfile-baremetal-persistent.yaml))*
+
+**The Final Target (Amazon EKS):**
+
+With the Helmfile orchestration successfully automating the deployments, I returned the application to its original intended target: Amazon EKS. Because deploying to EKS required complex, deep native AWS infrastructure provisioning (ALB, EBS CSI, DynamoDB, SQS, SNS, Lambda, and CloudWatch), the vast majority of this runbook is dedicated exclusively to documenting this final, production-grade deployment.
+
+!!! info "EKS Infrastructure Provisioning (KodeKloud Sandbox)"
+    Instead of using a personal, unrestricted AWS account, I provisioned this entire stack on the [KodeKloud AWS Playground](https://learn.kodekloud.com/user/playgrounds/playground-aws). Because this sandbox environment enforces strict Service Control Policies (SCPs) and IAM limitations, standard automated provisioning failed. I had to manually engineer around these restrictions to successfully build the EKS cluster. Every constraint I hit and how I resolved it is documented in my [EKS on KodeKloud via eksctl Runbook](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-eksctl/).
 
 ---
 
-## About the Application
-
-The **Retail Store Sample App** is a deliberately polyglot microservices e-commerce
-store, originally authored by the
-[AWS Containers team](https://github.com/aws-containers/retail-store-sample-app)
-and forked at
-[ibtisam-iq/retail-store-sample-app](https://github.com/ibtisam-iq/retail-store-sample-app).
-
-It models the kind of heterogeneous stack found in real-world platform engineering -
-five independent services, five different runtimes, five different persistence backends.
-
-Since this project marked my transition from monolithic 3-tier architectures to polyglot microservices, I conducted an in-depth analysis of the application's source code and inter-service communication. My detailed architectural breakdowns for each service can be found in the [repository's runbooks directory](https://github.com/ibtisam-iq/retail-store-sample-app/tree/main/runbooks).
+## Application Architecture
 
 | Service | Language | Role | Database |
 |---|---|---|---|
@@ -29,24 +53,10 @@ Since this project marked my transition from monolithic 3-tier architectures to 
 
 ---
 
-## What I Built on Top
+## Multi-Environment Configuration
 
-The upstream repository ships the application source code and base Helm charts.
-Everything below is original work I authored on top of that foundation.
-
-**Per-service `values-*.yaml` overrides**
-
-Each service ships with a base `values.yaml` inside its own `chart/` directory.
-I studied each one and authored additional override files on top - one per deployment
-scenario - so the same chart can be deployed across different target environments
-without touching the chart itself. Each service has its own dedicated runbook
-documenting every override decision.
-
-**Three Helmfile configurations**
-
-Rather than running five separate `helm install` commands in the right order every
-time, I authored three Helmfile configurations - one per deployment target - each
-declaring all five releases with explicit dependency ordering via `needs:`:
+### Three Helmfile Targets
+Rather than running five separate `helm install` commands in the right order every time, I authored three Helmfile configurations - one per deployment target - each declaring all five releases with explicit dependency ordering via `needs:`:
 
 | Helmfile | Target | Storage | Message Broker | UI Exposure |
 |---|---|---|---|---|
@@ -54,41 +64,38 @@ declaring all five releases with explicit dependency ordering via `needs:`:
 | [`helmfile-baremetal-persistent.yaml`](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/helmfile/helmfile-baremetal-persistent.yaml) | Bare-metal with `local-path` | PVC | RabbitMQ | NodePort |
 | [`helmfile-eks.yaml`](https://github.com/ibtisam-iq/retail-store-sample-app/blob/main/helmfile/helmfile-eks.yaml) | AWS EKS | `gp3` EBS PVC | AWS SQS | ALB Ingress |
 
-!!! tip "Any cluster, any Helmfile"
-    The ephemeral and persistent Helmfiles are not bare-metal-exclusive. They can run
-    on any Kubernetes cluster - kubeadm, EKS, GKE - wherever the referenced
-    `values-*.yaml` assumptions hold. The EKS Helmfile is the one that requires
-    AWS-specific infrastructure: EBS CSI driver, ALB Ingress Controller, DynamoDB,
-    SQS, and ACM - which is exactly what this runbook provisions.
+### Layered `values-*.yaml` Override Matrix
+This matrix demonstrates how environment-specific overrides were injected across the three deployment targets while leaving the base `values.yaml` untouched.
 
-**This runbook**
+| Service | Bare-Metal Ephemeral | Bare-Metal Persistent | Amazon EKS |
+|---|---|---|---|
+| **Catalog** | `values-mysql-ephemeral.yaml` | `values-mysql-pvc-baremetal.yaml` | `values-mysql-pvc-eks.yaml` |
+| **Cart** | `values-dynamodb-local.yaml` | `values-dynamodb-local.yaml` | `values-dynamodb-aws.yaml` |
+| **Orders** | `values-02-postgresql-ephemeral-msg-in-memory.yaml` | `values-03-postgresql-rabbitmq-pvc-baremetal.yaml` | `values-06-postgresql-pvc-eks-sqs.yaml` |
+| **Checkout** | `values-redis-local.yaml` | `values-redis-local.yaml` | `values-redis-local.yaml` |
+| **UI** | `values-nodeport.yaml` | `values-nodeport.yaml` | `values-alb-ingress.yaml` |
 
-The final Helmfile command for this deployment is one line:
-
-```bash
-helmfile -f helmfile/helmfile-eks.yaml apply
-```
-
-But that single command only works after an entire infrastructure stack has been
-built correctly. This runbook is the record of everything that had to exist before
-that command could succeed.
-
-## Related Runbooks
-
-| Topic | Link |
-|---|---|
-| kubeadm cluster bootstrap (SilverStack) | [Cluster Bootstrap Runbook](https://runbook.ibtisam-iq.com/bootstrap/kubernetes/cluster-kubeadm/) |
-| EKS provisioning on KodeKloud Playground | [EKS on KodeKloud Runbook](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-aws-playground/) |
+!!! note "Shared Base Configurations"
+    Base `values.yaml` and inter-service endpoint routing (`values-endpoints.yaml`) are universally shared across all platforms.
 
 ---
 
-## Getting Started
+## Amazon EKS Architectural Highlights
 
----
+The rest of this document exclusively covers the third platform: Amazon EKS. The following highlights define its deep cloud-native integration:
 
-## Phases
+1. **Native AWS Observability:** Because this is an AWS-centric deployment, I explicitly abandoned the ELK stack and Prometheus. I deployed Fluent Bit to stream logs natively into CloudWatch Container Insights, demonstrating deep alignment with the AWS managed ecosystem.
+2. **Event-Driven Order Notifications:** I engineered a serverless, event-driven pipeline where AWS SQS queues capture order events. These events immediately trigger an **AWS Lambda** function that executes custom business logic to publish order confirmations to an **AWS SNS** topic for direct email delivery.
+3. **Bypassing Service Control Policies (SCPs):** As the lab environment blocked `iam:PassRole` required by EKS Managed Node Groups, I bypassed this restriction by engineering self-managed worker nodes via custom AWS CloudFormation templates.
 
-The project deployment is documented across 6 phases. Each phase has its own runbook with step-by-step commands, configurations, and verification steps.
+## EKS Deployment Phases
+
+As established in the **Final Target** overview, running a single `helmfile apply` against Amazon EKS is only possible *after* an extensive amount of native AWS infrastructure has been provisioned and configured.
+
+To document this deep cloud integration, I have broken the entire EKS rollout down into a rigorous **10-Phase deployment lifecycle**. The runbook pages below detail every step from the first IAM role creation to the final end-to-end TLS validation.
+
+!!! note "Abstracted Bare-Metal Deployments"
+    Because the bare-metal environments required zero external cloud infrastructure and were entirely abstracted by the simple execution of their respective Helmfiles, they do not require step-by-step documentation. The 10 phases below cover **only** the complex Amazon EKS deployment.
 
 <div class="grid cards" markdown>
 
@@ -131,13 +138,10 @@ Architectural and engineering decisions made across the deployment phases to acc
 ### Deployment Orchestration
 
 - **Why Helmfile instead of ArgoCD?** Because this was my first deep-dive into microservices, I intentionally prioritized mastering deployment orchestration, multi-environment configurations, and release dependencies natively via Helmfile before abstracting the workflow behind a GitOps controller (which I subsequently implemented in my next project).
-- **Layered `values*.yaml` Strategy.** Instead of generating a monolithic values file (`helm show values`) and manually mutating it, I kept the upstream charts pristine. I authored dedicated, decoupled `values-*.yaml` override files for each service. This allowed me to elegantly expand the Helmfile orchestration across three distinct target behaviors: bare-metal ephemeral, bare-metal persistent, and fully-managed EKS.
 - **Single Runtime Override.** Because of the layered `values*.yaml` strategy, all infrastructure configurations were pre-defined. The only manual edit required during the entire deployment phase is injecting the dynamically generated ACM Certificate ARN into the UI service's ingress values file right before executing the grand `helmfile -f` command.
-- **Helmfile for Dependency Management.** Instead of running five separate `helm install` commands, Helmfile was used to declare all five releases. Explicit dependency ordering (`needs:`) ensures databases are ready before microservices start. ([Phase 7](microservices-deployment.md))
 
 ### Cloud-Native Integrations
 
-- **CloudWatch over ELK Stack.** While I utilized the ELK stack with Beats in my other microservices project, this deployment is heavily oriented towards native AWS EKS integrations. Choosing CloudWatch Container Insights via Fluent Bit perfectly aligns with the project's cloud-native focus and seamlessly centralizes logs within the AWS ecosystem. ([Phase 8-9](observability.md))
 - **Offloading State to AWS Managed Services.** Rather than running databases inside the cluster, the EKS Helmfile configuration binds the microservices to DynamoDB (Cart) and SQS/SNS (Orders) via IAM Roles for Service Accounts (IRSA). ([Phase 6](application-resources.md))
 - **Shared ALB via Ingress Group.** The UI, Prometheus, and Grafana all share a single Application Load Balancer using `alb.ingress.kubernetes.io/group.name: ecom-eks`. The ALB routes traffic based on the Host header, eliminating the cost of multiple load balancers. ([Phase 8-9](observability.md))
 - **gp3 as Default StorageClass.** `gp2` was patched out and `gp3` was set as the default `StorageClass` for the EBS CSI driver, providing a cheaper and more performant storage baseline for the stateful databases (MySQL, PostgreSQL). ([Phase 4-5](cluster-addons.md))

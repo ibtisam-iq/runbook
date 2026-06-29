@@ -3,7 +3,7 @@
 !!! info "Lab Context"
     I executed this entire deployment inside [KodeKloud's AWS Playground](https://learn.kodekloud.com/user/playgrounds/playground-aws) - a time-boxed AWS environment with a real account, real services, but a restricted IAM user. No personal AWS account was used.
 
-    Running EKS on this playground comes with non-trivial IAM permission gaps (e.g., no `iam:PassRole`, no `iam:PutRolePolicy` in some contexts). The workarounds for those restrictions are documented in a dedicated runbook: [EKS on KodeKloud AWS Playground →](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-aws-playground/)
+    Running EKS on this playground comes with non-trivial IAM permission gaps (e.g., no `iam:PassRole`, no `iam:PutRolePolicy` in some contexts). The workarounds for those restrictions are documented in a dedicated runbook: [EKS on KodeKloud AWS Playground via eksctl →](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-eksctl/)
 
 ### Dev Machine
 

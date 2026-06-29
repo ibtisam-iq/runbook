@@ -4,20 +4,21 @@ A production-grade, globally distributed static site deployment on AWS: private 
 
 ---
 
-## Use Case
+## The Approach (Zero-Trust & Disaster Recovery)
 
-The following stack is for static-only websites (React, Vue, Angular, Hugo, Jekyll, Next.js static exports, etc.) hosted in a cost-effective, highly available, globally distributed manner, without requiring any compute resources like ECS or EC2.
+While deploying a static frontend (like React, Vue, or Next.js static exports) is often treated as a trivial task, operating it at an enterprise standard requires rigorous cloud engineering. 
 
-**Ideal for:**
+My objective for this architecture was to build a globally distributed, highly available delivery network with absolutely zero compute overhead (no EC2, no ECS) while enforcing strict zero-trust security and disaster resilience.
 
-- Portfolio sites like [My Portfolio Site](https://ibtisam-iq.com/)
-- Marketing landing pages
-- Product documentation sites
-- Small business/blog sites
+Instead of relying on public S3 buckets or legacy Origin Access Identities (OAI), I architected a completely sealed environment:
 
-!!! note
-    - I used my [portfolio-site](https://github.com/ibtisam-iq/portfolio-site) repository as the static content for this deployment because it is a production static site with a real `dist/` build output.
-    - I have also included the [Complete Terminal Session](https://github.com/ibtisam-iq/platform-engineering-systems/blob/main/systems/static-website/terminal-session.txt) that I ran to deploy this stack.
+1. **Zero-Trust Delivery:** The S3 origin is entirely private. Content is delivered exclusively through a global CloudFront distribution authenticated via Origin Access Control (OAC) using SigV4 request signing.
+2. **Encrypted Disaster Recovery:** To guarantee high availability against regional outages, I engineered automated Cross-Region Replication (us-east-1 to us-west-2). I explicitly managed dual-region KMS keys (CMKs) and strict IAM roles to ensure data is decrypted at the source and safely re-encrypted at the destination.
+3. **Audit & Observability:** I wired multi-service telemetry, utilizing CloudTrail for complete API event tracking (management and data events) and S3 Server Access Logs for raw HTTP request visibility.
+
+!!! note "Production Deployment"
+    - I executed this architecture to serve my own [portfolio site](https://ibtisam-iq.com/), utilizing its production `dist/` build output as the static payload.
+    - The raw execution log is available in the [Complete Terminal Session](https://github.com/ibtisam-iq/platform-engineering-systems/blob/main/systems/static-website/terminal-session.txt).
 
 ---
 
