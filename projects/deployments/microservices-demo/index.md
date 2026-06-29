@@ -2,7 +2,7 @@
 
 ## Overview
  
-I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) (10-service polyglot monorepo) on Amazon EKS with a production-grade DevOps pipeline built from scratch: GitHub Actions CI with Trivy security scanning, Helm chart packaging to GHCR, ArgoCD GitOps with Image Updater for continuous delivery, full observability (Prometheus, Grafana, ELK, Slack alerting), Gateway API networking, and HPA autoscaling.
+I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/microservices-demo) (10-service polyglot monorepo) on Amazon EKS with a production-grade, highly automated DevOps pipeline built from scratch: GitHub Actions CI with Trivy security scanning, Helm chart packaging to GHCR, ArgoCD GitOps with Image Updater for event-driven continuous delivery, Gateway API networking, ExternalDNS for automated Route 53 record provisioning, full observability (Prometheus, Grafana, ELK, Slack alerting), and HPA autoscaling.
 
 | Item | Value |
 |------|-------|
@@ -10,6 +10,9 @@ I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/mic
 | CD repo | [ibtisam-iq/platform-engineering-systems](https://github.com/ibtisam-iq/platform-engineering-systems/tree/main/systems/microservices-demo) |
 | Live app | `app.ibtisam.qzz.io` |
 | ArgoCD | `argocd.ibtisam.qzz.io` |
+| Prometheus | `prometheus.ibtisam.qzz.io` |
+| Grafana | `grafana.ibtisam.qzz.io` |
+| Kibana | `kibana.ibtisam.qzz.io` |
 | Terminal sessions | [terminal-session/](https://github.com/ibtisam-iq/microservices-demo/tree/main/terminal-session) |
 | Screenshots | [assets/](https://github.com/ibtisam-iq/microservices-demo/tree/main/assets) |
 
@@ -17,23 +20,25 @@ I deployed Google's [Online Boutique](https://github.com/GoogleCloudPlatform/mic
 
 ## Architecture at a Glance
 
-```
-Developer pushes code to src/
+The entire CI/CD pipeline operates as a fully automated, **event-driven system**. It reacts to events from source to cluster, guaranteeing continuous delivery with absolutely **zero manual intervention**, Git writes, or PR approvals for deployments.
+
+```text
+[Event: Code Push] Developer pushes code to src/
     │
     ▼
 GitHub Actions (CI)
     ├── Trivy filesystem + image scan
     ├── Docker build (BuildKit + GHA cache)
-    └── Push 3 tags to GHCR (:sha-<40>, :sha-<7>, :latest)
+    └── [Event: Image Publish] Push 3 tags to GHCR (:sha-<40>, :sha-<7>, :latest)
           │
           ▼
 ArgoCD Image Updater (on cluster)
     ├── Polls GHCR every 2 min
-    ├── Detects new :latest digest
+    ├── [Event: Registry Detection] Detects new :latest digest
     └── Patches ArgoCD Application
           │
           ▼
-ArgoCD syncs, pods roll
+[Event: GitOps Sync] ArgoCD syncs, pods roll
     ├── 10 microservices in boutique-app namespace
     ├── Gateway API HTTPRoute -> shared ALB -> app.ibtisam.qzz.io
     └── ExternalDNS auto-creates Route 53 records
@@ -89,9 +94,11 @@ Architectural and engineering decisions made across all 6 phases. Each links to 
 ### Image Tagging and Continuous Delivery
 
 - **Image tagging evolved through 3 iterations.** Chart version tags (broken for CD), immutable SHA tags (noisy), and finally ArgoCD Image Updater with digest strategy. ([Phase 1](ci.md))
-- **Chose Approach B (Image Updater) over SHA-based GitOps.** CI pushes images and stops. Image Updater watches GHCR and handles deployments. Eliminated `reusable-gitops.yaml` entirely and removed the `GIT_TOKEN` dependency for code pushes. ([Phase 1](ci.md))
-- **Digest strategy, not newest-build.** BuildKit sets the image config's `created` timestamp to epoch (`1970-01-01`) for reproducible builds. `newest-build` cannot differentiate tags. `digest` tracks `:latest` tag's digest directly, no timestamps involved. ([Phase 4](gitops-argocd.md))
-- **tag: "latest" in values, not empty string.** `tag: ""` falls back to Chart.AppVersion, but CI never pushes images with the chart version tag. Image Updater needs `:latest` to track. ([Phase 4](gitops-argocd.md))
+- **Chose Approach B (Image Updater) over SHA-based GitOps.** CI pushes images and stops. Image Updater watches GHCR and handles deployments automatically. Eliminated `reusable-gitops.yaml` entirely and removed the `GIT_TOKEN` dependency for code pushes. ([Phase 1](ci.md))
+- **Update strategy: digest.** BuildKit sets the image config's `created` timestamp to epoch (`1970-01-01T00:00:00Z`) for reproducible builds. `newest-build` was evaluated but cannot differentiate tags. `digest` compares the `:latest` tag's digest in GHCR against what is currently running, bypassing timestamps. ([Phase 4](gitops-argocd.md))
+- **Update method: argocd (default).** Image overrides are patched directly onto the Application CR as kustomize image entries. No Git write-back is performed, which avoids noisy commits. If the Application is ever deleted and recreated from Git, Image Updater re-applies the overrides on its next poll cycle.
+- **Traceability Tradeoff.** Pods show `frontend:latest@sha256:<digest>` instead of `frontend:sha-<commit>`. Commit traceability requires looking up the digest in GHCR. To support this audit trail, CI pushes `:sha-<40char>`, `:sha-<7char>`, and `:latest` tags on every build.
+- **tag: "latest" constraint.** In `values-eks.yaml`, `tag: "latest"` is explicitly set rather than an empty string. Image Updater requires a version constraint to know which tag to track for digest changes. Without it, the strategy fails. ([Phase 4](gitops-argocd.md))
 
 ### Helm Chart and Values
 
