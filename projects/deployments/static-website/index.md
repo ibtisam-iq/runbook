@@ -1,4 +1,4 @@
-# Secure Static Hosting and Global Distribution (S3 + CloudFront + KMS + IAM + CloudTrail)
+# Secure Static Hosting & Global Distribution on AWS [S3, KMS, IAM, CloudFront, OAC, ACM, CloudTrail]
 
 A production-grade, globally distributed static site deployment on AWS: private S3 origin served through CloudFront with Origin Access Control, KMS encryption at rest, Cross-Region Replication for disaster recovery, and full audit logging via CloudTrail.
 
@@ -17,7 +17,7 @@ Instead of relying on public S3 buckets or legacy Origin Access Identities (OAI)
 3. **Audit & Observability:** I wired multi-service telemetry, utilizing CloudTrail for complete API event tracking (management and data events) and S3 Server Access Logs for raw HTTP request visibility.
 
 !!! note "Production Deployment"
-    - I executed this architecture to serve my own [portfolio site](https://ibtisam-iq.com/), utilizing its production `dist/` build output as the static payload.
+    - I executed this architecture to serve my own [portfolio site](https://github.com/ibtisam-iq/portfolio-site), utilizing its production `dist/` build output as the static payload.
     - The raw execution log is available in the [Complete Terminal Session](https://github.com/ibtisam-iq/platform-engineering-systems/blob/main/systems/static-website/terminal-session.txt).
 
 ---

@@ -1,4 +1,4 @@
-# Event-Driven GitOps: Deploying Polyglot Microservices on AWS EKS featuring 3 CI Pipelines for change detection, Trivy scanning, and chart releases; Terraform for infrastructure provisioning; Helm for GHCR chart packaging; Kustomize for combining raw Gateway API manifests with the Helm chart; Gateway API for traffic routing; ExternalDNS for automated Route 53 DNS; ArgoCD for GitOps deployments; Image Updater for zero-touch continuous delivery; kube-prometheus-stack for monitoring; AlertManager and Slack for notifications; and Elastic Stack for logging
+# Event-Driven GitOps: Deploying Polyglot Microservices on Amazon EKS [Terraform, GitHub Actions, Helm, Kustomize, Gateway API, ExternalDNS, ArgoCD, Image Updater, Prometheus, Elastic Stack]
 
 ## Overview
  

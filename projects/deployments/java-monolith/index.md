@@ -1,10 +1,15 @@
-# Java 3-Tier Monolith: End-to-End CI/CD, DevSecOps, and Cloud Deployments
+# BankApp: Evolutionary Cloud Migration of a Java 3-Tier Monolith [EC2 Auto Scaling, ECS Fargate, Amazon EKS, Gateway API, Amazon RDS]
 
 ## Overview
 
 I engineered a comprehensive, end-to-end DevSecOps strategy for a **3-tier, monolithic** [Java Spring Boot Banking Application](https://github.com/ibtisam-iq/java-monolith-app). While packaged and deployed as a single monolithic artifact, the application strictly adheres to a 3-tier architectural pattern (Presentation, Business logic, and Data access layers).
 
-This project demonstrates the deliberate architectural evolution of the application from local development through to production-grade cloud environments. I executed complete codebase modernization, multi-stage Docker containerization, strict CI/CD pipeline automation (Jenkins and GitHub Actions), and deployed the final artifact across four increasingly complex infrastructure paradigms: AWS EC2 Auto Scaling, Amazon ECS Fargate, Bare-Metal Kubernetes, and Amazon EKS.
+Instead of treating deployment as a static event, I architected this project as a **vertical cloud migration journey**. After executing a complete codebase modernization and multi-stage Docker containerization, I automated the lifecycle via 14-stage CI pipelines in Jenkins and GitHub Actions. I then orchestrated the exact same Spring Boot 3.4 artifact across four increasingly scalable compute paradigms:
+
+1. **AWS EC2 Auto Scaling:** Provisioning the legacy baseline via virtual machines and UserData bootstrap scripts.
+2. **Amazon ECS Fargate:** Refactoring the compute layer into serverless containers while maintaining the ALB networking boundary.
+3. **Bare-Metal Kubernetes:** Validating the Kustomize overlay architecture and ingress decoupled through the Gateway API.
+4. **Amazon EKS:** Achieving massive scale by decoupling application state to Amazon RDS and scaling horizontally via the HPA.
 
 | Item | Value |
 |------|-------|
@@ -87,6 +92,14 @@ For Phase 6 (Bare-Metal Kubernetes), I utilized the Iximiuz platform to simulate
 To deploy the AWS infrastructure (EC2 ASG, ECS, and EKS), I utilized a KodeKloud AWS subscription rather than a personal account. KodeKloud labs enforce aggressive Service Control Policies (SCPs) that outright block the creation of standard EKS Managed Node Groups via Terraform. 
 
 To overcome this, I engineered a highly customized Terraform configuration that provisions the EKS Control Plane and attaches **Self-Managed Nodes** via custom CloudFormation stacks, completely bypassing the SCP restrictions. The logic and code to achieve this is documented in my **[EKS on KodeKloud Terraform Runbook](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-terraform/)**.
+
+---
+
+## Codebase Modernization & Database Mastery
+
+Before engineering the pipelines or cloud infrastructure, I executed a rigorous modernization phase. I upgraded the legacy application to Spring Boot 3.4.5 and Java 21, fixed invalid `groupId`s, replaced deprecated database drivers, and injected native container health probes (`/actuator/health`) directly into the application logic to satisfy Kubernetes deployment requirements.
+
+A critical aspect of this modernization was **Database & Environment Standardization**. I replaced all hardcoded credentials and engineered a dynamic configuration boundary. This required navigating edge cases such as correctly wrapping the `SPRING_DATASOURCE_URL` in double quotes within `.env` files to prevent shell truncation of the `&` operator. By standardizing the environment, I mastered environment-specific database resolution, seamlessly transitioning the application connection from a native bare-metal installation (`localhost`), to Docker Compose internal DNS (`db`), and finally to decoupled cloud endpoints (Amazon RDS) without altering a single line of application code.
 
 ---
 

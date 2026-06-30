@@ -1,4 +1,4 @@
-# Multi-Environment Orchestration: Deploying Polyglot Microservices from Bare-Metal to Amazon EKS [eksctl, Terraform, AWS CloudFormation, Helmfile, ALB Ingress Controller, ACM, EBS CSI Driver, DynamoDB, AWS SQS, AWS Lambda, AWS SNS, Fluent Bit, CloudWatch Container Insights]
+# Multi-Environment Orchestration: Deploying Polyglot Microservices from Bare-Metal to Amazon EKS [Helmfile, ALB Ingress Controller, EBS CSI Driver, DynamoDB, AWS SQS, SNS, Lambda, Fluent Bit, CloudWatch]
 
 ## Overview
 
