@@ -6,7 +6,11 @@ Dev Machine Rootfs is a production-grade DevOps workstation image for iximiuz pl
 
 It turns the generic Ubuntu base into a fully provisioned environment with Docker, Kubernetes tooling, Terraform, AWS CLI, Ansible, security scanners, and an aggressive alias/completion setup aimed at day-to-day platform work.
 
-> **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process, not through Docker. Running the image with `docker run` will not produce a working systemd, Docker daemon, or network services - see [Verification](#verification) for the correct approach.
+!!! warning "MicroVM Rootfs"
+    **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process, not through Docker. Running the image with `docker run` will not produce a working systemd, Docker daemon, or network services: see [Verification](#verification) for the correct approach.
+
+!!! tip "Quick Start"
+    Skip the build and try it now: **[Launch Dev Machine ↗](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7)**. Click **Start**, and the full workstation boots in the browser in under a minute. The rest of this page covers how the image itself is built.
 
 ![](../../../assets/screenshots/dev-machine-drive-config.png)
 
@@ -28,7 +32,7 @@ Dev Machine Rootfs must:
 
 - Provide a **single interactive DevOps workstation** image that boots instantly on iximiuz.
 - Inherit a stable, systemd-enabled Ubuntu 24.04 environment from `ubuntu-24-04-rootfs`.
-- Pre-install the **full SilverStack toolchain** - Docker, Kubernetes CLIs, IaC tools, security scanners, and utilities - matching the versions in the Dev Machine README.
+- Pre-install the **full SilverStack toolchain** (Docker, Kubernetes CLIs, IaC tools, security scanners, and utilities) matching the versions in the Dev Machine README.
 - Configure **aliases and bash completions** so `k`, `d`, and other shortcuts behave identically to their full commands.
 - Ship a Dev Machine-specific **welcome banner** documenting all tools, shortcuts, and ephemerality.
 - Be built reproducibly via **GitHub Actions**, tagged and pushed to GHCR as `ghcr.io/ibtisam-iq/dev-machine-rootfs`.
@@ -44,7 +48,7 @@ All installation work is split into focused scripts:
 | Script | Purpose |
 |---|---|
 | `install-docker.sh` | Installs Docker CE from the official Docker apt repo; enables `docker.service`; adds `$USER` to docker group |
-| `install-tools.sh` | 27-phase installation: runtimes, Kubernetes CLIs, IaC tools, security scanners, utilities |
+| `install-tools.sh` | 35-phase installation: runtimes, Kubernetes CLIs, IaC tools, security scanners, database clients, utilities |
 | `install-cloudflared.sh` | Installs Cloudflare Tunnel CLI from the official Cloudflare apt repo |
 | `setup-completions.sh` | Writes bash + zsh completions for all CLIs into `/etc/bash_completion.d/` (system-wide) |
 | `customize-bashrc.sh` | Appends kubectl, docker, terraform, git, and utility aliases to `~/.bashrc` |
@@ -53,30 +57,30 @@ All installation work is split into focused scripts:
 
 ## Key Decisions
 
-- **No systemd services** - systemd services belong to the base and service images; Dev Machine is a pure interactive workstation.
+- **No systemd services**: systemd services belong to the base and service images; Dev Machine is a pure interactive workstation.
 
-- **amd64-only build** - QEMU and arm64 are intentionally omitted. The CI workflow builds `linux/amd64` exclusively. This is a known limitation: Dev Machine cannot run on arm64 iximiuz hosts.
+- **amd64-only build**: QEMU and arm64 are intentionally omitted. The CI workflow builds `linux/amd64` exclusively. This is a known limitation: Dev Machine cannot run on arm64 iximiuz hosts.
 
-- **`install-tools.sh` uses `COPY`, not bind mount** - `install-tools.sh` runs `rm -rf /tmp/*` in its PHASE 27 final cleanup. A bind mount would cause `rm` to target a live mount point, producing undefined behavior. `COPY` places the script in a real image layer that can be safely deleted. All other scripts use bind mounts because they do not delete `/tmp/`.
+- **`install-tools.sh` uses `COPY`, not bind mount**: `install-tools.sh` runs `rm -rf /tmp/*` in its PHASE 35 final cleanup. A bind mount would cause `rm` to target a live mount point, producing undefined behavior. `COPY` places the script in a real image layer that can be safely deleted. All other scripts use bind mounts because they do not delete `/tmp/`.
 
-- **`welcome` file placement** - `COPY welcome $HOME/.welcome` runs after all other install steps. `customize-bashrc.sh` appends logic to `~/.bashrc` that displays and deletes `~/.welcome` on first interactive login. The file must exist after all RUN layers complete - but it must not be consumed by a non-interactive build step. Placing it last guarantees it survives the build.
+- **`welcome` file placement**: `COPY welcome $HOME/.welcome` runs after all other install steps. `customize-bashrc.sh` appends logic to `~/.bashrc` that displays and deletes `~/.welcome` on first interactive login. The file must exist after all RUN layers complete, but it must not be consumed by a non-interactive build step. Placing it last guarantees it survives the build.
 
-- **`BUILD_DATE` and `VCS_REF` injected by CI** - the workflow passes these as build-args from `docker/metadata-action` output and `github.sha`, respectively. Local builds may omit them; the OCI labels will be empty strings, which is acceptable for local testing only.
+- **`BUILD_DATE` and `VCS_REF` injected by CI**: the workflow passes these as build-args from `docker/metadata-action` output and `github.sha`, respectively. Local builds may omit them; the OCI labels will be empty strings, which is acceptable for local testing only.
 
-- **`USER $USER` at the end is intentional - do not change it to `USER root`**
+- **`USER $USER` at the end is intentional: do not change it to `USER root`**
 
 The Dockerfile ends with `USER $USER`, not `USER root`. This is a deliberate decision, not an oversight. Understanding why requires distinguishing the two completely independent execution contexts this image is used in:
 
 | Context | Who controls the starting user | Effect of `USER` directive |
 |---|---|---|
-| `docker run` binary check | Docker daemon, reads `USER` from OCI image config | **Matters** - process starts as `ibtisam` |
-| iximiuz microVM boot | Platform kernel + systemd as PID 1 | **Irrelevant** - `USER` field is never read |
+| `docker run` binary check | Docker daemon, reads `USER` from OCI image config | **Matters**: process starts as `ibtisam` |
+| iximiuz microVM boot | Platform kernel + systemd as PID 1 | **Irrelevant**: `USER` field is never read |
 
-When iximiuz boots this image, it mounts the filesystem as a block device, boots it with its own kernel, and systemd becomes PID 1 entirely independent of anything in the OCI image config. The `USER` directive is an OCI image config field - it only tells `docker run` which user to start the process as. It has zero effect on the microVM boot.
+When iximiuz boots this image, it mounts the filesystem as a block device, boots it with its own kernel, and systemd becomes PID 1 entirely independent of anything in the OCI image config. The `USER` directive is an OCI image config field: it only tells `docker run` which user to start the process as. It has zero effect on the microVM boot.
 
 Ending at `USER $USER` is correct for both reasons:
 
-  - **For `docker run` binary checks:** the process starts as `ibtisam`. This correctly validates that all tools are accessible to the non-root interactive user - the user who will actually use them inside the VM. If the Dockerfile ended with `USER root`, the binary check would pass even if a tool were installed in a location only root can reach, masking real permission issues.
+  - **For `docker run` binary checks:** the process starts as `ibtisam`. This correctly validates that all tools are accessible to the non-root interactive user (the user who will actually use them inside the VM). If the Dockerfile ended with `USER root`, the binary check would pass even if a tool were installed in a location only root can reach, masking real permission issues.
   - **For microVM boot:** completely irrelevant. systemd boots as root via the platform kernel regardless of this directive.
 
 Adding `USER root` before `EXPOSE 22` would be a regression: it makes `docker run` checks run as root, silently hides permission problems, and provides zero benefit for the actual iximiuz runtime.
@@ -93,10 +97,10 @@ dev/machine/
 ├── welcome
 └── scripts/
     ├── customize-bashrc.sh
-    ├── install-cloudflared.sh          # Uses COPY - deletes /tmp/*
+    ├── install-cloudflared.sh          # Uses COPY; deletes /tmp/*
     ├── install-docker.sh               # Uses bind mount (does not delete /tmp/)
-    ├── install-tools.sh                # Uses COPY - deletes /tmp/* in PHASE 27
-    ├── install-tools-all.sh            # Reference/dev script - NOT called in build
+    ├── install-tools.sh                # Uses COPY; deletes /tmp/* in PHASE 35
+    ├── install-tools-all.sh            # Reference/dev script (NOT called in build)
     └── setup-completions.sh            # Uses bind mount (does not delete /tmp/)
 ```
 
@@ -136,25 +140,26 @@ docker build \
   .
 ```
 
-> `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
+!!! note
+    `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
 
 The Dockerfile performs the following sequence:
 
-**Step 1 - Inherit the base**
+**Step 1: Inherit the base**
 
-- `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest` - inherits systemd, SSH, `$USER` account, shell config, and base toolset.
+- `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`: inherits systemd, SSH, `$USER` account, shell config, and base toolset.
 - `USER root` is set for all installation steps.
 
-**Step 2 - Install Docker CE** (`install-docker.sh` via bind mount)
+**Step 2: Install Docker CE** (`install-docker.sh` via bind mount)
 
 - Adds the official Docker apt repository.
 - Installs `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`.
 - Writes `/etc/docker/daemon.json` (registry mirror for faster pulls).
-- Runs `systemctl enable docker` - daemon starts automatically on VM boot, not during build.
+- Runs `systemctl enable docker`: daemon starts automatically on VM boot, not during build.
 - Adds `$USER` to the `docker` group.
 - Installs bash completion for `docker` into `/etc/bash_completion.d/docker`.
 
-**Step 3 - Install DevOps toolchain** (`install-tools.sh` via `COPY`)
+**Step 3: Install DevOps toolchain** (`install-tools.sh` via `COPY`)
 
 - PHASE 1: Base packages (tmux, nano, nmap, socat, maven, git-lfs, openssl, etc.)
 - PHASE 2: Java 21 (`openjdk-21-jdk`)
@@ -181,31 +186,40 @@ The Dockerfile performs the following sequence:
 - PHASE 23: gitleaks v8.28.0
 - PHASE 24: cosign v3.0.3
 - PHASE 25: syft v1.26.1
-- PHASE 26: pip tools (pre-commit, ansible, ansible-lint, yamllint)
-- PHASE 27: Final cleanup - `rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*`
+- PHASE 26: eksctl v0.226.0 (official GitHub release, checksum-verified)
+- PHASE 27: Python tools via pip (pre-commit, ansible, ansible-lint, yamllint)
+- PHASE 28: Database CLI Clients (mysql-client, postgresql-client, sqlite3, redis-tools)
+- PHASE 29: mongosh (official MongoDB apt repo)
+- PHASE 30: act v0.2.89 (GitHub Actions local runner)
+- PHASE 31: helmfile v1.5.2 (Helm release orchestrator)
+- PHASE 32: helm-diff plugin (installed via `helm plugin install`, required by helmfile)
+- PHASE 33: skaffold (latest stable, official GCS binary)
+- PHASE 34: lychee v0.24.2 (fast link checker)
+- PHASE 35: Final cleanup; `apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*`
 
-**Step 4 - Install cloudflared** (`install-cloudflared.sh` via `COPY`)
+**Step 4: Install cloudflared** (`install-cloudflared.sh` via `COPY`)
 
 - Adds the Cloudflare apt repository.
 - Installs `cloudflared`.
 
-**Step 5 - Set up completions** (`setup-completions.sh` via bind mount)
+**Step 5: Set up completions** (`setup-completions.sh` via bind mount)
 
 - Writes bash and zsh completions for all CLIs into `/etc/bash_completion.d/` and `/usr/share/zsh/vendor-completions/`.
 - Tools covered: kubectl, helm, terraform, docker, gh, aws, kustomize, stern, kubectx/kubens, yq, trivy, cosign, syft, ansible, pre-commit, pip3, npm.
 
-**Step 6 - Fix ownership**
+**Step 6: Fix ownership**
 
-- `chown -R ${USER}:${USER} /home/${USER}` - corrects ownership of any files root wrote into the user's home during steps 2–5.
+- `chown -R ${USER}:${USER} /home/${USER}`: corrects ownership of any files root wrote into the user's home during steps 2–5.
 
-**Step 7 - User customizations (order matters)**
+**Step 7: User customizations (order matters)**
 
 - `USER $USER` and `ENV HOME=/home/$USER`
-- `COPY welcome $HOME/.welcome` - placed at this stage so the banner is not consumed by any non-interactive build step.
-- `customize-bashrc.sh` (bind mount) - appends kubectl, docker, terraform, git, and utility aliases and helpers to `~/.bashrc`.
-- **`EXPOSE 22`** - documents the SSH port for iximiuz port-forwarding. SSH itself is managed by systemd inherited from the base image.
+- `COPY welcome $HOME/.welcome`: placed at this stage so the banner is not consumed by any non-interactive build step.
+- `customize-bashrc.sh` (bind mount): appends kubectl, docker, terraform, git, and utility aliases and helpers to `~/.bashrc`.
+- **`EXPOSE 22`**: documents the SSH port for iximiuz port-forwarding. SSH itself is managed by systemd inherited from the base image. SSH itself is managed by systemd inherited from the base image.
 
-> **Note:** The Dockerfile intentionally ends at `USER $USER` - not `USER root`. See [Key Decisions → `USER $USER` at the end is intentional](#key-decisions) for the full explanation.
+!!! note
+    The Dockerfile intentionally ends at `USER $USER`: not `USER root`. See [Key Decisions → `USER $USER` at the end is intentional](#key-decisions) for the full explanation.
 
 ---
 
@@ -222,9 +236,9 @@ The canonical build runs via [`.github/workflows/build-dev-machine-rootfs.yml`](
 **Key steps:**
 
 1. Checkout repository.
-2. Set up Docker Buildx (no QEMU - amd64 only, intentional).
+2. Set up Docker Buildx (no QEMU: amd64 only, intentional).
 3. Log in to GHCR via `secrets.GITHUB_TOKEN`.
-4. Extract metadata via `docker/metadata-action` - generates tags (`latest`, `sha-*`, `YYYY-MM-DD`) and OCI labels including `org.opencontainers.image.base.name`.
+4. Extract metadata via `docker/metadata-action`: generates tags (`latest`, `sha-*`, `YYYY-MM-DD`) and OCI labels including `org.opencontainers.image.base.name`.
 5. `docker/build-push-action` with:
     - `context: ./iximiuz/rootfs/dev/machine`
     - `platforms: linux/amd64`
@@ -254,7 +268,7 @@ skopeo inspect docker://ghcr.io/ibtisam-iq/dev-machine-rootfs:latest \
 
 ---
 
-### ✅ Correct: Binary Presence Check (`docker run` - limited scope)
+### ✅ Correct: Binary Presence Check (`docker run`: limited scope)
 
 `docker run` with `/bin/bash` confirms that binaries are present on PATH. It does **not** validate runtime behavior (no systemd, no docker daemon, no SSH, no network services):
 
@@ -271,11 +285,20 @@ docker run --rm \
     helm version --short
     kustomize version
     k9s version
+    kubectx --help >/dev/null 2>&1 && echo kubectx OK
+    kubens --help >/dev/null 2>&1 && echo kubens OK
     stern --version
+    eksctl version
     terraform version | head -1
     aws --version
     ansible --version | head -1
     pre-commit --version
+    yamllint --version
+    act --version
+    helmfile version
+    helm plugin list | grep diff
+    skaffold version
+    lychee --version
     trivy --version | head -1
     gitleaks version
     cosign version
@@ -284,11 +307,17 @@ docker run --rm \
     yq --version
     fzf --version
     rg --version
+    mysql --version
+    psql --version
+    sqlite3 --version
+    redis-cli --version
+    mongosh --version
     cloudflared --version
   "
 ```
 
-> This confirms binaries are installed and accessible. It does **not** confirm that `docker.service`, `ssh.service`, or any other systemd service is working. Errors like `Cannot connect to the Docker daemon` are expected and correct here.
+!!! note
+    This confirms binaries are installed and accessible. It does **not** confirm that `docker.service`, `ssh.service`, or any other systemd service is working. Errors like `Cannot connect to the Docker daemon` are expected and correct here.
 
 ---
 
@@ -297,14 +326,14 @@ docker run --rm \
 The only valid way to verify runtime behavior is to boot the image in an iximiuz microVM:
 
 ```bash
-# Step 1 - ensure labctl is installed and authenticated
+# Step 1: ensure labctl is installed and authenticated
 labctl auth whoami
 
-# Step 2 - download the manifest
+# Step 2: download the manifest
 curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/iximiuz/manifests/dev-machine.yml \
   -o dev-machine.yml
 
-# Step 3 - create the playground
+# Step 3: create the playground
 labctl playground create --base flexbox dev-machine -f dev-machine.yml
 ```
 
@@ -334,7 +363,7 @@ cat ~/.welcome                       # Expected: Dev Machine banner (deleted aft
 
 ### ❌ Not Valid: `docker run` for systemd or service checks
 
-Running with `docker run` (even `--privileged`) will not produce a working systemd environment because the image has no `CMD` to start systemd. This is correct behavior - it confirms the image is purpose-built for microVM use.
+Running with `docker run` (even `--privileged`) will not produce a working systemd environment because the image has no `CMD` to start systemd. This is correct behavior: it confirms the image is purpose-built for microVM use.
 
 Expected errors when attempting service checks via `docker run`:
 
@@ -343,15 +372,16 @@ System has not been booted with systemd as init system (PID 1). Can't operate.
 Cannot connect to the Docker daemon at unix:///var/run/docker.sock
 ```
 
-These are **not bugs** - they are expected and correct.
+These are **not bugs**: they are expected and correct.
 
 ---
 
 ## Integration with iximiuz Labs
 
-> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
-> https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7
-> - no local tools required. The `labctl` steps below are for launching via manifest.
+!!! tip "Quickest path"
+    Open the playground directly in the browser and click **Start Playground**:
+    https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7
+    No local tools required. The `labctl` steps below are for launching via manifest.
 
 ### Prerequisites
 
@@ -372,7 +402,7 @@ These are **not bugs** - they are expected and correct.
     labctl auth whoami
     ```
 
-### Step 1 - Download the Manifest
+### Step 1: Download the Manifest
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/iximiuz/manifests/dev-machine.yml \
@@ -388,15 +418,16 @@ drives:
     size: 50GiB
 ```
 
-### Step 2 - Create the Playground
+### Step 2: Create the Playground
 
 ```bash
 labctl playground create --base flexbox dev-machine -f dev-machine.yml
 ```
 
-> The playground appears under **Playgrounds → My Custom**, not under **Playgrounds → Running**.
+!!! note
+    The playground appears under **Playgrounds → My Custom**, not under **Playgrounds → Running**.
 
-### Step 3 - Open and Verify
+### Step 3: Open and Verify
 
 Navigate to the URL printed by `labctl`, or open the playground from [labs.iximiuz.com/dashboard](https://labs.iximiuz.com/dashboard).
 
@@ -414,3 +445,4 @@ Once connected, run the runtime verification steps listed in [Verification](#ver
 - [Ubuntu base rootfs README](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/rootfs/ubuntu/README.md)
 - [Dev Machine workflow](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-dev-machine-rootfs.yml)
 - [Dev Machine manifest](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/dev-machine.yml)
+- [Dev CI/CD Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-cicd-rootfs-image/): the minimal jump host image, not this one

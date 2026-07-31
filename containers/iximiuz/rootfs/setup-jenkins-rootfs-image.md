@@ -4,11 +4,15 @@
 
 Jenkins LTS Rootfs is a production-grade Jenkins CI server image for iximiuz playgrounds. It boots Jenkins via systemd, with Nginx as a reverse proxy and `cloudflared` pre-installed for instant public access over a Cloudflare Tunnel.
 
-> **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, Docker daemon, or service behavior via `docker run` - use `labctl` instead (see [Verification](#verification)).
+!!! warning "MicroVM Rootfs"
+    **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, Docker daemon, or service behavior via `docker run`: use `labctl` instead (see [Verification](#verification)).
+
+!!! tip "Quick Start"
+    Skip the build and try it now: **[Launch Jenkins Server↗](https://labs.iximiuz.com/playgrounds/SilverStack-jenkins-server-63fe430c)**. Click **Start**, and Jenkins boots behind Nginx in the browser in under two minutes. The rest of this page covers how the image itself is built.
 
 ![](../../../assets/screenshots/jenkins-server-drive-config.png)
 
-**Pipeline tools and plugins are intentionally NOT baked in.** Two post-setup scripts are placed on `PATH` and run after the VM is live - keeping the image lean.
+**Pipeline tools and plugins are intentionally NOT baked in.** Two post-setup scripts are placed on `PATH` and run after the VM is live; this keeps the image lean.
 
 All source artifacts:
 
@@ -30,9 +34,9 @@ Jenkins LTS Rootfs must:
 - Provide a Jenkins LTS instance running on top of `ubuntu-24-04-rootfs` with systemd as PID 1.
 - Start services in boot order: `lab-init` → `nginx` → `jenkins`, making Jenkins available on **port 80** via Nginx immediately on first boot.
 - Configure Nginx as a reverse proxy using a build-time parameterized port (`__JENKINS_PORT__`), with `/health` endpoint and production-grade headers.
-- Provide a Cloudflare-ready environment via `cloudflared` so Jenkins can be exposed on a custom domain with SSL - no firewall rules needed.
+- Provide a Cloudflare-ready environment via `cloudflared` so Jenkins can be exposed on a custom domain with SSL (no firewall rules needed).
 - Expose two post-setup scripts (`install-pipeline-tools`, `install-plugins`) on `/usr/local/bin/` and **never run them during the build**.
-- Apply a **limited `sudo` profile** for the `jenkins` daemon user - enough to manage services and read logs, but not full root.
+- Apply a **limited `sudo` profile** for the `jenkins` daemon user: enough to manage services and read logs, but not full root.
 - Be built reproducibly via GitHub Actions and published as `ghcr.io/ibtisam-iq/jenkins-rootfs` with `latest`, `lts`, and `2.541.2-lts` tags.
 
 ---
@@ -84,21 +88,21 @@ CI default: `JENKINS_PORT=8080`. Override with `--build-arg JENKINS_PORT=<port>`
 
 ## Key Decisions
 
-**Post-setup tools and plugins, not baked in** - `install-pipeline-tools` and `install-plugins` are placed on `PATH` as callable scripts, not run during build. This keeps image size minimal and gives full control over what gets installed per environment.
+**Post-setup tools and plugins, not baked in**: `install-pipeline-tools` and `install-plugins` are placed on `PATH` as callable scripts, not run during build. This keeps image size minimal and gives full control over what gets installed per environment.
 
-**Trivy pinned to `v0.69.3`** - Trivy `v0.69.4` was a confirmed supply-chain attack (CVE-2026-33634, March 19, 2026). The malicious binary exfiltrated secrets from CI/CD pipelines via compromised Aqua Security credentials. `install-pipeline-tools` pins `v0.69.3` - the last verified safe release. Reference: [trivy/discussions/10425](https://github.com/aquasecurity/trivy/discussions/10425).
+**Trivy pinned to `v0.69.3`**: Trivy `v0.69.4` was a confirmed supply-chain attack (CVE-2026-33634, March 19, 2026). The malicious binary exfiltrated secrets from CI/CD pipelines via compromised Aqua Security credentials. `install-pipeline-tools` pins `v0.69.3`: the last verified safe release. Reference: [trivy/discussions/10425](https://github.com/aquasecurity/trivy/discussions/10425).
 
-**Systemd-first Jenkins** - Jenkins runs as a real `Type=notify` systemd service with `OOMScoreAdjust=-900`, explicit `LimitNOFILE`/`LimitNPROC`, and `Restart=always`. This aligns the image with production behavior rather than a simple process.
+**Systemd-first Jenkins**: Jenkins runs as a real `Type=notify` systemd service with `OOMScoreAdjust=-900`, explicit `LimitNOFILE`/`LimitNPROC`, and `Restart=always`. This aligns the image with production behavior rather than a simple process.
 
-**Nginx as canonical entry point** - All external traffic enters via Nginx on port 80. Jenkins only listens on a local port (`127.0.0.1:JENKINS_PORT`). Nginx normalizes headers, handles caching, exposes `/health`, and is the target for Cloudflare Tunnel HTTP mapping.
+**Nginx as canonical entry point**: All external traffic enters via Nginx on port 80. Jenkins only listens on a local port (`127.0.0.1:JENKINS_PORT`). Nginx normalizes headers, handles caching, exposes `/health`, and is the target for Cloudflare Tunnel HTTP mapping.
 
-**Limited `sudo` for the `jenkins` daemon** - Instead of `NOPASSWD:ALL`, the sudoers entry gives Jenkins exactly what it needs: `systemctl restart/stop/start/status jenkins`, `systemctl reload nginx`, and `journalctl`. This limits blast radius if Jenkins is compromised.
+**Limited `sudo` for the `jenkins` daemon**: Instead of `NOPASSWD:ALL`, the sudoers entry gives Jenkins exactly what it needs: `systemctl restart/stop/start/status jenkins`, `systemctl reload nginx`, and `journalctl`. This limits blast radius if Jenkins is compromised.
 
-**`lab-init.service` runs before SSH, Nginx, and Jenkins** - SSH host keys are deleted from the base image for security (each VM gets unique keys). `lab-init.sh` regenerates them at every boot via `ssh-keygen -A`. It also creates `/run/sshd` and `/run/nginx`, which are wiped by `tmpfs` on each reboot. Without this, `sshd` and `nginx` would fail to start.
+**`lab-init.service` runs before SSH, Nginx, and Jenkins**: SSH host keys are deleted from the base image for security (each VM gets unique keys). `lab-init.sh` regenerates them at every boot via `ssh-keygen -A`. It also creates `/run/sshd` and `/run/nginx`, which are wiped by `tmpfs` on each reboot. Without this, `sshd` and `nginx` would fail to start.
 
-**`CMD ["/lib/systemd/systemd"]`** - Jenkins rootfs is a service image. Unlike the Dev Machine workstation image, it includes a `CMD` so `docker run` can attempt to start systemd. Systemd will immediately report `System has not been booted with systemd as init system` in a plain Docker container - this is expected and correct. The image is purpose-built for microVM boot.
+**`CMD ["/lib/systemd/systemd"]`**: Jenkins rootfs is a service image. Unlike the Dev Machine workstation image, it includes a `CMD` so `docker run` can attempt to start systemd. Systemd will immediately report `System has not been booted with systemd as init system` in a plain Docker container: this is expected and correct. The image is purpose-built for microVM boot.
 
-**`USER root` at image end** - Jenkins rootfs ends as `USER root`, unlike Dev Machine. This is intentional: the `CMD ["/lib/systemd/systemd"]` requires root because systemd must start as PID 1. When the iximiuz platform boots the microVM, it runs as root regardless - but the explicit `USER root` + `CMD` combination makes the intent unambiguous.
+**`USER root` at image end**: Jenkins rootfs ends as `USER root`, unlike Dev Machine. This is intentional: the `CMD ["/lib/systemd/systemd"]` requires root because systemd must start as PID 1. When the iximiuz platform boots the microVM, it runs as root regardless: but the explicit `USER root` + `CMD` combination makes the intent unambiguous.
 
 ---
 
@@ -134,7 +138,7 @@ jenkins/
 | ARG | CI Default | Description |
 |---|---|---|
 | `USER` | `ibtisam` | Interactive non-root user (inherited from base) |
-| `JENKINS_PORT` | `8080` | Jenkins HTTP port - substituted in service, nginx, welcome |
+| `JENKINS_PORT` | `8080` | Jenkins HTTP port; substituted in service, nginx, welcome |
 | `BUILD_DATE` | From CI metadata-action | OCI label: image creation timestamp |
 | `VCS_REF` | `github.sha` | OCI label: git commit SHA |
 
@@ -163,35 +167,36 @@ docker build \
   .
 ```
 
-> `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
+!!! note
+    `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
 
 The Dockerfile performs the following sequence in order:
 
-**Step 1 - Inherit the base**
+**Step 1: Inherit the base**
 
-- `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest` - inherits systemd, SSH, `ibtisam` account, shell config, and base toolset.
+- `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`: inherits systemd, SSH, `ibtisam` account, shell config, and base toolset.
 - `USER root` is set for all installation and configuration steps.
 - Build args declared: `USER`, `JENKINS_PORT`, `BUILD_DATE`, `VCS_REF`.
 - `ENV` sets: `JENKINS_HOME`, `JENKINS_PORT`, `JAVA_HOME`, `PATH` (Java bin prepended), `TZ=UTC`.
 
-**Step 2 - Copy and parameterize configs**
+**Step 2: Copy and parameterize configs**
 
 - `COPY configs/nginx.conf /etc/nginx/sites-available/jenkins` → `sed` replaces `__JENKINS_PORT__`.
 - `COPY configs/jenkins.service /etc/systemd/system/jenkins.service` → `sed` replaces `__JENKINS_PORT__`.
-- `COPY configs/sudoers.d/jenkins-user /etc/sudoers.d/jenkins-user` - grants jenkins daemon limited sudo.
-- `COPY configs/systemd/lab-init.service /etc/systemd/system/lab-init.service` - oneshot boot init.
+- `COPY configs/sudoers.d/jenkins-user /etc/sudoers.d/jenkins-user`: grants jenkins daemon limited sudo.
+- `COPY configs/systemd/lab-init.service /etc/systemd/system/lab-init.service`: oneshot boot init.
 
-**Step 3 - Copy build-time scripts**
+**Step 3: Copy build-time scripts**
 
-- `COPY scripts/ /opt/jenkins-scripts/` + `chmod +x *.sh` - all scripts available for subsequent RUN steps.
+- `COPY scripts/ /opt/jenkins-scripts/` + `chmod +x *.sh`: all scripts available for subsequent RUN steps.
 
-**Step 4 - Install post-setup scripts on PATH**
+**Step 4: Install post-setup scripts on PATH**
 
 - `install-pipeline-tools.sh` → `/usr/local/bin/install-pipeline-tools` (mode 0755)
 - `install-plugins.sh` → `/usr/local/bin/install-plugins` (mode 0755)
-- These are **not executed here** - they are callable by the user after the VM is live.
+- These are **not executed here**: they are callable by the user after the VM is live.
 
-**Step 5 - Install Java 21 + Jenkins LTS** (`install-jenkins.sh`)
+**Step 5: Install Java 21 + Jenkins LTS** (`install-jenkins.sh`)
 
 - Validates port argument.
 - Installs `openjdk-21-jdk` + `fontconfig` via apt.
@@ -200,7 +205,7 @@ The Dockerfile performs the following sequence in order:
 - Creates `jenkins` user directories: `/var/lib/jenkins`, `/var/lib/jenkins/plugins`, `/var/lib/jenkins/workspace`, `/var/lib/jenkins/.ssh`, `/var/log/jenkins`.
 - Sets ownership and permissions (`jenkins:jenkins`).
 
-**Step 6 - Configure Nginx** (`configure-nginx.sh`)
+**Step 6: Configure Nginx** (`configure-nginx.sh`)
 
 - Installs `nginx` via apt.
 - Validates `/etc/nginx/sites-available/jenkins` exists (was COPY'd in Step 2).
@@ -208,10 +213,10 @@ The Dockerfile performs the following sequence in order:
 - Enables Jenkins site: `ln -sf sites-available/jenkins sites-enabled/jenkins`.
 - Creates systemd override `/etc/systemd/system/nginx.service.d/override.conf`:
     - `Type=simple`, `ExecStart=/usr/sbin/nginx -g 'daemon off;'`
-    - This is required for systemd container compatibility - Nginx must run in foreground.
+    - This is required for systemd container compatibility: Nginx must run in foreground.
 - Runs `nginx -t` to validate config.
 
-**Step 7 - Enable systemd units**
+**Step 7: Enable systemd units**
 
 ```bash
 systemctl enable lab-init
@@ -220,7 +225,7 @@ systemctl enable jenkins
 ```
 This creates symlinks in `/etc/systemd/system/multi-user.target.wants/`. The `healthcheck.sh` validates these symlinks exist.
 
-**Step 8 - Build-time healthcheck** (`healthcheck.sh ${USER}`)
+**Step 8: Build-time healthcheck** (`healthcheck.sh ${USER}`)
 
 Validates 8 sections without starting any services (systemd is not running during build):
 
@@ -237,29 +242,30 @@ Validates 8 sections without starting any services (systemd is not running durin
 
 If any check fails, the build fails with a non-zero exit.
 
-**Step 9 - Install cloudflared** (`install-cloudflared.sh`)
+**Step 9: Install cloudflared** (`install-cloudflared.sh`)
 
 - Adds the official Cloudflare apt repository.
 - Installs `cloudflared`.
 
-**Step 10 - Fix ownership**
+**Step 10: Fix ownership**
 
-- `chown -R ${USER}:${USER} /home/${USER}` - corrects ownership of any files root wrote into the non-root user's home.
+- `chown -R ${USER}:${USER} /home/${USER}`: corrects ownership of any files root wrote into the non-root user's home.
 
-**Step 11 - User customizations (order matters)**
+**Step 11: User customizations (order matters)**
 
 - `USER $USER` + `ENV HOME=/home/$USER`
 - `COPY welcome $HOME/.welcome` → `sed -i` replaces `__JENKINS_PORT__` in the banner.
-- `customize-bashrc.sh` (bind mount) - appends Jenkins and Nginx aliases to `~/.bashrc`:
+- `customize-bashrc.sh` (bind mount): appends Jenkins and Nginx aliases to `~/.bashrc`:
+
     - `jenkins-status`, `jenkins-logs`, `jenkins-restart`, `jenkins-start`, `jenkins-stop`
     - `nginx-status`, `nginx-logs`, `nginx-reload`
     - Standard `ll`, `la`, `l` aliases
 
-**Step 12 - Return to root + CMD**
+**Step 12: Return to root + CMD**
 
-- `USER root` - required because `CMD ["/lib/systemd/systemd"]` must start as root.
-- `EXPOSE 22 80 ${JENKINS_PORT}` - documents SSH, Nginx, and internal Jenkins ports.
-- `CMD ["/lib/systemd/systemd"]` - starts systemd as PID 1 when the microVM boots.
+- `USER root`: required because `CMD ["/lib/systemd/systemd"]` must start as root.
+- `EXPOSE 22 80 ${JENKINS_PORT}`: documents SSH, Nginx, and internal Jenkins ports.
+- `CMD ["/lib/systemd/systemd"]`: starts systemd as PID 1 when the microVM boots.
 
 ---
 
@@ -276,9 +282,9 @@ Canonical build: [`.github/workflows/build-jenkins-rootfs.yml`](https://github.c
 **Key steps:**
 
 1. Checkout repository.
-2. Set up Docker Buildx (no QEMU - amd64 only, intentional).
+2. Set up Docker Buildx (no QEMU: amd64 only, intentional).
 3. Log in to GHCR via `secrets.GITHUB_TOKEN`.
-4. Extract metadata via `docker/metadata-action` - generates tags and OCI labels:
+4. Extract metadata via `docker/metadata-action`: generates tags and OCI labels:
     - Tags: `latest`, `lts`, `2.541.2-lts` (all on default branch), `sha-<short>`, `YYYY-MM-DD`
     - Labels include: `org.opencontainers.image.base.name=ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
 5. `docker/build-push-action` with:
@@ -289,7 +295,8 @@ Canonical build: [`.github/workflows/build-jenkins-rootfs.yml`](https://github.c
     - GHA layer cache enabled.
 6. Print final image digest.
 
-> **Note:** `BUILD_DATE` and `VCS_REF` are **not** passed as `build-args` in the current workflow. This means the `org.opencontainers.image.created` and `org.opencontainers.image.revision` OCI labels in the Dockerfile LABEL block will be empty strings. The `docker/metadata-action` does inject these into image labels via its own mechanism - but the Dockerfile ARG interpolation in the LABEL block will be blank. This is a known gap: the workflow should pass `BUILD_DATE` and `VCS_REF` as explicit `build-args`.
+!!! note
+    `BUILD_DATE` and `VCS_REF` are **not** passed as `build-args` in the current workflow. This means the `org.opencontainers.image.created` and `org.opencontainers.image.revision` OCI labels in the Dockerfile LABEL block will be empty strings. The `docker/metadata-action` does inject these into image labels via its own mechanism, but the Dockerfile ARG interpolation in the LABEL block will be blank. This is a known gap: the workflow should pass `BUILD_DATE` and `VCS_REF` as explicit `build-args`.
 
 ---
 
@@ -313,7 +320,7 @@ skopeo inspect docker://ghcr.io/ibtisam-iq/jenkins-rootfs:latest \
 
 ---
 
-### ✅ Correct: Binary and Config Presence Check (`docker run` - limited scope)
+### ✅ Correct: Binary and Config Presence Check (`docker run`: limited scope)
 
 `docker run` with a shell confirms binaries, files, and symlinks are present. It does **not** validate runtime behavior (no systemd, no Jenkins, no Nginx, no SSH):
 
@@ -342,7 +349,8 @@ docker run --rm ghcr.io/ibtisam-iq/jenkins-rootfs:latest bash -c "
 "
 ```
 
-> Errors like `System has not been booted with systemd as init system` or `Cannot connect to the Docker daemon` when running these checks are **expected and correct** - they confirm the image is purpose-built for microVM use, not Docker containers.
+!!! note
+    Errors like `System has not been booted with systemd as init system` or `Cannot connect to the Docker daemon` when running these checks are **expected and correct**: they confirm the image is purpose-built for microVM use, not Docker containers.
 
 ---
 
@@ -351,15 +359,15 @@ docker run --rm ghcr.io/ibtisam-iq/jenkins-rootfs:latest bash -c "
 The only valid way to verify the full stack (systemd, Jenkins, Nginx, SSH) is to boot in an iximiuz microVM:
 
 ```bash
-# Step 1 - ensure labctl is installed and authenticated
+# Step 1: ensure labctl is installed and authenticated
 labctl auth whoami
 
-# Step 2 - download the manifest
+# Step 2: download the manifest
 curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/iximiuz/manifests/jenkins-server.yml \
   -o jenkins-server.yml
 
-# Step 3 - create the playground
-labctl playground create --base flexbox jenkins-server -f jenkins-server.yml
+# Step 3: create the playground
+labctl playground create --base flexbox SilverStack-jenkins-server -f jenkins-server.yml
 ```
 
 Once the VM is running, connect via the terminal tab or `labctl ssh jenkins-server`, then:
@@ -367,7 +375,7 @@ Once the VM is running, connect via the terminal tab or `labctl ssh jenkins-serv
 ```bash
 # --- System health ---
 systemctl is-system-running          # Expected: running
-systemctl status lab-init            # Expected: active (exited) - oneshot complete
+systemctl status lab-init            # Expected: active (exited): oneshot complete
 systemctl status nginx               # Expected: active (running)
 systemctl status jenkins             # Expected: active (running)
 systemctl status ssh                 # Expected: active (running)
@@ -397,15 +405,16 @@ Attempting systemd or service checks via `docker run` will produce:
 System has not been booted with systemd as init system (PID 1). Can't operate.
 ```
 
-This is **expected and correct** - not a bug. Even with `--privileged`, a plain Docker container cannot replicate the microVM boot model. Use the iximiuz microVM for all service-level verification.
+This is **expected and correct**, not a bug. Even with `--privileged`, a plain Docker container cannot replicate the microVM boot model. Use the iximiuz microVM for all service-level verification.
 
 ---
 
 ## Integration with iximiuz Labs
 
-> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
-> https://labs.iximiuz.com/playgrounds/SilverStack-jenkins-server-63fe430c
-> - no local tools required. The `labctl` steps below are for launching via manifest.
+!!! tip "Quickest path"
+    Open the playground directly in the browser and click **Start Playground**:
+    https://labs.iximiuz.com/playgrounds/SilverStack-jenkins-server-63fe430c
+    No local tools required. The `labctl` steps below are for launching via manifest.
 
 ### Prerequisites
 
@@ -431,7 +440,7 @@ Before proceeding, ensure the following are in place on the machine from which `
 
 ---
 
-### Step 1 - Create the playground
+### Step 1: Create the playground
 
 Download the manifest directly without cloning the full repository:
 
@@ -449,7 +458,7 @@ drives:
     size: 50GiB
 ```
 
-The manifest can be edited before running - for example, to adjust `cpuCount`, `ramSize`, or `size` to match account quota or preferences.
+The manifest can be edited before running: for example, to adjust `cpuCount`, `ramSize`, or `size` to match account quota or preferences.
 
 Run `labctl playground create` pointing at the local manifest:
 
@@ -465,12 +474,12 @@ Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-jenkins-server-
 SilverStack-jenkins-server-63fe430c
 ```
 
-> **Note:** The playground does **not** appear under **Playgrounds → Running**.
-> Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom**.
+!!! note
+    The playground does **not** appear under **Playgrounds → Running**. Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom**.
 
 ---
 
-### Step 2 - Open the playground
+### Step 2: Open the playground
 
 Click the URL printed by `labctl`, or navigate manually:
 
@@ -490,7 +499,7 @@ To review or adjust settings before starting, click ⋮ → **Configure**. This 
 
 ---
 
-### Step 3 - Verify the running playground
+### Step 3: Verify the running playground
 
 Once started, the welcome banner is displayed automatically and shows the configured internal
 ports, service status commands, and next steps.
@@ -507,7 +516,8 @@ To expose the service on a custom public domain, `cloudflared` is already instal
 
 If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the following runbook:
 
-> 📖 [self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md](../../../self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md#phase-4-implementation---creating-cloudflare-tunnels)
+!!! info "Related Reading"
+    📖 [self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md](../../../self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md#phase-4-implementation---creating-cloudflare-tunnels)
 
 ---
 
@@ -521,3 +531,4 @@ If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the foll
 - [Jenkins workflow](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-jenkins-rootfs.yml)
 - [Jenkins manifest](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/jenkins-server.yml)
 - [Dev Machine Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-machine-rootfs-image/)
+- [Dev CI/CD Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-cicd-rootfs-image/)

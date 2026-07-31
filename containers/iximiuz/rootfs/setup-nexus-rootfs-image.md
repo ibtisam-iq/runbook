@@ -4,9 +4,13 @@
 
 Nexus Repository Manager Rootfs is a production-grade Nexus 3 Community Edition image for iximiuz playgrounds. It runs on top of `ubuntu-24-04-rootfs`, booting `lab-init` → `nginx` → `nexus` via systemd, with Nginx on port 80 and `cloudflared` pre-installed for Cloudflare Tunnel custom-domain access.
 
-The image uses its own embedded storage under `/opt/sonatype-work` - no external database is required.
+The image uses its own embedded storage under `/opt/sonatype-work`: no external database is required.
 
-> **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, service behavior, or Nexus startup via `docker run` - use `labctl` instead (see [Verification](#verification)).
+!!! warning "MicroVM Rootfs"
+    **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, service behavior, or Nexus startup via `docker run`: use `labctl` instead (see [Verification](#verification)).
+
+!!! tip "Quick Start"
+    Skip the build and try it now: **[Launch Nexus Playground↗](https://labs.iximiuz.com/playgrounds/SilverStack-nexus-server-9a3f87e9)**. Click **Start**, and Nexus boots behind Nginx in the browser in under two minutes. The rest of this page covers how the image itself is built.
 
 ![](../../../assets/screenshots/nexus-server-drive-config.png)
 
@@ -30,9 +34,9 @@ Nexus Rootfs must:
 - Provide Nexus 3.89.1-02 CE running as the `nexus` system user on top of `ubuntu-24-04-rootfs`.
 - Boot in the sequence `lab-init` → `nginx` → `nexus` via systemd, exposing Nexus through Nginx on **port 80** immediately on first boot.
 - Configure Nginx as a reverse proxy using build-time port substitution (`__NEXUS_PORT__`), with a `/health` endpoint.
-- Write Nexus port and host into `nexus.properties` at build time - no manual configuration needed after first boot.
+- Write Nexus port and host into `nexus.properties` at build time; no manual configuration needed after first boot.
 - Provide `cloudflared` for instant public domain exposure without firewall rules.
-- Apply a **limited `sudo` profile** for the `nexus` daemon user - service management and log inspection only.
+- Apply a **limited `sudo` profile** for the `nexus` daemon user: service management and log inspection only.
 - Be built reproducibly via GitHub Actions and published as `ghcr.io/ibtisam-iq/nexus-rootfs` with `latest`, `community`, and `3.89.1.02-community` tags.
 
 ---
@@ -86,25 +90,25 @@ application-host=0.0.0.0
 nexus-context-path=/
 ```
 
-This means Nexus is fully configured at build time - no manual port configuration needed at runtime.
+This means Nexus is fully configured at build time; no manual port configuration needed at runtime.
 
 ---
 
 ## Key Decisions
 
-**Nexus is architecture-aware** - `install-nexus.sh` detects the CPU architecture and builds the correct Sonatype download URL. Sonatype uses `linux-aarch_64` (with underscore) for ARM, not `aarch64` - the script handles this explicitly. The CI workflow builds `linux/amd64` only (QEMU intentionally omitted).
+**Nexus is architecture-aware**: `install-nexus.sh` detects the CPU architecture and builds the correct Sonatype download URL. Sonatype uses `linux-aarch_64` (with underscore) for ARM, not `aarch64`; the script handles this explicitly. The CI workflow builds `linux/amd64` only (QEMU intentionally omitted).
 
-**JVM user prefs directory** - The `nexus` system user has no home directory (`--no-create-home`). Without intervention, the JVM attempts to write user preferences to `~/.java` and fails silently. `install-nexus.sh` appends `-Djava.util.prefs.userRoot=/opt/sonatype-work/jvm-prefs` to `nexus.vmoptions`. `lab-init.sh` recreates this directory at every boot and ensures `nexus:nexus` ownership - because `/opt/sonatype-work` permissions may be reset when the microVM mounts it fresh.
+**JVM user prefs directory**: The `nexus` system user has no home directory (`--no-create-home`). Without intervention, the JVM attempts to write user preferences to `~/.java` and fails silently. `install-nexus.sh` appends `-Djava.util.prefs.userRoot=/opt/sonatype-work/jvm-prefs` to `nexus.vmoptions`. `lab-init.sh` recreates this directory at every boot and ensures `nexus:nexus` ownership, because `/opt/sonatype-work` permissions may be reset when the microVM mounts it fresh.
 
-**`lab-init.service` runs before SSH, Nginx, and Nexus** - SSH host keys are deleted from the base image (unique per VM; `lab-init.sh` regenerates them via `ssh-keygen -A` at each boot). `/run/sshd` and `/run/nginx` are wiped by `tmpfs` on every reboot. `/opt/nexus` and `/opt/sonatype-work` ownership must be confirmed as `nexus:nexus` at every boot. Without this, all three services would fail to start.
+**`lab-init.service` runs before SSH, Nginx, and Nexus**: SSH host keys are deleted from the base image (unique per VM; `lab-init.sh` regenerates them via `ssh-keygen -A` at each boot). `/run/sshd` and `/run/nginx` are wiped by `tmpfs` on every reboot. `/opt/nexus` and `/opt/sonatype-work` ownership must be confirmed as `nexus:nexus` at every boot. Without this, all three services would fail to start.
 
-**Nginx as canonical entry point** - All external traffic enters via Nginx on port 80. Nexus only listens on `0.0.0.0:NEXUS_PORT` internally. `client_max_body_size 1G` is set in `nginx.conf` to support large artifact uploads (Maven JARs, Docker layers). Nexus does not have its own reverse-proxy awareness headers in this configuration - the proxy headers (`X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`) are set at the Nginx layer.
+**Nginx as canonical entry point**: All external traffic enters via Nginx on port 80. Nexus only listens on `0.0.0.0:NEXUS_PORT` internally. `client_max_body_size 1G` is set in `nginx.conf` to support large artifact uploads (Maven JARs, Docker layers). Nexus does not have its own reverse-proxy awareness headers in this configuration; the proxy headers (`X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto`) are set at the Nginx layer.
 
-**Limited `sudo` for `nexus` daemon** - `configs/sudoers.d/nexus-user` grants the `nexus` system user passwordless access to: `systemctl restart/stop/start/status nexus`, `systemctl reload nginx`, and `journalctl`. No full root. This limits blast radius if Nexus is compromised.
+**Limited `sudo` for `nexus` daemon**: `configs/sudoers.d/nexus-user` grants the `nexus` system user passwordless access to: `systemctl restart/stop/start/status nexus`, `systemctl reload nginx`, and `journalctl`. No full root. This limits blast radius if Nexus is compromised.
 
-**`USER root` at image end + `CMD ["/lib/systemd/systemd"]`** - Nexus rootfs ends as `USER root`. This is required because `CMD ["/lib/systemd/systemd"]` must start as root. When the iximiuz platform boots the microVM, it runs as root regardless - but the explicit `USER root` + `CMD` makes the intent unambiguous and allows `docker run` to attempt systemd boot (which will fail in a plain container as expected).
+**`USER root` at image end + `CMD ["/lib/systemd/systemd"]`**: Nexus rootfs ends as `USER root`. This is required because `CMD ["/lib/systemd/systemd"]` must start as root. When the iximiuz platform boots the microVM, it runs as root regardless; the explicit `USER root` + `CMD` makes the intent unambiguous and allows `docker run` to attempt systemd boot (which will fail in a plain container as expected).
 
-**`BUILD_DATE` and `VCS_REF` are not passed as `build-args` in CI** - The workflow does not pass `BUILD_DATE` or `VCS_REF` as explicit `build-args`. The Dockerfile `LABEL` block interpolates these from the ARGs, so the `org.opencontainers.image.created` and `org.opencontainers.image.revision` OCI labels will be empty strings. The `docker/metadata-action` step does inject these into image labels via its own mechanism, but only at the OCI manifest layer - not via ARG substitution in the LABEL block. This is a known gap.
+**`BUILD_DATE` and `VCS_REF` are not passed as `build-args` in CI**: The workflow does not pass `BUILD_DATE` or `VCS_REF` as explicit `build-args`. The Dockerfile `LABEL` block interpolates these from the ARGs, so the `org.opencontainers.image.created` and `org.opencontainers.image.revision` OCI labels will be empty strings. The `docker/metadata-action` step does inject these into image labels via its own mechanism, but only at the OCI manifest layer, not via ARG substitution in the LABEL block. This is a known gap.
 
 ---
 
@@ -138,7 +142,7 @@ nexus/
 | ARG | CI Default | Description |
 |---|---|---|
 | `USER` | `ibtisam` | Interactive non-root user (inherited from base) |
-| `NEXUS_PORT` | `8081` | Nexus HTTP port - substituted in nginx, nexus.properties, welcome |
+| `NEXUS_PORT` | `8081` | Nexus HTTP port (substituted in nginx, nexus.properties, welcome) |
 | `BUILD_DATE` | From CI metadata-action | OCI label: image creation timestamp |
 | `VCS_REF` | `github.sha` | OCI label: git commit SHA |
 
@@ -168,31 +172,33 @@ docker build \
   .
 ```
 
-> `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
+!!! note
+    `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
 
 The Dockerfile performs the following sequence in order:
 
-**Step 1 - Inherit the base**
+**Step 1: Inherit the base**
 
 - `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
 - `USER root` for all installation steps
 - ARGs declared: `USER`, `NEXUS_PORT`, `BUILD_DATE`, `VCS_REF`
 - `ENV` sets: `NEXUS_HOME=/opt/nexus`, `NEXUS_DATA=/opt/sonatype-work`, `NEXUS_PORT`, `JAVA_HOME`, `PATH` (Java bin prepended), `TZ=UTC`
 
-**Step 2 - Copy and parameterize configs**
+**Step 2: Copy and parameterize configs**
 
 - `COPY configs/nginx.conf /etc/nginx/sites-available/nexus` → `sed` replaces `__NEXUS_PORT__`
 - `COPY configs/nexus.service /etc/systemd/system/nexus.service`
 - `COPY configs/sudoers.d/nexus-user /etc/sudoers.d/nexus-user`
 - `COPY configs/systemd/lab-init.service /etc/systemd/system/lab-init.service`
 
-> Note: Dockerfile does **not** run `sed` on `nexus.service` for port substitution. The port is written directly into `nexus.properties` by `install-nexus.sh` at the next step.
+!!! note
+    Dockerfile does **not** run `sed` on `nexus.service` for port substitution. The port is written directly into `nexus.properties` by `install-nexus.sh` at the next step.
 
-**Step 3 - Copy build-time scripts**
+**Step 3: Copy build-time scripts**
 
 - `COPY scripts/ /opt/nexus-scripts/` + `chmod +x *.sh`
 
-**Step 4 - Install Java 21 + Nexus CE** (`install-nexus.sh ${NEXUS_PORT}`)
+**Step 4: Install Java 21 + Nexus CE** (`install-nexus.sh ${NEXUS_PORT}`)
 
 - Validates port argument.
 - Installs `openjdk-21-jdk` via apt.
@@ -206,17 +212,18 @@ The Dockerfile performs the following sequence in order:
 - Appends `-Djava.util.prefs.userRoot=/opt/sonatype-work/jvm-prefs` to `nexus.vmoptions`.
 - Creates `/opt/sonatype-work/jvm-prefs` and sets `nexus:nexus` ownership.
 
-**Step 5 - Configure Nginx** (`configure-nginx.sh`)
+**Step 5: Configure Nginx** (`configure-nginx.sh`)
 
 - Installs `nginx` via apt.
 - Validates `/etc/nginx/sites-available/nexus` exists (COPY'd in Step 2).
 - Removes default Nginx site, enables Nexus site symlink.
 - Creates systemd override `/etc/systemd/system/nginx.service.d/override.conf`:
+
     - `Type=simple`, `ExecStart=/usr/sbin/nginx -g 'daemon off;'`
     - Required for systemd container compatibility.
 - Runs `nginx -t` to validate config.
 
-**Step 6 - Enable systemd units**
+**Step 6: Enable systemd units**
 
 ```bash
 systemctl enable lab-init
@@ -225,7 +232,7 @@ systemctl enable nexus
 ```
 Creates symlinks in `/etc/systemd/system/multi-user.target.wants/`. Validated by `healthcheck.sh`.
 
-**Step 7 - Build-time healthcheck** (`healthcheck.sh ${USER}`)
+**Step 7: Build-time healthcheck** (`healthcheck.sh ${USER}`)
 
 Validates 8 sections without starting services (systemd not running during build):
 
@@ -237,32 +244,33 @@ Validates 8 sections without starting services (systemd not running during build
 | 4. Nexus port config | `nexus.properties` exists; `application-port=NEXUS_PORT`; nginx upstream port matches |
 | 5. Nginx config | Site file present; symlink enabled; default removed; `nginx -t` passes |
 | 6. Systemd units | `lab-init`, `ssh`, `nginx`, `nexus` symlinks in `multi-user.target.wants/` |
-| 7. SSH config | `sshd_config` and `sshd` binary present; host keys absent (expected - generated at boot) |
+| 7. SSH config | `sshd_config` and `sshd` binary present; host keys absent (expected: generated at boot) |
 | 8. Users | Interactive `$USER` account; `sudoers.d/nexus-user` present |
 
-**Step 8 - Install cloudflared** (`install-cloudflared.sh`)
+**Step 8: Install cloudflared** (`install-cloudflared.sh`)
 
 - Adds Cloudflare apt repository and GPG key.
 - Installs `cloudflared`.
 
-**Step 9 - Fix ownership**
+**Step 9: Fix ownership**
 
 - `chown -R ${USER}:${USER} /home/${USER}`
 
-**Step 10 - User customizations**
+**Step 10: User customizations**
 
 - `USER $USER` + `ENV HOME=/home/$USER`
 - `COPY welcome $HOME/.welcome` → `sed -i` replaces `__NEXUS_PORT__`
 - `customize-bashrc.sh` (bind mount) appends to `~/.bashrc`:
+
     - `nexus-status`, `nexus-logs`, `nexus-restart`, `nexus-start`, `nexus-stop`
     - `nginx-status`, `nginx-logs`, `nginx-reload`
     - Standard `ll`, `la`, `l` aliases
 
-**Step 11 - Return to root + CMD**
+**Step 11: Return to root + CMD**
 
-- `USER root` - required for `CMD ["/lib/systemd/systemd"]`.
-- `EXPOSE 22 80 ${NEXUS_PORT}`
-- `CMD ["/lib/systemd/systemd"]`
++ `USER root`: required for `CMD ["/lib/systemd/systemd"]`
++ `EXPOSE 22 80 ${NEXUS_PORT}`
++ `CMD ["/lib/systemd/systemd"]`
 
 ---
 
@@ -279,7 +287,7 @@ Canonical build: [`.github/workflows/build-nexus-rootfs.yml`](https://github.com
 **Key steps:**
 
 1. Checkout repository.
-2. Set up Docker Buildx (no QEMU - amd64 only, intentional).
+2. Set up Docker Buildx (no QEMU: amd64 only, intentional).
 3. Log in to GHCR via `secrets.GITHUB_TOKEN`.
 4. Extract metadata via `docker/metadata-action`:
     - Tags: `latest`, `community`, `3.89.1.02-community` (on default branch), `sha-<short>`, `YYYY-MM-DD`
@@ -292,7 +300,8 @@ Canonical build: [`.github/workflows/build-nexus-rootfs.yml`](https://github.com
     - GHA layer cache enabled.
 6. Print final image digest.
 
-> **Known gap:** `BUILD_DATE` and `VCS_REF` are not passed as explicit `build-args`. The Dockerfile `LABEL` block will produce empty string OCI labels for `created` and `revision`. The `docker/metadata-action` does inject these into the OCI manifest labels at the image layer - but not via Dockerfile ARG interpolation.
+!!! note "Known gap"
+    `BUILD_DATE` and `VCS_REF` are not passed as explicit `build-args`. The Dockerfile `LABEL` block will produce empty string OCI labels for `created` and `revision`. The `docker/metadata-action` does inject these into the OCI manifest labels at the image layer, but not via Dockerfile ARG interpolation.
 
 ---
 
@@ -313,7 +322,7 @@ skopeo inspect docker://ghcr.io/ibtisam-iq/nexus-rootfs:latest \
 
 ---
 
-### ✅ Correct: Binary and Config Presence Check (`docker run` - limited scope)
+### ✅ Correct: Binary and Config Presence Check (`docker run`: limited scope)
 
 Confirms binaries, files, and symlinks are baked in correctly. Does **not** validate runtime behavior (no systemd, no Nexus, no Nginx, no SSH):
 
@@ -344,7 +353,8 @@ docker run --rm ghcr.io/ibtisam-iq/nexus-rootfs:latest bash -c "
 "
 ```
 
-> Errors like `System has not been booted with systemd as init system` are **expected and correct** - not a bug.
+!!! note
+    Errors like `System has not been booted with systemd as init system` are **expected and correct**; they are not a bug.
 
 ---
 
@@ -353,14 +363,14 @@ docker run --rm ghcr.io/ibtisam-iq/nexus-rootfs:latest bash -c "
 The only valid way to verify the full stack (systemd, Nexus, Nginx, SSH) is to boot in an iximiuz microVM:
 
 ```bash
-# Step 1 - ensure labctl is authenticated
+# Step 1: ensure labctl is authenticated
 labctl auth whoami
 
-# Step 2 - download the manifest
+# Step 2: download the manifest
 curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/iximiuz/manifests/nexus-server.yml \
   -o nexus-server.yml
 
-# Step 3 - create the playground
+# Step 3: create the playground
 labctl playground create --base flexbox nexus-server -f nexus-server.yml
 ```
 
@@ -369,7 +379,7 @@ Once the VM is running, connect via the terminal tab or `labctl ssh nexus-server
 ```bash
 # --- System health ---
 systemctl is-system-running           # Expected: running
-systemctl status lab-init             # Expected: inactive (exited) - oneshot complete
+systemctl status lab-init             # Expected: inactive (exited): oneshot complete
 systemctl status nginx                # Expected: active (running)
 systemctl status nexus                # Expected: active (running)
 systemctl status ssh                  # Expected: active (running)
@@ -397,17 +407,19 @@ alias | grep nginx-
 System has not been booted with systemd as init system (PID 1). Can't operate.
 ```
 
-This is **expected and correct** - not a bug. The image is purpose-built for microVM boot, not Docker container runtime. Use the iximiuz microVM for all service-level verification.
+This is **expected and correct**; it is not a bug. The image is purpose-built for microVM boot, not Docker container runtime. Use the iximiuz microVM for all service-level verification.
 
-> Nexus takes **60–90 seconds** to fully initialize on first boot. `systemctl status nexus` may show `activating` during this period - this is normal. Wait for the `Started` log line in `nexus-logs` before testing the UI.
+!!! note "Initialization Time"
+    Nexus takes **60–90 seconds** to fully initialize on first boot. `systemctl status nexus` may show `activating` during this period; this is normal. Wait for the `Started` log line in `nexus-logs` before testing the UI.
 
 ---
 
 ## Integration with iximiuz Labs
 
-> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
-> https://labs.iximiuz.com/playgrounds/SilverStack-nexus-server-9a3f87e9
-> - no local tools required. The `labctl` steps below are for launching via manifest.
+!!! tip "Quickest path"
+    Open the playground directly in the browser and click **Start Playground**:
+    https://labs.iximiuz.com/playgrounds/SilverStack-nexus-server-9a3f87e9
+    No local tools required. The `labctl` steps below are for launching via manifest.
 
 ### Prerequisites
 
@@ -433,7 +445,7 @@ Before proceeding, ensure the following are in place on the machine from which `
 
 ---
 
-### Step 1 - Create the playground
+### Step 1: Create the playground
 
 Download the manifest directly without cloning the full repository:
 
@@ -451,7 +463,7 @@ drives:
     size: 50GiB
 ```
 
-The manifest can be edited before running - for example, to adjust `cpuCount`, `ramSize`, or `size` to match account quota or preferences.
+The manifest can be edited before running: for example, to adjust `cpuCount`, `ramSize`, or `size` to match account quota or preferences.
 
 Run `labctl playground create` pointing at the local manifest:
 
@@ -467,12 +479,12 @@ Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-nexus-server-9a
 SilverStack-nexus-server-9a3f87e9
 ```
 
-> **Note:** The playground does **not** appear under **Playgrounds → Running**.
-> Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom**.
+!!! note
+    The playground does **not** appear under **Playgrounds → Running**. Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom**.
 
 ---
 
-### Step 2 - Open the playground
+### Step 2: Open the playground
 
 Click the URL printed by `labctl`, or navigate manually:
 
@@ -492,7 +504,7 @@ To review or adjust settings before starting, click ⋮ → **Configure**. This 
 
 ---
 
-### Step 3 - Verify the running playground
+### Step 3: Verify the running playground
 
 Once started, the welcome banner is displayed automatically and shows the configured internal
 ports, service status commands, and next steps.
@@ -509,7 +521,8 @@ To expose the service on a custom public domain, `cloudflared` is already instal
 
 If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the following runbook:
 
-> 📖 [self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md](../../../self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md#phase-4-implementation---creating-cloudflare-tunnels)
+!!! info "Related Reading"
+    📖 [self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md](../../../self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md#phase-4-implementation---creating-cloudflare-tunnels)
 
 ---
 
@@ -525,3 +538,4 @@ If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the foll
 - [Jenkins Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-jenkins-rootfs-image/)
 - [SonarQube Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-sonarqube-rootfs-image/)
 - [Dev Machine runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-machine-rootfs-image/)
+- [Dev CI/CD Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-cicd-rootfs-image/)
