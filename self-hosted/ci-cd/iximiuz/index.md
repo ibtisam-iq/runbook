@@ -1,6 +1,6 @@
 # Building a Self-Hosted CI/CD Stack Behind NAT: From EC2 to iximiuz Labs with Cloudflare Tunnel
 
-This runbook documents the complete journey of building a production-grade self-hosted CI/CD stack on iximiuz Labs - from initial EC2 proof-of-concept, through NAT discovery, to the Cloudflare Tunnel solution, and finally to packaging everything as custom rootfs images.
+This runbook documents the complete journey of building a production-grade self-hosted CI/CD stack on iximiuz Labs: from initial EC2 proof-of-concept, through NAT discovery, to the Cloudflare Tunnel solution, and finally to packaging everything as custom rootfs images.
 
 ---
 
@@ -14,7 +14,7 @@ The goal was a self-hosted CI/CD stack consisting of Jenkins, SonarQube, and Nex
 - `sonar.ibtisam-iq.com`
 - `nexus.ibtisam-iq.com`
 
-Complete infrastructure ownership - no managed CI/CD services.
+Complete infrastructure ownership: no managed CI/CD services.
 
 ### Why iximiuz Labs
 
@@ -22,9 +22,9 @@ During CKA and CKAD certification preparation, iximiuz Labs appeared in the offi
 
 iximiuz Labs was chosen for:
 
-- **Custom rootfs support** - define infrastructure as OCI images, version them in Git, provision them reproducibly.
-- **Persistent storage** - 100 GB persistent volume survives session restarts; no rebuild from scratch each time.
-- **Flexbox playground model** - up to 5 nodes per playground on a shared local network (`172.16.0.0/24`), 24-hour runtime sessions, custom rootfs provisioning.
+- **Custom rootfs support**: define infrastructure as OCI images, version them in Git, provision them reproducibly.
+- **Persistent storage**: 100 GB persistent volume survives session restarts; no rebuild from scratch each time.
+- **Flexbox playground model**: up to 5 nodes per playground on a shared local network (`172.16.0.0/24`), 24-hour runtime sessions, custom rootfs provisioning.
 
 The Flexbox model is a natural fit for this stack: one node as a jump host, three for Jenkins, SonarQube, and Nexus.
 
@@ -34,7 +34,7 @@ The Flexbox model is a natural fit for this stack: one node as a jump host, thre
 
 ### Initial Testing Approach
 
-Before committing to iximiuz, 2–3 days were spent validating the full stack architecture on three separate EC2 instances - one per service:
+Before committing to iximiuz, 2–3 days were spent validating the full stack architecture on three separate EC2 instances: one per service:
 
 | EC2 instance | Service installed |
 |---|---|
@@ -57,11 +57,11 @@ The EC2 test proved the architecture was sound. The resulting Nginx configs, sys
 
 ---
 
-## Phase 2: Moving to iximiuz Labs - The NAT Discovery
+## Phase 2: Moving to iximiuz Labs: The NAT Discovery
 
 ### Attempting to Replicate the Setup
 
-With the EC2 stack working, the same configuration was copied to an iximiuz Flexbox playground. Services started, Nginx responded on port 80, health checks passed - everything worked locally. But DNS and SSL setup hit an immediate wall.
+With the EC2 stack working, the same configuration was copied to an iximiuz Flexbox playground. Services started, Nginx responded on port 80, health checks passed: everything worked locally. But DNS and SSL setup hit an immediate wall.
 
 ### The Discovery
 
@@ -76,7 +76,8 @@ Unlike EC2, iximiuz Labs does not display a public IP anywhere in the UI. Runnin
 
 Every node returned the same IP. The nodes were behind Network Address Translation (NAT).
 
-> iximiuz Labs runs playgrounds as microVMs on bare-metal hosts using Firecracker. Each playground connects to a bridge network on the host; bridges of different playgrounds are isolated using network namespaces. All VMs within a playground share a single NAT gateway IP for outbound traffic - no inbound routing exists per VM.
+!!! note "Architecture Details"
+    iximiuz Labs runs playgrounds as microVMs on bare-metal hosts using Firecracker. Each playground connects to a bridge network on the host; bridges of different playgrounds are isolated using network namespaces. All VMs within a playground share a single NAT gateway IP for outbound traffic: no inbound routing exists per VM.
 
 ### Understanding Why Traditional SSL Setup Fails
 
@@ -88,17 +89,17 @@ VM 2 (172.16.0.3) ─┤──► NAT Gateway ──► 148.113.47.48 ──► 
 VM 3 (172.16.0.4) ─┘
 ```
 
-**Problem 1 - No unique public IP for DNS:**
+**Problem 1: No unique public IP for DNS:**
 DNS A records require one IP per domain. All nodes share the same NAT gateway IP, so it's impossible to create distinct A records for Jenkins, SonarQube, and Nexus. Even if all three subdomains pointed to `148.113.47.48`, there's no port forwarding and no control over the NAT gateway to distinguish which VM should receive which traffic.
 
-**Problem 2 - Certbot HTTP-01 challenge requires inbound access:**
+**Problem 2: Certbot HTTP-01 challenge requires inbound access:**
 Certbot's HTTP-01 validation works by having Let's Encrypt make an HTTP request to port 80 of the domain's server. Behind NAT, the NAT gateway blocks all inbound traffic. Certbot fails with:
 ```
 FAILED: Challenge did not complete successfully.
-detail: DNS problem: SERVFAIL looking up A for your-domain.com
+detail: DNS problem: SERVFAIL looking up A for domain.com
 ```
 
-**Problem 3 - Nginx is necessary but not sufficient:**
+**Problem 3: Nginx is necessary but not sufficient:**
 Nginx routes port 80 to backend services, but only after a request reaches the server. With no routable public IP, external traffic never arrives at Nginx.
 
 | Approach | Why It Fails |
@@ -117,14 +118,14 @@ That intermediary is Cloudflare's edge network. The mechanism is Cloudflare Tunn
 
 ---
 
-## Phase 3: The Solution - Cloudflare Tunnel
+## Phase 3: The Solution: Cloudflare Tunnel
 
 ### The Core Concept
 
-Cloudflare Tunnel (`cloudflared`) reverses the connectivity model. The server reaches out to Cloudflare and holds a persistent encrypted tunnel open:
+Cloudflare Tunnel (`cloudflared`) reverses the connectivity model. The server reaches out to Cloudflare and holds a persistent outbound tunnel.
 
 ```
-Browser ──► Cloudflare Edge (jenkins.ibtisam-iq.com - SSL terminated)
+Browser ──► Cloudflare Edge (jenkins.ibtisam-iq.com: SSL terminated)
                   │
                   │  persistent outbound tunnel (WebSocket/HTTP2)
                   │
@@ -149,13 +150,13 @@ No public IP required. No inbound firewall rules. No port exposure.
 | Property | How It Works |
 |---|---|
 | NAT traversal | Outbound connections work through NAT by default; `cloudflared` initiates outbound |
-| SSL management | Certificates issued and terminated at Cloudflare's edge - no Certbot required |
+| SSL management | Certificates issued and terminated at Cloudflare's edge (no Certbot required) |
 | No HTTP-01 challenge | Cloudflare provisions and renews SSL automatically for tunneled domains |
 | Custom subdomains | Each tunnel maps to one subdomain; Cloudflare manages the CNAME record |
 
 ---
 
-## Phase 4: Implementation - Creating Cloudflare Tunnels
+## Phase 4: Implementation: Creating Cloudflare Tunnels
 
 ### Step 1: Create the Tunnel in Cloudflare Dashboard
 
@@ -169,9 +170,9 @@ For each service (Jenkins, SonarQube, Nexus), create a separate tunnel:
 
 After saving, Cloudflare shows an installation page with the `cloudflared service install` command.
 
-### Step 2: Install and Run the Connector
+### Step 2: Install `cloudflared` on Each Service Node
 
-`cloudflared` is **pre-installed now in all three service rootfs images** (`jenkins-rootfs`, `sonarqube-rootfs`, `nexus-rootfs`). Skip the apt installation step - it is already on `PATH`.
+`cloudflared` is **pre-installed now in all three service rootfs images** (`jenkins-rootfs`, `sonarqube-rootfs`, `nexus-rootfs`). Skip the apt installation step; it is already on `PATH`.
 
 Run the install command shown by the Cloudflare dashboard on each respective server:
 
@@ -193,7 +194,8 @@ sudo systemctl status cloudflared
 # Expected: active (running)
 ```
 
-> **Security note:** The tunnel token is a sensitive credential - anyone with it can connect to Cloudflare's edge as this tunnel. Ensure `/etc/systemd/system/cloudflared.service` is root-owned with mode `0600`.
+!!! warning "Security note"
+    The tunnel token is a sensitive credential: anyone with it can connect to Cloudflare's edge as this tunnel. Ensure `/etc/systemd/system/cloudflared.service` is root-owned with mode `0600`.
 
 ### Step 3: Configure Published Application Routes
 
@@ -211,7 +213,7 @@ Back in the Cloudflare dashboard for each tunnel, go to **Published application 
 
 - Request buffering, timeout management, and access logging
 - A `/health` endpoint independent of the backend service
-- Flexibility: if a service port changes, only the Nginx upstream changes - the tunnel config stays the same
+- Flexibility: if a service port changes, only the Nginx upstream changes; the tunnel config stays the same
 - Consistent entry point regardless of which service is behind
 
 Cloudflare automatically creates a DNS CNAME record for each subdomain. No A record. No IP address.
@@ -236,10 +238,10 @@ curl -I https://nexus.ibtisam-iq.com
 
 Benefits of one tunnel per service:
 
-- **Isolation** - taking down one tunnel does not affect others
-- **Independent lifecycle** - each service can be restarted without impacting others
-- **Security** - each tunnel has its own token; compromising one doesn't expose the other services
-- **Free tier** - Cloudflare supports unlimited tunnels on free accounts
+- **Isolation**: taking down one tunnel does not affect others
+- **Independent lifecycle**: each service can be restarted without impacting others
+- **Security**: each tunnel has its own token; compromising one doesn't expose the other services
+- **Free tier**: Cloudflare supports unlimited tunnels on free accounts
 
 ![](../../../assets/screenshots/cloudflare-tunnels-cicd-stack-healthy.png)
 
@@ -274,9 +276,9 @@ Jenkins LTS process
 
 ### Security Posture
 
-- No open inbound ports - Jenkins listens only on `127.0.0.1:8080`; Nginx on `0.0.0.0:80` but the VM has no public IP
-- Attack surface reduction - attackers cannot directly probe the origin server
-- Zero Trust enforcement - Cloudflare can apply MFA, geo-blocking, and access policies at the edge before forwarding
+- No open inbound ports: Jenkins listens only on `127.0.0.1:8080`; Nginx on `0.0.0.0:80` but the VM has no public IP
+- Attack surface reduction: attackers cannot directly probe the origin server
+- Zero Trust enforcement: Cloudflare can apply MFA, geo-blocking, and access policies at the edge before forwarding
 
 ---
 
@@ -305,11 +307,11 @@ iximiuz Labs supports OCI-compliant custom rootfs images as VM root filesystems.
 
 **What is NOT baked in (by design):**
 
-- `cloudflared` tunnel tokens - these are per-playground secrets; they must be supplied at runtime via `sudo cloudflared service install <token>`
-- Jenkins initial admin password - generated fresh per boot
-- SonarQube initial admin password - always `admin` (changed during first-login setup wizard)
-- Nexus initial admin password - located at `/opt/sonatype-work/nexus3/admin.password` on first boot
-- PostgreSQL database contents - provisioned fresh by `lab-init.sh` at each boot
+- `cloudflared` tunnel tokens: these are per-playground secrets; they must be supplied at runtime via `sudo cloudflared service install <token>`
+- Jenkins initial admin password: generated fresh per boot
+- SonarQube initial admin password: always `admin` (changed during first-login setup wizard)
+- Nexus initial admin password: located at `/opt/sonatype-work/nexus3/admin.password` on first boot
+- PostgreSQL database contents: provisioned fresh by `lab-init.sh` at each boot
 
 ### The Result
 
@@ -328,8 +330,8 @@ All four nodes boot with their services running. The only remaining manual step 
 
 ## Related
 
-- [Setup - CI/CD Stack Orchestration](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/setup-cicd-stack-orchestration/) - manifest, node topology, Dev Machine
-- [Self-Hosted CI/CD Stack - Operations](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/cicd-stack-operations/) - Jenkins, SonarQube, Nexus post-provisioning configuration
+- [Setup CI/CD Stack: Orchestration](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/setup-cicd-stack-orchestration/): manifest, node topology, Dev Machine
+- [Self-Hosted CI/CD Stack: Operations](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/cicd-stack-operations/): Jenkins, SonarQube, Nexus post-provisioning configuration
 - [Jenkins Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-jenkins-rootfs-image/)
 - [SonarQube Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-sonarqube-rootfs-image/)
 - [Nexus Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-nexus-rootfs-image/)

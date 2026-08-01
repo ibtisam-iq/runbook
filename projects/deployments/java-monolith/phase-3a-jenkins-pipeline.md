@@ -35,14 +35,22 @@ The verified `SNAPSHOT` or `RELEASE` artifact is published to the self-hosted So
 The multi-stage `Dockerfile` is built. The dynamic image tag from Stage 3 is applied, and OCI-compliant labels (including `org.opencontainers.image.revision`) are injected so the container metadata permanently reflects the source commit.
 
 ### Stage 9: Trivy Image Scan (Hard Gate)
-A second Trivy scan is performed on the fully built Docker container. This is a **hard security gate**. Any `CRITICAL` OS or library CVE detected inside the final image immediately fails the pipeline (`exit-code 1`), preventing vulnerable code from ever reaching a registry.
+A second Trivy scan is performed on the fully built Docker container. This is a **hard security gate**. Any `CRITICAL` CVE detected inside the final image immediately fails the pipeline (`exit-code 1`), preventing vulnerable code from ever reaching a registry. A second advisory pass reports `HIGH`, `MEDIUM` and `LOW` without breaking the build.
+
+!!! note "This stage does not split OS from library"
+    Unlike the Python and Node pipelines (and unlike this project's own GitHub Actions workflow), the Jenkins image scan runs **two passes with no `--vuln-type` filter**. It blocks on any `CRITICAL`, whether the fix belongs to me or to Canonical.
+
+    That is the pre-redesign posture, retained here because the Jammy migration took critical OS findings to zero, so nothing currently trips it. It is a known divergence rather than a design decision, and the three-pass split described in [Phase 3b](phase-3b-github-actions.md) is the intended target shape.
 
 ### Stages 10–13: Multi-Registry Publish
-If all tests and security gates pass, and the pipeline is running on the `main` branch, the verified Docker image is pushed to four distinct registries to demonstrate multi-cloud artifact management:
+If all tests and security gates pass, and the pipeline is running on the `main` branch, the verified Docker image is pushed to **three** registries:
+
 - **Stage 10:** Docker Hub
 - **Stage 11:** GitHub Container Registry (GHCR)
-- **Stage 12:** Amazon Elastic Container Registry (ECR)
-- **Stage 13:** Nexus Docker Registry
+- **Stage 12:** Nexus Docker Registry (path-based routing)
+- **Stage 13:** Amazon Elastic Container Registry (ECR), **present in the file but commented out**
+
+Stage 13 is scaffolded with its full `withCredentials` block and push commands, and stays disabled until an ECR repository and `aws-creds` are provisioned. The commented block documents the five prerequisites needed to enable it.
 
 ### Stage 14: GitOps CD Trigger
 The final stage bridges Continuous Integration to Continuous Deployment. The pipeline clones the CD repository (`platform-engineering-systems`), updates the `image.env` file with the newly generated Docker tag, and commits the change back to GitHub. This commit automatically triggers the downstream deployment tools (ArgoCD/Flux).

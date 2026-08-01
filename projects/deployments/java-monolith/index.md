@@ -18,7 +18,7 @@ Instead of treating deployment as a static event, I architected this project as 
 | **CD repo** | [ibtisam-iq/platform-engineering-systems/systems/java-monolith](https://github.com/ibtisam-iq/platform-engineering-systems/tree/main/systems/java-monolith) |
 | **Live App** | `https://bankapp.ibtisam-iq.com` |
 | **Core Stack** | Java 21 LTS, Spring Boot 3.4.5, Spring Security, Hibernate, MySQL 8.4 |
-| **CI / Security** | Jenkins (Declarative), GitHub Actions, Trivy (3-Pass Scan), SonarQube |
+| **CI / Security** | Jenkins (Declarative), GitHub Actions, Trivy (multi-pass scan), SonarQube |
 | **Artifact Registries**| Nexus, Amazon S3, Amazon ECR, Docker Hub, GHCR |
 | **Platform / IaC** | Terraform, Kustomize, AWS CLI, Bash Bootstrap |
 | **Infrastructure** | EC2 ASG, ECS Fargate, Kubernetes (kubeadm & EKS), Gateway API (ALB & Nginx), RDS, EBS `gp3` |
@@ -35,7 +35,7 @@ This project is not a single deployment. It is an evolutionary journey demonstra
              ▼
 [ DevSecOps CI Pipelines (Jenkins & GitHub Actions) ]
    ├── Code Quality: SonarQube & JaCoCo Coverage
-   ├── Security: Trivy (3-Pass Scan: FS, OS Packages, Library JARs)
+   ├── Security: Trivy (FS scan + image scan, layered by OS vs Library ownership)
    └── Build: Multi-Stage Docker & Maven compilation
              │
              ▼
@@ -122,7 +122,7 @@ The project is thoroughly documented across 8 sequential documents. Each documen
   14-stage declarative pipeline, eliminating Jenkins UI `tools`, Maven-driven SonarQube analysis, and dynamic Git SHA versioning.
 
 - **[:material-github: Phase 3b: GitHub Actions CI](phase-3b-github-actions.md)**
-  Concurrency controls, Alpine-to-Jammy Trivy migrations, three-pass scan architecture (OS vs Library layer), and SonarQube API deprecation fixes.
+  Concurrency controls, Alpine-to-Jammy Trivy migrations, layered scan architecture (OS vs Library ownership), the deliberate report-don't-block posture on inherited code, and SonarQube API deprecation fixes.
 
 - **[:material-server-network: Phase 4: AWS EC2 Auto Scaling](phase-4-ec2-auto-scaling.md)**
   AWS CLI VPC provisioning, strict Security Group chaining, IAM Instance Profiles, and dynamic S3 artifact retrieval via User Data scripts.
@@ -164,7 +164,7 @@ This project represents months of dedicated engineering. Rather than simply depl
 
 ### Phase 3b: GitHub Actions CI
 - **Base Image OS Mitigation:** Handled CRITICAL OS-level CVEs by abandoning the unpatched Alpine base image in favor of `eclipse-temurin:21-jre-jammy`, securing the runtime foundation.
-- **Three-Pass Scan Architecture:** Segmented Trivy scanning into three distinct passes: a filesystem config scan, an OS package scan (Warn Only), and a library dependency scan (Fail on Critical). This prevents pipeline failures on vendor OS issues while aggressively gating application-level vulnerabilities.
+- **Layered Scan Architecture:** Segmented Trivy scanning by *who owns the fix*: a filesystem config scan, an OS package scan (vendor's responsibility), a library dependency scan (the application's own `pom.xml`), and a full JSON audit artifact. This separates findings I can act on from findings that depend on Canonical's release schedule. On this inherited codebase every pass reports rather than blocks, a deliberate decision documented in [Phase 3b](phase-3b-github-actions.md#security-gate-posture), where the Jenkins pipeline blocks and the GitHub Actions workflow does not.
 - **SonarQube API Refactoring:** Proactively updated deprecated Spring Security APIs (`AntPathRequestMatcher`) in the application code to resolve SonarQube `java:S5738` deprecation warnings and keep the pipeline green.
 
 ### Phase 4: AWS EC2 Auto Scaling

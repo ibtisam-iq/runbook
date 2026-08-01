@@ -2,7 +2,20 @@
 
 To demonstrate pipeline portability and a "zero-infrastructure" CI/CD approach, I mirrored the 14-stage Jenkins pipeline within a GitHub Actions workflow ([`.github/workflows/ci.yml`](https://github.com/ibtisam-iq/java-monolith-app/blob/main/.github/workflows/ci.yml)). 
 
-This proves the ability to implement enterprise-grade DevSecOps standards without relying on self-hosted build agents. The workflow is functionally identical to the Jenkins architecture, maintaining the exact same strict security gates, quality checks, and deployment integrations.
+This proves the ability to implement enterprise-grade DevSecOps standards without relying on self-hosted build agents. The workflow mirrors the Jenkins stage sequence, tooling, and deployment integrations exactly.
+
+!!! warning "The security gates are deliberately not identical"
+    The stages match; the **enforcement** does not. Every Trivy pass in this workflow runs with `exit-code: '0'` and reports rather than blocks, where the [Jenkins pipeline](phase-3a-jenkins-pipeline.md) fails the build on `CRITICAL`.
+
+    That is intentional. BankApp is an inherited codebase, not code I wrote. Hard-failing a build on `CRITICAL` CVEs in someone else's dependency tree takes a decision that belongs to whoever maintains that code. My role as the DevOps engineer is to make the finding visible, reproducible, and impossible to miss, not to seize the merge button on another team's behalf.
+
+    The line states its own reversal, so the position stays an explicit decision rather than a quietly softened threshold:
+
+    ```yaml
+    exit-code: '0'     # Just to pass the scan step. Change to '1' to fail on CRITICALs.
+    ```
+
+    Full comparison in [Security Gate Posture](#security-gate-posture) below.
 
 ## The 14-Stage Mirror Architecture
 
@@ -19,16 +32,20 @@ The GitHub Actions workflow executes the identical 14 stages as Jenkins, mapped 
 - Because SonarQube runs on the self-hosted network, GitHub Actions leverages a publicly exposed webhook to wait for the Quality Gate status, successfully bridging the SaaS runner to the private Sonar instance.
 
 ### Stage 7–9: Artifacts, Build & Image Scan
-- Publishes the compiled JAR to the private Nexus registry (authenticating via `settings.xml` injected from secrets).
-- Builds the multi-stage Docker image and tags it for four distinct registries.
-- Runs the hard-gate Trivy image scan. Any critical vulnerabilities immediately fail the workflow (`exit-code 1`).
+- Publishes the compiled JAR to the private Nexus registry (authenticating via `settings.xml` injected from secrets), and uploads the same JAR as a GitHub Actions artifact.
+- Builds the multi-stage Docker image and tags it for three registries in a single build pass.
+- Runs the three-pass Trivy image scan (Pass A: OS, Pass B: library, Pass C: full JSON audit), which is four `trivy-action` invocations because Pass B splits CRITICAL from HIGH/MEDIUM. All of them report without blocking; see the posture note above.
 
 ### Stage 10–13: Multi-Registry Publish
-The workflow logs into and pushes to four different registries:
+The workflow logs into and pushes to **three** registries:
+
 - **Docker Hub:** Authenticated via `DOCKER_USERNAME` / `DOCKER_PASSWORD`
 - **GitHub Container Registry (GHCR):** Authenticated natively via the workflow's `GITHUB_TOKEN` (no explicit secret required).
-- **Amazon ECR:** Authenticated via `aws-actions/configure-aws-credentials`.
-- **Nexus Docker Registry:** Authenticated via `NEXUS_USERNAME` / `NEXUS_PASSWORD`.
+- **Nexus Docker Registry:** Authenticated via `NEXUS_USERNAME` / `NEXUS_PASSWORD`, path-based routing.
+
+**Amazon ECR is scaffolded but commented out** as Stage 13b, pending an ECR repository and AWS credentials. The disabled block uses `aws-actions/amazon-ecr-login@v2` and reads `AWS_ACCOUNT_ID` / `AWS_REGION` from secrets.
+
+All three logins run **before** the build rather than before the push. On pull request builds nothing is published, but the logins are still required so the BuildKit `cache-from: type=gha` layer cache can pull authenticated layers; without them the cache silently misses and every PR build runs cold.
 
 ### Stage 14: GitOps CD Trigger
 The final stage bridges GitHub Actions to Continuous Deployment. The workflow leverages a `GIT_TOKEN` with repository scopes to check out the external `platform-engineering-systems` CD repository, inject the new image tag into `systems/java-monolith/image.env`, and commit the changes to trigger ArgoCD.
@@ -54,7 +71,7 @@ concurrency:
 
 Initially, the pipeline failed on the Trivy image scan. The runtime image was based on `eclipse-temurin:21-jre-alpine`. 
 
-**The Bug:** Alpine uses `musl libc`, and security patches from upstream projects lag for days to weeks. Trivy consistently reported 5-15 `CRITICAL` CVEs in the OS layer with status `affected` (no fix available). Because the pipeline is configured to `exit-code: '1'` on criticals, the build was permanently blocked.
+**The Bug:** Alpine uses `musl libc`, and security patches from upstream projects lag for days to weeks. Trivy consistently reported 5-15 `CRITICAL` CVEs in the OS layer with status `affected` (no fix available). At that point the workflow was a single scan pass configured with `exit-code: '1'` on criticals, so the build was permanently blocked with no reachable passing state.
 
 **The Fix:** I migrated the runtime stage to `eclipse-temurin:21-jre-jammy` (Ubuntu 22.04 LTS). Canonical patches `glibc` vulnerabilities within hours, resulting in zero critical OS-level CVEs and allowing the pipeline to pass.
 
@@ -72,18 +89,40 @@ A Docker image contains two completely different layers of software with differe
 ```
 Failing the build on OS CVEs blocks the pipeline on issues outside developer control. This pass reports vulnerabilities but never fails.
 
-#### Pass B: Library JARs (Fail on Critical)
+#### Pass B: Library JARs (Reported, Not Enforced)
 ```yaml
 - name: Trivy — image scan JAR/library
   with:
     vuln-type: library
     severity: CRITICAL
-    exit-code: '1'
+    exit-code: '0'     # Just to pass the scan step. Change to '1' to fail on CRITICALs.
 ```
-This scans the application dependencies declared in `pom.xml`. Any CRITICAL CVE here fails the build immediately because the developer owns the fix (bumping the Maven version).
+This scans the application dependencies declared in `pom.xml`, the layer whose fix is a Maven version bump rather than an upstream distro patch. This is the pass that *would* be enforced on code I own; see the posture note at the top for why it reports here.
 
 !!! note
-    During implementation, Pass B correctly caught 7 CRITICAL CVEs introduced by the Spring Boot BOM. I had to explicitly override versions for `tomcat-embed-core`, `spring-security-web` (to 6.5.9), and `thymeleaf` in `pom.xml` to resolve them. The complete override analysis is documented in `docs/trivy-troubleshooting.md`.
+    During implementation, Pass B correctly caught 7 CRITICAL CVEs introduced by the Spring Boot BOM. I explicitly overrode `tomcat-embed-core`, `spring-security-core` and `spring-security-web` (to 6.5.9), `thymeleaf` and `thymeleaf-spring6`, `spring-framework`, `logback-core`, and `jackson` in `pom.xml` to resolve them.
+
+    Two of those needed `<dependencyManagement>` rather than a `<properties>` key, because Spring Boot's BOM does not expose a property for the Thymeleaf artifacts and silently ignores the override. The complete analysis is in [`docs/trivy-troubleshooting.md`](https://github.com/ibtisam-iq/java-monolith-app/blob/main/docs/trivy-troubleshooting.md).
+
+#### Pass C: Full Audit Artifact
+A fourth invocation runs with no `vuln-type` filter across `CRITICAL,HIGH,MEDIUM,LOW`, writes JSON, and uploads it with `retention-days: 14`. This is the durable record: Pass A's advisory findings otherwise exist only in log output that ages out.
+
+### Security Gate Posture
+
+Actual `exit-code` values in each file today, not the intended design:
+
+| Trivy pass | Jenkinsfile | GitHub Actions |
+|---|---|---|
+| Filesystem, `CRITICAL` | `1` (blocks) | `0` (reports) |
+| Filesystem, `HIGH`/`MEDIUM` | `0` (reports) | `0` (reports) |
+| Image, OS packages | *(no OS/library split)* | `0` (reports) |
+| Image, library `CRITICAL` | `1` (blocks on any CRITICAL) | `0` (reports) |
+| Image, full audit JSON | archived | uploaded, 14-day retention |
+
+Two things this table makes visible:
+
+1. **The Jenkins image scan has no `--vuln-type` split at all.** It runs two passes and blocks on any `CRITICAL`, OS or library. That is the pre-redesign shape, still in the file, passing today only because the Jammy migration took critical OS findings to zero. It is a known divergence, not a decision.
+2. **The filesystem gate differs by engine, and that part is drift.** All three Jenkinsfiles in this project (Java, Python, Node) block on `CRITICAL` at the source scan; on GitHub Actions only the Node workflow does. The two implementations were written weeks apart, and `exit-code` is a single character that flips a scan from advisory to enforcing while every stage name and log line stays identical.
 
 ### Challenge 3: SonarQube and Deprecated APIs
 

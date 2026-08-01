@@ -1,10 +1,13 @@
-# SilverStack CI/CD Stack - Infrastructure and Orchestration
+# SilverStack CI/CD Stack: Infrastructure and Orchestration
 
 This runbook describes how the SilverStack CI/CD stack is composed and provisioned on iximiuz Labs using a single manifest and four custom rootfs images. It covers infrastructure topology, node roles, resource allocation, manifest structure, Dev Machine behavior, and connectivity verification.
 
-Operational configuration inside Jenkins, SonarQube, and Nexus (credentials, webhooks, repositories) is covered in [Self-Hosted CI/CD Stack - Operations](cicd-stack-operations.md).
+Operational configuration inside Jenkins, SonarQube, and Nexus (credentials, webhooks, repositories) is covered in [Self-Hosted CI/CD Stack: Operations](cicd-stack-operations.md).
 
 ![](../../../assets/screenshots/silverstack-cicd-stack-playground.png)
+
+!!! tip "Quick Start"
+    Skip the manifest and try the whole stack now: **[Launch CI/CD Stack ↗](https://labs.iximiuz.com/playgrounds/SilverStack-CICD-Stack-1766a8a1)**. Click **Start**, and all four nodes (Dev Machine, Jenkins, SonarQube, Nexus) boot together in the browser. The rest of this page covers how the stack is composed and provisioned.
 
 ---
 
@@ -41,9 +44,9 @@ All four machines share a local network (`172.16.0.0/24`) and run within one Fle
 
 The Flexbox playground type provides a **shared pool of 10 vCPUs, 16 GiB RAM, and 150 GiB disk** across all machines. The allocation above sums to exactly those limits:
 
-- `dev-machine` gets the smallest slice (1 vCPU, 1 GiB) - it runs no services; SSH aliases and IDE only.
+- `dev-machine` gets the smallest slice (1 vCPU, 1 GiB): it runs no services; SSH aliases and IDE only.
 - `jenkins-server` gets 4 GiB RAM for build concurrency and the Jenkins plugin ecosystem.
-- `sonarqube-server` gets the largest RAM allocation (6 GiB) - SonarQube embeds Elasticsearch alongside PostgreSQL; both are memory-intensive.
+- `sonarqube-server` gets the largest RAM allocation (6 GiB): SonarQube embeds Elasticsearch alongside PostgreSQL; both are memory-intensive.
 - `nexus-server` gets 5 GiB RAM and the full 40 GiB disk to accommodate Maven, npm, and Docker artifact storage growth.
 - Total disk: 30 + 40 + 40 + 40 = 150 GiB exactly.
 
@@ -64,13 +67,13 @@ The manifest pre-defines 8 tabs:
 | SonarQube UI | `http-port: 80` | `sonarqube-server` |
 | Nexus UI | `http-port: 80` | `nexus-server` |
 
-All three UI tabs use port 80 - they open the Nginx reverse proxy, not the service ports directly.
+All three UI tabs use port 80: they open the Nginx reverse proxy, not the service ports directly.
 
 ---
 
 ## Dev CI/CD Machine Rootfs
 
-The Dev Machine is the **entry point into the stack**. It runs no services - it is a jump host and DevOps workstation. Its rootfs lives under [`iximiuz/rootfs/dev/ci-cd/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/dev/ci-cd).
+The Dev Machine is the **entry point into the stack**. It runs no services: it is a jump host and DevOps workstation. Its rootfs lives under [`iximiuz/rootfs/dev/ci-cd/`](https://github.com/ibtisam-iq/silver-stack/tree/main/iximiuz/rootfs/dev/ci-cd).
 
 ### Source Layout
 
@@ -84,7 +87,7 @@ dev/ci-cd/
 
 ### Dockerfile Behavior
 
-The Dockerfile is intentionally minimal - no services, no systemd units, no installs:
+The Dockerfile is intentionally minimal: no services, no systemd units, no installs:
 
 ```
 FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest
@@ -105,8 +108,8 @@ EXPOSE 22
 
 Key points:
 
-- **No `USER root` at the end** - unlike the service rootfs images, this image does not return to `root` before `CMD`. There is no `CMD` in the Dockerfile at all - `CMD ["/lib/systemd/systemd"]` is inherited from the base image.
-- **No `SONARQUBE_PORT`, `NEXUS_PORT`, or service-specific build args** - the only build arg consumed is `USER=ibtisam`.
+- **No `USER root` at the end**: unlike the service rootfs images, this image does not return to `root` before `CMD`. There is no `CMD` in the Dockerfile at all: `CMD ["/lib/systemd/systemd"]` is inherited from the base image.
+- **No `SONARQUBE_PORT`, `NEXUS_PORT`, or service-specific build args**: the only build arg consumed is `USER=ibtisam`.
 - **All tools inherited** from `ubuntu-24-04-rootfs`: `arkade`, `jq`, `yq`, `fx`, `task`, `just`, `fzf`, `btop`, `cfssl`, `ripgrep`, `code-server`, and all base CLI tools.
 
 ### Welcome Banner
@@ -138,27 +141,29 @@ alias stack-sonarqube='ssh -o StrictHostKeyChecking=no ibtisam@sonarqube-server'
 alias stack-nexus='ssh -o StrictHostKeyChecking=no ibtisam@nexus-server'
 ```
 
-> `-o StrictHostKeyChecking=no` is intentional - iximiuz microVM SSH host keys are ephemeral and regenerated at every boot. Strict key checking would prompt on every new playground creation.
+!!! note
+    `-o StrictHostKeyChecking=no` is intentional: iximiuz microVM SSH host keys are ephemeral and regenerated at every boot. Strict key checking would prompt on every new playground creation.
 
 ### CI Workflow
 
 `ghcr.io/ibtisam-iq/dev-cicd-rootfs` is built by [`.github/workflows/build-dev-cicd-rootfs.yml`](https://github.com/ibtisam-iq/silver-stack/blob/main/.github/workflows/build-dev-cicd-rootfs.yml).
 
 - Triggers on changes under `iximiuz/rootfs/dev/ci-cd/**` (excluding `README.md`) and on edits to the workflow file.
-- `platforms: linux/amd64` only - QEMU intentionally omitted.
+- `platforms: linux/amd64` only (QEMU intentionally omitted).
 - Tags: `latest`, `sha-<short>`, `YYYY-MM-DD`.
 - Build arg passed: `USER=ibtisam`.
-- `BUILD_DATE` and `VCS_REF` are **not** passed as explicit `build-args` - same known gap as other rootfs images.
+- `BUILD_DATE` and `VCS_REF` are **not** passed as explicit `build-args`: same known gap as other rootfs images.
 
 ---
 
 ## Provisioning the Playground
 
-> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
-> https://labs.iximiuz.com/playgrounds/SilverStack-CICD-Stack-1766a8a1
-> - no local tools required. The `labctl` steps below are for launching via manifest.
+!!! tip "Quickest path"
+    Open the playground directly in the browser and click **Start Playground**:
+    https://labs.iximiuz.com/playgrounds/SilverStack-CICD-Stack-1766a8a1
+    No local tools required. The `labctl` steps below are for launching via manifest.
 
-### Step 1 - Create the Stack
+### Step 1: Create the Stack
 
 From a machine where `labctl` is authenticated and the [silver-stack](https://github.com/ibtisam-iq/silver-stack) repo is cloned:
 
@@ -180,9 +185,10 @@ Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-CICD-Stack-1766
 SilverStack-CICD-Stack-1766a8a1
 ```
 
-> Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom** in the iximiuz dashboard, **not** under "Running".
+!!! note
+    Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom** in the iximiuz dashboard, **not** under "Running".
 
-### Step 2 - Verify Tabs and Connectivity
+### Step 2: Verify Tabs and Connectivity
 
 After the playground comes up:
 
@@ -195,7 +201,7 @@ After the playground comes up:
    ```
 3. Confirm the HTTP tabs (**Jenkins UI**, **SonarQube UI**, **Nexus UI**) load on port 80 via Nginx.
 
-### Step 3 - Verify Each Node's Services
+### Step 3: Verify Each Node's Services
 
 SSH into each service node and run the health checks:
 
@@ -216,7 +222,8 @@ systemctl is-active lab-init nginx nexus       # all three: active
 curl -f http://localhost/health                # healthy
 ```
 
-> SonarQube takes 2–3 minutes to fully initialize. `systemctl status sonarqube` may show `activating` during this period.
+!!! note
+    SonarQube takes 2–3 minutes to fully initialize. `systemctl status sonarqube` may show `activating` during this period.
 
 ---
 
@@ -240,7 +247,7 @@ Jenkins pipelines can reach SonarQube and Nexus by hostname for internal communi
 Each service node has `cloudflared` pre-installed. To expose a service publicly:
 
 ```bash
-# On each service node - run the install command from Cloudflare dashboard
+# On each service node, run the install command from Cloudflare dashboard
 sudo cloudflared service install <token-from-cloudflare-dashboard>
 ```
 
@@ -252,7 +259,7 @@ See the [journey runbook](self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-lab
 
 ## Next Steps
 
-Once all nodes are reachable and healthy, switch to [Self-Hosted CI/CD Stack - Operations](cicd-stack-operations.md) for:
+Once all nodes are reachable and healthy, switch to [Self-Hosted CI/CD Stack: Operations](cicd-stack-operations.md) for:
 
 - Jenkins post-setup: pipeline tools, plugins
 - Credentials: SonarQube, GitHub, Docker Hub, Nexus, GHCR
@@ -264,10 +271,11 @@ Once all nodes are reachable and healthy, switch to [Self-Hosted CI/CD Stack - O
 
 ## Related
 
-- [Journey runbook](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs/) - NAT, Cloudflare Tunnel, rootfs evolution
-- [Self-Hosted CI/CD Stack - Operations](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/cicd-stack-operations/) - post-provisioning operational config
+- [Journey runbook](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs/): NAT, Cloudflare Tunnel, rootfs evolution
+- [Self-Hosted CI/CD Stack: Operations](https://runbook.ibtisam-iq.com/self-hosted/ci-cd/iximiuz/cicd-stack-operations/): post-provisioning operational config
 - [Jenkins Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-jenkins-rootfs-image/)
 - [SonarQube Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-sonarqube-rootfs-image/)
 - [Nexus Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-nexus-rootfs-image/)
-- [Ubuntu base rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-machine-rootfs-image/)
+- [Dev CI/CD Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-cicd-rootfs-image/): the jump-host image running on this stack's `dev-machine` node
+- [Dev Machine Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-machine-rootfs-image/): the standalone full-toolchain workstation, a different image
 - [cicd-stack.yml manifest](https://github.com/ibtisam-iq/silver-stack/blob/main/iximiuz/manifests/cicd-stack.yml)
