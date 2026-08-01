@@ -3,8 +3,8 @@
 ## Context
 
 A Docker image built with `docker build` produces a single-platform image tied to the architecture of the host running the build. When the same image needs to run on both `linux/amd64` and
-`linux/arm64` hosts - such as when deploying to heterogeneous infrastructure or publishing a
-public image - the single-platform image must be replaced with a multi-architecture manifest list.
+`linux/arm64` hosts (such as when deploying to heterogeneous infrastructure or publishing a
+public image), the single-platform image must be replaced with a multi-architecture manifest list.
 
 This entry documents the complete process of converting an existing single-platform Docker image
 into a multi-architecture image using `docker buildx`, covering the conceptual model, builder
@@ -28,8 +28,8 @@ setup, platform-aware build execution, and registry push.
 ### What a Single-Architecture Image Is
 
 A Docker image is a stack of read-only filesystem layers bundled with metadata. When built on an
-`amd64` host with `docker build`, every binary inside the image - the base OS packages, installed
-tools, and application binaries - is compiled for the `x86_64` instruction set. The image carries
+`amd64` host with `docker build`, every binary inside the image (including base OS packages, installed
+tools, and application binaries) is compiled for the `x86_64` instruction set. The image carries
 platform metadata (`linux/amd64`) that tells the Docker daemon which CPU it requires. Running this
 image on an `arm64` host either fails outright or requires software emulation.
 
@@ -52,7 +52,7 @@ specifies no platform flag. The selection is automatic and transparent.
 
 ### Why `docker build` Cannot Produce Multi-Arch Images
 
-`docker build` builds for exactly one platform - the native platform of the Docker daemon.
+`docker build` builds for exactly one platform: the native platform of the Docker daemon.
 It does not produce manifest lists and has no `--platform` flag that accepts multiple values.
 Producing a manifest list requires:
 
@@ -76,7 +76,7 @@ No separate installation is required on standard Docker installations.
 
 ### What a Builder Instance Is
 
-`buildx` uses the concept of a **builder** - a named BuildKit daemon with its own driver and
+`buildx` uses the concept of a **builder**: a named BuildKit daemon with its own driver and
 configuration. The default builder created by Docker Desktop uses the `docker` driver, which is
 constrained to the host's native platform. Building for multiple platforms requires a builder
 using the **`docker-container` driver**, which:
@@ -126,10 +126,10 @@ RUN case "${TARGETARCH}" in \
     chmod +x /usr/local/bin/tool
 ```
 
-> **Why `ARG TARGETARCH` with no value?**
-> BuildKit injects these variables automatically only when they are declared as `ARG` without an
-> assigned value. If a default value is set (e.g., `ARG TARGETARCH=amd64`), the injected value
-> is overridden and the build always behaves as if it is targeting `amd64`.
+!!! note "Why `ARG TARGETARCH` with no value?"
+    BuildKit injects these variables automatically only when they are declared as `ARG` without an
+    assigned value. If a default value is set (e.g., `ARG TARGETARCH=amd64`), the injected value
+    is overridden and the build always behaves as if it is targeting `amd64`.
 
 ### Why `--push` Is Required for Multi-Arch Output
 
@@ -151,8 +151,9 @@ support this format. The `--push` flag replaces `--load` for multi-platform buil
 - The image tagged with a registry-qualified name: `<registry>/<namespace>/<image>:<tag>`
 - On a **Linux host only**: root or `sudo` access to register QEMU handlers (one-time setup)
 
-> **On Docker Desktop (macOS or Windows):** QEMU is pre-installed and registered automatically.
-> Steps 1a and 1b below are not required and can be skipped.
+!!! note "On Docker Desktop (macOS or Windows)"
+    QEMU is pre-installed and registered automatically.
+    Steps 1a and 1b below are not required and can be skipped.
 
 ---
 
@@ -164,11 +165,11 @@ support this format. The `--push` flag replaces `--load` for multi-platform buil
 docker run --privileged --rm tonistiigi/binfmt --install all
 ```
 
-> **Why `--privileged`?**
-> Registering binary format handlers requires writing to `/proc/sys/fs/binfmt_misc`, which is a
-> kernel interface. Container access to kernel interfaces requires the `--privileged` flag.
-> The `--rm` flag removes the container immediately after the handlers are registered - it is
-> a one-shot operation, not a long-running service.
+!!! note "Why `--privileged`?"
+    Registering binary format handlers requires writing to `/proc/sys/fs/binfmt_misc`, which is a
+    kernel interface. Container access to kernel interfaces requires the `--privileged` flag.
+    The `--rm` flag removes the container immediately after the handlers are registered; it is
+    a one-shot operation, not a long-running service.
 
 Expected output:
 
@@ -207,14 +208,14 @@ docker buildx create \
   --use
 ```
 
-> **Why `--driver docker-container` and not the default driver?**
-> The default `docker` driver runs BuildKit inside the Docker daemon itself and is constrained
-> to the host's native platform. The `docker-container` driver launches a dedicated BuildKit
-> container that has QEMU handlers available and can cross-compile for foreign platforms.
+!!! note "Why `--driver docker-container` and not the default driver?"
+    The default `docker` driver runs BuildKit inside the Docker daemon itself and is constrained
+    to the host's native platform. The `docker-container` driver launches a dedicated BuildKit
+    container that has QEMU handlers available and can cross-compile for foreign platforms.
 
-> **Why `--use`?**
-> `--use` sets this builder as the active builder for all subsequent `buildx` commands in the
-> current shell session. Without it, the new builder is created but not activated.
+!!! note "Why `--use`?"
+    `--use` sets this builder as the active builder for all subsequent `buildx` commands in the
+    current shell session. Without it, the new builder is created but not activated.
 
 Expected output:
 
@@ -228,11 +229,11 @@ multi-builder
 docker buildx inspect --bootstrap
 ```
 
-> **Why bootstrap before building?**
-> `--bootstrap` starts the BuildKit daemon container and initialises it. Without this step, the
-> first build command triggers the bootstrap implicitly, making the initial build appear to hang
-> without feedback. Running bootstrap explicitly confirms the builder is healthy and shows the
-> platform list before any build is attempted.
+!!! note "Why bootstrap before building?"
+    `--bootstrap` starts the BuildKit daemon container and initialises it. Without this step, the
+    first build command triggers the bootstrap implicitly, making the initial build appear to hang
+    without feedback. Running bootstrap explicitly confirms the builder is healthy and shows the
+    platform list before any build is attempted.
 
 Expected output (relevant section):
 
@@ -265,12 +266,12 @@ Replace `<registry>/<namespace>/<image>:<tag>` with the fully qualified image na
 Replace `<path-to-build-context>` with the directory containing the `Dockerfile`, for example `.`
 for the current directory.
 
-> **What happens during this build?**
-> BuildKit runs two parallel build pipelines - one targeting `linux/amd64` and one targeting
-> `linux/arm64`. For the non-native target, QEMU provides instruction-set emulation for any
-> `RUN` steps that execute binaries. Once both platform builds complete, BuildKit assembles a
-> manifest list and pushes it to the registry in a single atomic operation. The local Docker
-> daemon does not store either image variant locally.
+!!! note "What happens during this build?"
+    BuildKit runs two parallel build pipelines: one targeting `linux/amd64` and one targeting
+    `linux/arm64`. For the non-native target, QEMU provides instruction-set emulation for any
+    `RUN` steps that execute binaries. Once both platform builds complete, BuildKit assembles a
+    manifest list and pushes it to the registry in a single atomic operation. The local Docker
+    daemon does not store either image variant locally.
 
 Expected terminal output (structure):
 
@@ -284,9 +285,10 @@ Expected terminal output (structure):
  => pushing manifest for <registry>/<namespace>/<image>:<tag>
 ```
 
-> **Note:** The `arm64` build steps run slower than the `amd64` steps when the build host is
-> `amd64`, because those steps execute under QEMU emulation. This is expected. The performance
-> difference is visible in the build log timing.
+!!! note
+    The `arm64` build steps run slower than the `amd64` steps when the build host is
+    `amd64`, because those steps execute under QEMU emulation. This is expected. The performance
+    difference is visible in the build log timing.
 
 ---
 
@@ -420,5 +422,5 @@ is that the first build requires pulling the BuildKit image, but this is a one-t
 ### `--push` over local export
 
 Multi-platform output is a manifest list. The local Docker daemon cannot store manifest lists.
-`--push` is not a workaround - it is the correct and only supported output method for builds
+`--push` is not a workaround; it is the correct and only supported output method for builds
 targeting multiple platforms simultaneously.

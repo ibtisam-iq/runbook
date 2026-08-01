@@ -4,9 +4,15 @@
 
 SonarQube Community Edition Rootfs is a production-grade SonarQube LTA image for iximiuz playgrounds. It runs SonarQube 26.2 on top of PostgreSQL 18, with Nginx as a reverse proxy, all managed by systemd, and `cloudflared` pre-installed for Cloudflare Tunnel custom-domain access.
 
-The image runs **three services** (PostgreSQL, Nginx, SonarQube) in addition to the init oneshot, making `lab-init.sh` significantly more complex - it performs live database provisioning at every boot.
+The image runs **three services** (PostgreSQL, Nginx, SonarQube) in addition to the init oneshot, making `lab-init.sh` significantly more complex: it performs live database provisioning at every boot.
 
-> **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, service behavior, or SonarQube startup via `docker run` - use `labctl` instead (see [Verification](#verification)).
+!!! warning "MicroVM Rootfs"
+    **This image is a microVM rootfs for the [iximiuz Labs](https://labs.iximiuz.com) platform.** The platform mounts it as a block device and boots it with its own kernel. systemd becomes PID 1 through the platform boot process. Do not attempt to validate systemd, service behavior, or SonarQube startup via `docker run`: use `labctl` instead (see [Verification](#verification)).
+
+!!! tip "Quick Start"
+    Skip the build and try it now: **[Launch SonarQube Playground ↗](https://labs.iximiuz.com/playgrounds/SilverStack-sonarqube-server-7761f36f)**.
+
+    Click **Start**, and SonarQube plus PostgreSQL boot behind Nginx in the browser (allow two to three minutes for Elasticsearch to warm up). The rest of this page covers how the image itself is built.
 
 ![](../../../assets/screenshots/sonarqube-server-drive-config.png)
 
@@ -29,11 +35,11 @@ SonarQube Rootfs must:
 
 - Provide SonarQube 26.2 CE (LTA) running as `sonar` user on PostgreSQL 18, on top of `ubuntu-24-04-rootfs`.
 - Boot in the sequence `lab-init` → `postgresql` → `nginx` → `sonarqube` via systemd, with SonarQube accessible on **port 80** via Nginx on first boot.
-- Provision the PostgreSQL `sonar` role and `sonarqube` database **at runtime** (idempotently) via `lab-init.sh` - never at build time.
+- Provision the PostgreSQL `sonar` role and `sonarqube` database **at runtime** (idempotently) via `lab-init.sh` (never at build time).
 - Configure SonarQube via a baked-in `sonar.properties` with pre-substituted port, JDBC credentials, JVM tuning, and Elasticsearch settings.
 - Apply Elasticsearch kernel parameters (`vm.max_map_count=524288`, `fs.file-max=131072`) at both build time (written to `/etc/sysctl.conf`) and runtime (applied by `lab-init.sh` via `sysctl -w`).
 - Provide `cloudflared` and clear setup instructions in the welcome banner.
-- Apply a **limited `sudo` profile** for the `sonar` daemon - service management and log inspection only.
+- Apply a **limited `sudo` profile** for the `sonar` daemon: service management and log inspection only.
 - Be built reproducibly via GitHub Actions and published as `ghcr.io/ibtisam-iq/sonarqube-rootfs` with `latest`, `community`, and `26.2.0-community` tags.
 
 ---
@@ -76,7 +82,8 @@ systemd (PID 1)
         OOMScoreAdjust=-900; LimitNOFILE=131072; LimitNPROC=8192
 ```
 
-> SonarQube embeds an **Elasticsearch node** inside the same process. Elasticsearch requires `vm.max_map_count ≥ 262144` (SonarQube recommends `524288`) and `fs.file-max ≥ 65536` (set to `131072` here). Both are applied at build time to `/etc/sysctl.conf` and re-applied at every boot by `lab-init.sh` because `sysctl` settings from `/etc/sysctl.conf` may not be loaded in the microVM's transient root filesystem.
+!!! note "Embedded Elasticsearch Requirements"
+    SonarQube embeds an **Elasticsearch node** inside the same process. Elasticsearch requires `vm.max_map_count ≥ 262144` (SonarQube recommends `524288`) and `fs.file-max ≥ 65536` (set to `131072` here). Both are applied at build time to `/etc/sysctl.conf` and re-applied at every boot by `lab-init.sh` because `sysctl` settings from `/etc/sysctl.conf` may not be loaded in the microVM's transient root filesystem.
 
 ### Port and Config Substitution
 
@@ -94,28 +101,28 @@ Note: Elasticsearch internal port is **always** `9001` (fixed in `sonar.properti
 
 ## Key Decisions
 
-**Database provisioning at runtime, not build time** - PostgreSQL cannot be initialized at Docker build time because the PostgreSQL cluster requires a live system with proper OS users, `/run/postgresql`, and a running `postgres` process. `lab-init.sh` performs all DB setup at each boot. The provisioning is **idempotent**: roles use `DO $$ BEGIN IF NOT EXISTS ... END $$` blocks, and database creation checks `pg_database` before running `CREATE DATABASE`. This means re-running `lab-init` on an existing VM is safe.
+**Database provisioning at runtime, not build time**: PostgreSQL cannot be initialized at Docker build time because the PostgreSQL cluster requires a live system with proper OS users, `/run/postgresql`, and a running `postgres` process. `lab-init.sh` performs all DB setup at each boot. The provisioning is **idempotent**: roles use `DO $$ BEGIN IF NOT EXISTS ... END $$` blocks, and database creation checks `pg_database` before running `CREATE DATABASE`. This means re-running `lab-init` on an existing VM is safe.
 
-**`pg_ctlcluster` over `service postgresql start`** - On Ubuntu/Debian, the `postgresql` systemd service is a "dummy" unit that wraps `pg_ctlcluster`. `lab-init.sh` calls `pg_ctlcluster 18 main start` directly for reliability inside the oneshot context, with a 30-second readiness poll before attempting any DB operations.
+**`pg_ctlcluster` over `service postgresql start`**: On Ubuntu/Debian, the `postgresql` systemd service is a "dummy" unit that wraps `pg_ctlcluster`. `lab-init.sh` calls `pg_ctlcluster 18 main start` directly for reliability inside the oneshot context, with a 30-second readiness poll before attempting any DB operations.
 
-**Elasticsearch sysctl applied twice** - `install-sonarqube.sh` writes the values to `/etc/sysctl.conf` and `/etc/security/limits.conf` at build time. `lab-init.sh` applies them live via `sysctl -w` at every boot. The double application is intentional: the microVM may not read `/etc/sysctl.conf` during its boot process, so the runtime application via `lab-init` is the reliable path.
+**Elasticsearch sysctl applied twice**: `install-sonarqube.sh` writes the values to `/etc/sysctl.conf` and `/etc/security/limits.conf` at build time. `lab-init.sh` applies them live via `sysctl -w` at every boot. The double application is intentional: the microVM may not read `/etc/sysctl.conf` during its boot process, so the runtime application via `lab-init` is the reliable path.
 
-**`sonar.properties` is a real config file, not a template** - Unlike Jenkins and Nexus, SonarQube's configuration is complex enough to warrant a full `configs/sonar.properties` with all tunables explicitly set. Only `sonar.web.port` is parameterized. The file includes explicit JVM heap settings:
+**`sonar.properties` is a real config file, not a template**: Unlike Jenkins and Nexus, SonarQube's configuration is complex enough to warrant a full `configs/sonar.properties` with all tunables explicitly set. Only `sonar.web.port` is parameterized. The file includes explicit JVM heap settings:
 - Web server: `-Xmx1G -Xms256m -XX:+UseG1GC`
 - Compute Engine (CE): `-Xmx2G -Xms512m -XX:+UseG1GC`
 - Elasticsearch: `-Xms1G -Xmx1G` (equal min/max to avoid heap resizing)
 
 These are sized for the manifest's `10GiB` RAM allocation.
 
-**Hardcoded JDBC credentials** - `sonar.properties` has `sonar.jdbc.username=sonar` and `sonar.jdbc.password=sonar_password`. `lab-init.sh` creates the role with `ENCRYPTED PASSWORD 'sonar_password'`. This is intentional for a lab image - changing either requires updating both files. Do not use these credentials in any production-adjacent deployment.
+**Hardcoded JDBC credentials**: `sonar.properties` has `sonar.jdbc.username=sonar` and `sonar.jdbc.password=sonar_password`. `lab-init.sh` creates the role with `ENCRYPTED PASSWORD 'sonar_password'`. This is intentional for a lab image: changing either requires updating both files. Do not use these credentials in any production-adjacent deployment.
 
-**`sonarqube.service` is `Type=simple`, not `notify`** - SonarQube's startup script (`sonar.sh console`) does not implement `sd_notify`. `Type=simple` is correct. `Requires=postgresql.service lab-init.service` ensures systemd will not start SonarQube until both its data tier and the init oneshot are complete.
+**`sonarqube.service` is `Type=simple`, not `notify`**: SonarQube's startup script (`sonar.sh console`) does not implement `sd_notify`. `Type=simple` is correct. `Requires=postgresql.service lab-init.service` ensures systemd will not start SonarQube until both its data tier and the init oneshot are complete.
 
-**Limited `sudo` for `sonar` daemon** - `configs/sudoers.d/sonarqube-user` grants the `sonar` system user passwordless access to: `systemctl restart/stop/start/status sonarqube`, `systemctl restart/status postgresql`, `systemctl reload nginx`, and `journalctl`. Unlike Jenkins and Nexus which only cover their own service, SonarQube's sudoers also includes PostgreSQL restart - because SonarQube depends on a running database and the `sonar` user may need to recover from a DB failure.
+**Limited `sudo` for `sonar` daemon**: `configs/sudoers.d/sonarqube-user` grants the `sonar` system user passwordless access to: `systemctl restart/stop/start/status sonarqube`, `systemctl restart/status postgresql`, `systemctl reload nginx`, and `journalctl`. Unlike Jenkins and Nexus which only cover their own service, SonarQube's sudoers also includes PostgreSQL restart: because SonarQube depends on a running database and the `sonar` user may need to recover from a DB failure.
 
-**`lab-init.service` is `Before=ssh,nginx,postgresql,sonarqube`** - It runs before all four. SSH host keys are regenerated per VM. `/run/sshd`, `/run/nginx`, and `/run/postgresql` are all wiped on boot. The PostgreSQL cluster start happens inside `lab-init.sh` directly, not through the `postgresql.service` dependency, because `lab-init` must both start PG and provision the DB before `sonarqube.service` launches.
+**`lab-init.service` is `Before=ssh,nginx,postgresql,sonarqube`**: It runs before all four. SSH host keys are regenerated per VM. `/run/sshd`, `/run/nginx`, and `/run/postgresql` are all wiped on boot. The PostgreSQL cluster start happens inside `lab-init.sh` directly, not through the `postgresql.service` dependency, because `lab-init` must both start PG and provision the DB before `sonarqube.service` launches.
 
-**`BUILD_DATE` and `VCS_REF` not passed as `build-args` in CI** - Same known gap as Jenkins and Nexus. The workflow does not pass these as explicit `build-args`, so the Dockerfile `LABEL` block will produce empty OCI labels for `created` and `revision`.
+**`BUILD_DATE` and `VCS_REF` not passed as `build-args` in CI**: Same known gap as Jenkins and Nexus. The workflow does not pass these as explicit `build-args`, so the Dockerfile `LABEL` block will produce empty OCI labels for `created` and `revision`.
 
 ---
 
@@ -151,7 +158,7 @@ sonarqube/
 | ARG | CI Default | Description |
 |---|---|---|
 | `USER` | `ibtisam` | Interactive non-root user (inherited from base) |
-| `SONARQUBE_PORT` | `9000` | SonarQube web port - substituted in sonar.properties, nginx, welcome |
+| `SONARQUBE_PORT` | `9000` | SonarQube web port (substituted in sonar.properties, nginx, welcome) |
 | `BUILD_DATE` | From CI metadata-action | OCI label: image creation timestamp |
 | `VCS_REF` | `github.sha` | OCI label: git commit SHA |
 
@@ -181,41 +188,45 @@ docker build \
   .
 ```
 
-> `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
+!!! note
+    `BUILD_DATE` and `VCS_REF` are injected by CI. Local builds do not require them.
 
 The Dockerfile performs the following sequence in order:
 
-**Step 1 - Inherit the base**
+**Step 1: Inherit the base**
 
 - `FROM ghcr.io/ibtisam-iq/ubuntu-24-04-rootfs:latest`
 - `USER root` for all installation steps
 - ARGs: `USER`, `SONARQUBE_PORT`, `BUILD_DATE`, `VCS_REF`
 - `ENV`: `SONARQUBE_HOME=/opt/sonarqube`, `SONARQUBE_PORT=${SONARQUBE_PORT:-9000}`, `JAVA_HOME`, `PATH` (Java bin prepended), `TZ=UTC`
 
-> Note: `SONARQUBE_PORT` in ENV uses `${SONARQUBE_PORT:-9000}` - a default fallback in case the ARG is not passed. This is different from Jenkins and Nexus which do not use a default in the ENV assignment.
+!!! note
+    `SONARQUBE_PORT` in `ENV` uses `${SONARQUBE_PORT:-9000}`: a default fallback in case the `ARG` is not passed. This is different from Jenkins and Nexus, which do not use a default in the `ENV` assignment.
 
-**Step 2 - Copy build-time scripts first**
+**Step 2: Copy build-time scripts first**
 
 - `COPY scripts/ /opt/sonarqube-scripts/` + `chmod +x *.sh`
 
-> This is structurally different from Jenkins and Nexus: scripts are copied **before** config files because the install scripts are needed before `sonar.properties` and `nginx.conf` exist. The Dockerfile does not need nginx config for the first two RUN steps.
+!!! note
+    This is structurally different from Jenkins and Nexus: scripts are copied **before** config files because the install scripts are needed before `sonar.properties` and `nginx.conf` exist. The Dockerfile does not need nginx config for the first two `RUN` steps.
 
-**Step 3 - Copy systemd units and sudoers**
+**Step 3: Copy systemd units and sudoers**
 
 - `COPY configs/sonarqube.service /etc/systemd/system/sonarqube.service`
 - `COPY configs/sudoers.d/sonarqube-user /etc/sudoers.d/sonarqube-user`
 - `COPY configs/systemd/lab-init.service /etc/systemd/system/lab-init.service`
 
-> `sonar.properties` and `nginx.conf` are **NOT copied here**. They are copied in later steps after their target directories exist.
+!!! note
+    `sonar.properties` and `nginx.conf` are **NOT copied here**. They are copied in later steps after their target directories exist.
 
-**Step 4 - Install PostgreSQL** (`install-postgresql.sh`)
+**Step 4: Install PostgreSQL** (`install-postgresql.sh`)
 
 - Installs `postgresql-common` (provides the PGDG repo setup script).
 - Runs `/usr/share/postgresql-common/pgdg/apt.postgresql.org.sh` non-interactively to add the PGDG repository.
 - Installs `postgresql-18` and `postgresql-contrib-18`.
 - Runs `systemctl enable postgresql`.
 
-**Step 5 - Install Java 21 + SonarQube CE** (`install-sonarqube.sh ${SONARQUBE_PORT}`)
+**Step 5: Install Java 21 + SonarQube CE** (`install-sonarqube.sh ${SONARQUBE_PORT}`)
 
 - Validates port argument.
 - Installs `openjdk-21-jdk` via apt.
@@ -227,7 +238,7 @@ The Dockerfile performs the following sequence in order:
 - Writes to `/etc/sysctl.conf`: `vm.max_map_count=524288` and `fs.file-max=131072`.
 - Writes to `/etc/security/limits.conf`: `sonar soft/hard nofile 131072`, `sonar soft/hard nproc 8192`.
 
-**Step 6 - Copy and configure `sonar.properties`**
+**Step 6: Copy and configure `sonar.properties`**
 
 ```dockerfile
 COPY configs/sonar.properties /opt/sonarqube/conf/sonar.properties
@@ -236,7 +247,7 @@ RUN sed -i "s/__SONARQUBE_PORT__/${SONARQUBE_PORT}/g" /opt/sonarqube/conf/sonar.
 ```
 This must happen **after** `install-sonarqube.sh` because `/opt/sonarqube/conf/` is created by the install script. The `chown` ensures the `sonar` user can read it at runtime.
 
-**Step 7 - Copy and configure `nginx.conf`**
+**Step 7: Copy and configure `nginx.conf`**
 
 ```dockerfile
 COPY configs/nginx.conf /etc/nginx/sites-available/sonarqube
@@ -244,7 +255,7 @@ RUN sed -i "s/__SONARQUBE_PORT__/${SONARQUBE_PORT}/g" /etc/nginx/sites-available
 ```
 `/etc/nginx/sites-available/` exists from the base image's Nginx installation.
 
-**Step 8 - Configure Nginx** (`configure-nginx.sh`)
+**Step 8: Configure Nginx** (`configure-nginx.sh`)
 
 - Installs `nginx` via apt (idempotent if already present).
 - Validates `/etc/nginx/sites-available/sonarqube` exists (COPY'd in Step 7).
@@ -252,7 +263,7 @@ RUN sed -i "s/__SONARQUBE_PORT__/${SONARQUBE_PORT}/g" /etc/nginx/sites-available
 - Creates systemd override: `Type=simple`, `ExecStart=/usr/sbin/nginx -g 'daemon off;'`.
 - Runs `nginx -t` to validate config.
 
-**Step 9 - Enable systemd units**
+**Step 9: Enable systemd units**
 
 ```bash
 systemctl enable lab-init
@@ -261,7 +272,7 @@ systemctl enable nginx
 systemctl enable sonarqube
 ```
 
-**Step 10 - Build-time healthcheck** (`healthcheck.sh ${USER}`)
+**Step 10: Build-time healthcheck** (`healthcheck.sh ${USER}`)
 
 Validates 10 sections without starting services (systemd not running during build):
 
@@ -273,18 +284,18 @@ Validates 10 sections without starting services (systemd not running during buil
 | 4. SonarQube installation | `/opt/sonarqube/{bin,conf,data,logs}` dirs; `sonar.sh` present; `sonar` user; `/opt/sonarqube` owned by `sonar` |
 | 5. Nginx config | Site file present; symlink enabled; default removed; `nginx -t` passes |
 | 6. Systemd units | `lab-init`, `ssh`, `postgresql`, `nginx`, `sonarqube` symlinks in `multi-user.target.wants/` |
-| 7. SSH config | `sshd_config` and `sshd` binary; host keys absent (expected - generated at boot) |
+| 7. SSH config | `sshd_config` and `sshd` binary; host keys absent (expected: generated at boot) |
 | 8. Users | Interactive `$USER` account; `sudoers.d/sonarqube-user` present |
 | 9. File permissions | `/opt/sonarqube` owned by `sonar` |
 | 10. Port config | `sonar.properties` has `sonar.web.port=SONARQUBE_PORT`; nginx config has `127.0.0.1:SONARQUBE_PORT` |
 
-**Step 11 - Install cloudflared** (`install-cloudflared.sh`)
+**Step 11: Install cloudflared** (`install-cloudflared.sh`)
 
-**Step 12 - Fix ownership**
+**Step 12: Fix ownership**
 
 - `chown -R ${USER}:${USER} /home/${USER}`
 
-**Step 13 - User customizations**
+**Step 13: User customizations**
 
 - `USER $USER` + `ENV HOME=/home/$USER`
 - `COPY welcome $HOME/.welcome` → `sed -i` replaces `__SONARQUBE_PORT__`
@@ -294,7 +305,7 @@ Validates 10 sections without starting services (systemd not running during buil
     - `nginx-status`, `nginx-logs`, `nginx-reload`
     - Standard `ll`, `la`, `l` aliases
 
-**Step 14 - Return to root + CMD**
+**Step 14: Return to root + CMD**
 
 - `USER root`
 - `EXPOSE 22 80 ${SONARQUBE_PORT}`
@@ -315,7 +326,7 @@ Canonical build: [`.github/workflows/build-sonarqube-rootfs.yml`](https://github
 **Key steps:**
 
 1. Checkout repository.
-2. Set up Docker Buildx (no QEMU - amd64 only, intentional).
+2. Set up Docker Buildx (no QEMU: amd64 only, intentional).
 3. Log in to GHCR via `secrets.GITHUB_TOKEN`.
 4. Extract metadata via `docker/metadata-action`:
     - Tags: `latest`, `community`, `26.2.0-community` (on default branch), `sha-<short>`, `YYYY-MM-DD`
@@ -328,7 +339,8 @@ Canonical build: [`.github/workflows/build-sonarqube-rootfs.yml`](https://github
     - GHA layer cache enabled.
 6. Print final image digest.
 
-> **Known gap:** `BUILD_DATE` and `VCS_REF` are not passed as explicit `build-args`. Same issue as Jenkins and Nexus - the Dockerfile `LABEL` block produces empty OCI labels for `created` and `revision`.
+!!! note "Known gap"
+    `BUILD_DATE` and `VCS_REF` are not passed as explicit `build-args`. Same issue as Jenkins and Nexus: the Dockerfile `LABEL` block produces empty OCI labels for `created` and `revision`.
 
 ---
 
@@ -349,7 +361,7 @@ skopeo inspect docker://ghcr.io/ibtisam-iq/sonarqube-rootfs:latest \
 
 ---
 
-### ✅ Correct: Binary and Config Presence Check (`docker run` - limited scope)
+### ✅ Correct: Binary and Config Presence Check (`docker run`: limited scope)
 
 Confirms binaries, files, configs, and symlinks. Does **not** validate runtime behavior (no systemd, no PostgreSQL, no SonarQube):
 
@@ -393,14 +405,14 @@ docker run --rm ghcr.io/ibtisam-iq/sonarqube-rootfs:latest bash -c "
 The only valid way to verify the full stack:
 
 ```bash
-# Step 1 - ensure labctl is authenticated
+# Step 1: ensure labctl is authenticated
 labctl auth whoami
 
-# Step 2 - download the manifest
+# Step 2: download the manifest
 curl -fsSL https://raw.githubusercontent.com/ibtisam-iq/silver-stack/main/iximiuz/manifests/sonarqube-server.yml \
   -o sonarqube-server.yml
 
-# Step 3 - create the playground
+# Step 3: create the playground
 labctl playground create --base flexbox sonarqube-server -f sonarqube-server.yml
 ```
 
@@ -409,10 +421,10 @@ Once the VM is running, connect via the terminal tab:
 ```bash
 # --- System health ---
 systemctl is-system-running              # Expected: running
-systemctl status lab-init                # Expected: active (exited) - oneshot complete
+systemctl status lab-init                # Expected: active (exited): oneshot complete
 systemctl status postgresql              # Expected: active (running)
 systemctl status nginx                   # Expected: active (running)
-systemctl status sonarqube               # Expected: active (running) - may be activating for 2-3 min
+systemctl status sonarqube               # Expected: active (running): may be activating for 2–3 min
 
 # --- PostgreSQL database provisioned ---
 sudo -u postgres psql -c '\l'           # sonarqube database should appear
@@ -445,17 +457,19 @@ alias | grep nginx-
 System has not been booted with systemd as init system (PID 1). Can't operate.
 ```
 
-This is **expected and correct** - not a bug.
+This is **expected and correct**; it is not a bug.
 
-> **SonarQube startup time:** SonarQube 26.2 with embedded Elasticsearch typically takes **2–3 minutes** to fully start on first boot. `systemctl status sonarqube` will show `activating` during this period. Monitor with `sonar-logs` and wait for the log line `SonarQube is operational` before testing the UI or API.
+!!! note "SonarQube Startup Time"
+    SonarQube 26.2 with embedded Elasticsearch typically takes **2–3 minutes** to fully start on first boot. `systemctl status sonarqube` will show `activating` during this period. Monitor with `sonar-logs` and wait for the log line `SonarQube is operational` before testing the UI or API.
 
 ---
 
 ## Integration with iximiuz Labs
 
-> **Quickest path:** open the playground directly in the browser and click **Start Playground** -
-> https://labs.iximiuz.com/playgrounds/SilverStack-sonarqube-server-7761f36f
-> - no local tools required. The `labctl` steps below are for launching via manifest.
+!!! tip "Quickest path"
+    Open the playground directly in the browser and click **Start Playground**:
+    https://labs.iximiuz.com/playgrounds/SilverStack-sonarqube-server-7761f36f
+    No local tools required. The `labctl` steps below are for launching via manifest.
 
 ### Prerequisites
 
@@ -481,7 +495,7 @@ Before proceeding, ensure the following are in place on the machine from which `
 
 ---
 
-### Step 1 - Create the playground
+### Step 1: Create the playground
 
 Download the manifest directly without cloning the full repository:
 
@@ -499,7 +513,7 @@ drives:
     size: 50GiB
 ```
 
-The manifest can be edited before running - for example, to adjust `cpuCount`, `ramSize`, or `size` to match account quota or preferences.
+The manifest can be edited before running: for example, to adjust `cpuCount`, `ramSize`, or `size` to match account quota or preferences.
 
 Run `labctl playground create` pointing at the local manifest:
 
@@ -515,12 +529,12 @@ Playground URL: https://labs.iximiuz.com/playgrounds/SilverStack-sonarqube-serve
 SilverStack-sonarqube-server-7761f36f
 ```
 
-> **Note:** The playground does **not** appear under **Playgrounds → Running**.
-> Custom playgrounds created via `labctl` appear under **Playgrounds → My Custom**.
+!!! note
+    The playground does **not** appear under **Playgrounds: Running**. Custom playgrounds created via `labctl` appear under **Playgrounds: My Custom**.
 
 ---
 
-### Step 2 - Open the playground
+### Step 2: Open the playground
 
 Click the URL printed by `labctl`, or navigate manually:
 
@@ -540,7 +554,7 @@ To review or adjust settings before starting, click ⋮ → **Configure**. This 
 
 ---
 
-### Step 3 - Verify the running playground
+### Step 3: Verify the running playground
 
 Once started, the welcome banner is displayed automatically and shows the configured internal
 ports, service status commands, and next steps.
@@ -558,7 +572,8 @@ To expose the service on a custom public domain, `cloudflared` is already instal
 
 If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the following runbook:
 
-> 📖 [self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md](../../../self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md#phase-4-implementation---creating-cloudflare-tunnels)
+!!! info "Related Reading"
+    📖 [self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md](../../../self-hosted/ci-cd/iximiuz/self-hosted-cicd-stack-journey-from-ec2-to-iximiuz-labs.md#phase-4-implementation---creating-cloudflare-tunnels)
 
 ---
 
@@ -574,3 +589,4 @@ If any issues arise during Cloudflare Tunnel setup, refer to phase 4 in the foll
 - [Nexus Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-nexus-rootfs-image/)
 - [Jenkins Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-jenkins-rootfs-image/)
 - [Dev Machine runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-machine-rootfs-image/)
+- [Dev CI/CD Rootfs runbook](https://runbook.ibtisam-iq.com/containers/iximiuz/rootfs/setup-dev-cicd-rootfs-image/)
