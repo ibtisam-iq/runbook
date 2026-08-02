@@ -5,7 +5,7 @@
 ### Export Variables
 
 ```bash
-export CERT_ARN=arn:aws:acm:us-east-1:730335615031:certificate/f0afb980-b86d-47cd-beaf-e8494affd00a
+export CERT_ARN=arn:aws:acm:us-east-1:${ACCOUNT_ID}:certificate/<certificate-id>
 export ALB_GROUP_NAME=ecom-eks
 export GRAFANA_HOST=grafana.ibtisam-iq.com
 export PROMETHEUS_HOST=prometheus.ibtisam-iq.com

@@ -516,21 +516,21 @@ KodeKloud lab session with a new AWS account, without deleting the local state f
 
 ```
 Error: reading IAM OIDC Provider
-(arn:aws:iam::533267240574:oidc-provider/...):
+(arn:aws:iam::<previous-account-id>:oidc-provider/...):
 operation error IAM: GetOpenIDConnectProvider,
-api error AccessDenied: User: arn:aws:iam::851725341232:user/kk_labs_user_...
+api error AccessDenied: User: arn:aws:iam::<current-account-id>:user/kk_labs_user_...
 is not authorized to access this resource
 ```
 
 The plan output also shows the account ID changing:
 
 ```
-~ aws_account_id = "533267240574" -> "851725341232"
+~ aws_account_id = "<previous-account-id>" -> "<current-account-id>"
 ```
 
 **Root cause:** The `terraform.tfstate` file on disk still references all resources
-from the previous lab session (account `533267240574`). With new credentials pointing
-to a different account (`851725341232`), Terraform tries to refresh old-account
+from the previous lab session (account `<previous-account-id>`). With new credentials pointing
+to a different account (`<current-account-id>`), Terraform tries to refresh old-account
 resources and fails.
 
 **Fix:**

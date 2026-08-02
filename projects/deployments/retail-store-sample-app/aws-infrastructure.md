@@ -5,6 +5,11 @@
 
     Running EKS on this playground comes with non-trivial IAM permission gaps (e.g., no `iam:PassRole`, no `iam:PutRolePolicy` in some contexts). The workarounds for those restrictions are documented in a dedicated runbook: [EKS on KodeKloud AWS Playground via eksctl →](https://runbook.ibtisam-iq.com/iac/terraform/provisioning/eks-on-kodekloud-eksctl/)
 
+!!! note "Account identifiers in this runbook"
+    Account IDs, access key IDs, certificate ARNs and hosted zone IDs are shown as placeholders such as `<account-id>` rather than as captured values.
+
+    Where a command exports `ACCOUNT_ID`, subsequent commands use the variable. Substitute the values and the sequence runs unchanged.
+
 ### Dev Machine
 
 I used [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStack-dev-machine-e672bcf7) - a custom root filesystem on iximiuz Labs, which I maintain with all DevOps tools pre-installed (`kubectl`, `eksctl`, `terraform`, `helm`, `helmfile`, `aws cli`, etc.). No local machine setup is required.
@@ -13,9 +18,9 @@ I used [SilverStack Dev Machine](https://labs.iximiuz.com/playgrounds/SilverStac
 
 ```bash
 aws configure
-# AWS Access Key ID:     AKIA2UC3FDA33YOHSI62
-# AWS Secret Access Key: <secret>
-# Default region name:  us-east-1
+# AWS Access Key ID:     <access-key-id>
+# AWS Secret Access Key: <secret-access-key>
+# Default region name:   us-east-1
 # Default output format: json
 ```
 
@@ -28,7 +33,7 @@ cd retail-store-sample-app
 CLUSTER_NAME=ibtisam-iq-eks-cluster
 REGION=us-east-1
 export ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-echo $ACCOUNT_ID   # 730335615031
+echo $ACCOUNT_ID   # <account-id>
 ```
 
 ---
@@ -136,7 +141,7 @@ addons:
 managedNodeGroups: []
 
 autoModeConfig:
-  enabled: false 
+  enabled: false
 ```
 
 !!! warning "No OIDC in cluster.yaml"

@@ -45,7 +45,7 @@ kubectl get deploy -n kube-system aws-load-balancer-controller
 # aws-load-balancer-controller   2/2     2            2
 
 kubectl get sa -n kube-system aws-load-balancer-controller -o yaml | grep role-arn
-# eks.amazonaws.com/role-arn: arn:aws:iam::730335615031:role/aws-load-balancer-controller
+# eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/aws-load-balancer-controller
 ```
 
 ---
@@ -128,7 +128,7 @@ export CERT_ARN=$(aws acm request-certificate \
   --query CertificateArn \
   --output text)
 echo $CERT_ARN
-# arn:aws:acm:us-east-1:730335615031:certificate/f0afb980-b86d-47cd-beaf-e8494affd00a
+# arn:aws:acm:us-east-1:<account-id>:certificate/<certificate-id>
 ```
 
 ### Get DNS Validation Record

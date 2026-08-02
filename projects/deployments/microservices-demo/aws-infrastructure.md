@@ -4,6 +4,11 @@
 
 This runbook documents how I provisioned the AWS infrastructure for the Online Boutique project: DNS hosted zone, TLS certificate, EKS cluster control plane, bastion host, and self-managed worker nodes. Everything runs on a [KodeKloud AWS Playground](https://learn.kodekloud.com/user/playgrounds/playground-aws) with SCP restrictions, not a personal AWS account.
 
+!!! note "Account identifiers in this runbook"
+    Account IDs, certificate ARNs and hosted zone IDs appear as placeholders such as `<account-id>` rather than as captured values.
+
+    Substitute the values, or use the exported `ACCOUNT_ID` variable where the commands provide one, and the sequence runs unchanged.
+
 This is Phase 2 of a 6-phase project.
 
 | Phase | Title | What It Covers |
@@ -80,7 +85,7 @@ aws route53 create-hosted-zone \
   --hosted-zone-config Comment="Public hosted zone for ${DOMAIN}",PrivateZone=false
 ```
 
-Route 53 assigned the hosted zone ID `Z0210061LY7BBUGRLOK6` and four nameservers. I acquired the `qzz.io` domain for free from [digitalplat.org](https://domain.digitalplat.org/) and updated its nameserver delegation to point `ibtisam.qzz.io` to these AWS nameservers.
+Route 53 assigned a hosted zone ID and four nameservers. I acquired the `qzz.io` domain for free from [digitalplat.org](https://domain.digitalplat.org/) and updated its nameserver delegation to point `ibtisam.qzz.io` to these AWS nameservers.
 
 !!! info "Runbook: Free Domain, SSL, and Nginx HTTPS"
 
@@ -146,7 +151,7 @@ aws acm describe-certificate \
 # +------------------+----------+
 ```
 
-Certificate ARN: `arn:aws:acm:us-east-1:767397778924:certificate/47da9369-a997-4197-9f4b-60b426a112a3`
+Certificate ARN: `arn:aws:acm:us-east-1:<account-id>:certificate/<certificate-id>`
 
 This ARN is referenced later in the Gateway API's `LoadBalancerConfiguration` for HTTPS listeners (Phase 3).
 

@@ -64,7 +64,7 @@ SQS_QUEUE_ARN=$(aws sqs get-queue-attributes \
   --query "Attributes.QueueArn" \
   --output text)
 echo $SQS_QUEUE_ARN
-# arn:aws:sqs:us-east-1:730335615031:orders-events
+# arn:aws:sqs:us-east-1:<account-id>:orders-events
 
 # 2. Create IAM policy
 cat > orders-sqs-policy.json << EOF

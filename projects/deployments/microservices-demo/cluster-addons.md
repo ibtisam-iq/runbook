@@ -172,7 +172,7 @@ Three resources were created:
 
 **GatewayClass** (`amazon-alb-gateway-class`) tells the ALB Controller that it is the implementation for Gateway API resources.
 
-**LoadBalancerConfiguration** specifies the ALB parameters: internet-facing scheme, public subnets, and the ACM certificate ARN from Phase 2 (`arn:aws:acm:us-east-1:767397778924:certificate/47da9369-...`) for HTTPS termination.
+**LoadBalancerConfiguration** specifies the ALB parameters: internet-facing scheme, public subnets, and the ACM certificate ARN from Phase 2 for HTTPS termination.
 
 **Gateway** (`app-alb-gateway`) defines two listeners: HTTP on port 80 and HTTPS on port 443. Both accept HTTPRoutes from any namespace (`allowedRoutes.namespaces.from: All`). When this Gateway is created, the ALB Controller provisions the actual AWS ALB. The Gateway status took approximately 5 minutes to transition to `Programmed: True` while the ALB was being provisioned and health checks passed.
 
