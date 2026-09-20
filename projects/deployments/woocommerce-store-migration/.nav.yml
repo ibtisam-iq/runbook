@@ -1,0 +1,8 @@
+title: WooCommerce Store Migration
+nav:
+  - index.md
+  - architecture-and-design.md
+  - database-and-asset-extraction.md
+  - declarative-docker-stack.md
+  - troubleshooting-and-lessons-learned.md
+  - automated-runbook.md
