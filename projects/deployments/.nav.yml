@@ -1,6 +1,7 @@
 title: Deployments
 nav:
   - index.md
+  - woocommerce-store-migration
   - microservices-demo
   - retail-store-sample-app
   - java-monolith
