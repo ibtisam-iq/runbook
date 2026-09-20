@@ -64,7 +64,7 @@ theme:
   logo: assets/icons/favicon.svg
   font:
     text: Inter
-    code: Roboto Mono
+    code: JetBrains Mono
   language: en
   features:
     # Navigation
